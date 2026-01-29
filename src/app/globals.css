@@ -1,0 +1,497 @@
+@import "tailwindcss";
+
+:root {
+  /* Emerald Cash (red + green) theme */
+  color-scheme: light;
+  --ec-bg: #ecfdf5;
+  --ec-surface: #ffffff;
+  --ec-surface-rgb: 255, 255, 255;
+  --ec-text: #0f172a;
+  --ec-muted: #475569;
+  --ec-border: rgba(15, 23, 42, 0.12);
+
+  --ec-green-600: #059669;
+  --ec-green-700: #047857;
+  --ec-green-50: #ecfdf5;
+
+  --ec-red-600: #dc2626;
+  --ec-red-700: #b91c1c;
+  --ec-red-50: #fef2f2;
+
+  --ec-shadow: 0 24px 70px rgba(15, 23, 42, 0.10);
+  --ec-bg-gradient-end: color-mix(in srgb, var(--ec-green-50) 65%, #ffffff 35%);
+
+  /* Back-compat with existing CSS variables */
+  --background: var(--ec-bg);
+  --foreground: var(--ec-text);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+	  :root {
+	    color-scheme: dark;
+	    --ec-bg: #070b10;
+	    --ec-surface: #0b1220;
+	    --ec-surface-rgb: 11, 18, 32;
+	    --ec-text: #e2e8f0;
+	    --ec-muted: #94a3b8;
+	    --ec-border: rgba(226, 232, 240, 0.14);
+
+    --ec-green-50: #052e16;
+    --ec-red-50: #450a0a;
+
+    --ec-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+    --ec-bg-gradient-end: color-mix(in srgb, var(--ec-bg) 88%, var(--ec-green-600));
+
+    --background: var(--ec-bg);
+    --foreground: var(--ec-text);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ec-bg: #ecfdf5;
+  --ec-surface: #ffffff;
+  --ec-surface-rgb: 255, 255, 255;
+  --ec-text: #0f172a;
+  --ec-muted: #475569;
+  --ec-border: rgba(15, 23, 42, 0.12);
+
+  --ec-green-600: #059669;
+  --ec-green-700: #047857;
+  --ec-green-50: #ecfdf5;
+
+  --ec-red-600: #dc2626;
+  --ec-red-700: #b91c1c;
+  --ec-red-50: #fef2f2;
+
+  --ec-shadow: 0 24px 70px rgba(15, 23, 42, 0.10);
+  --ec-bg-gradient-end: color-mix(in srgb, var(--ec-green-50) 65%, #ffffff 35%);
+
+  --background: var(--ec-bg);
+  --foreground: var(--ec-text);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ec-bg: #070b10;
+  --ec-surface: #0b1220;
+  --ec-surface-rgb: 11, 18, 32;
+  --ec-text: #e2e8f0;
+  --ec-muted: #94a3b8;
+  --ec-border: rgba(226, 232, 240, 0.14);
+
+  --ec-green-50: #052e16;
+  --ec-red-50: #450a0a;
+
+  --ec-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  --ec-bg-gradient-end: color-mix(in srgb, var(--ec-bg) 88%, var(--ec-green-600));
+
+  --background: var(--ec-bg);
+  --foreground: var(--ec-text);
+}
+
+body {
+  margin: 0;
+  color: var(--ec-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 10% 8%, color-mix(in srgb, var(--ec-green-600) 18%, transparent), transparent 48%),
+    linear-gradient(180deg, var(--ec-bg), var(--ec-bg-gradient-end));
+  background-color: var(--ec-bg);
+}
+
+/* Make default form controls follow the theme.
+   Many screens rely on browser defaults (which are white) for inputs/selects. */
+:where(
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="search"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="week"],
+    textarea,
+    select
+  ) {
+  background-color: rgba(var(--ec-surface-rgb), 0.92);
+  background-color: color-mix(in srgb, var(--ec-surface) 92%, transparent);
+  color: var(--ec-text);
+}
+
+:where(textarea::placeholder, input::placeholder) {
+  color: var(--ec-muted);
+  color: color-mix(in srgb, var(--ec-muted) 72%, transparent);
+}
+
+/* --- Tailwind color bridge -------------------------------------------------
+   Some screens still use Tailwind's `bg-white/..` + `text-gray-..` utilities.
+   Map those to the CSS variable theme so toggling `data-theme` updates the UI. */
+
+:root[data-theme="dark"] .text-black,
+:root[data-theme="dark"] .text-gray-900,
+:root[data-theme="dark"] .text-gray-800,
+:root[data-theme="dark"] .text-gray-700 {
+  color: var(--ec-text);
+}
+
+:root[data-theme="dark"] .text-gray-600,
+:root[data-theme="dark"] .text-gray-500 {
+  color: var(--ec-muted);
+}
+
+:root[data-theme="dark"] .text-gray-400 {
+  color: var(--ec-muted);
+  color: color-mix(in srgb, var(--ec-muted) 72%, transparent);
+}
+
+:root[data-theme="dark"] .placeholder\:text-gray-400::placeholder {
+  color: var(--ec-muted);
+  color: color-mix(in srgb, var(--ec-muted) 72%, transparent);
+}
+
+:root[data-theme="dark"] .bg-white {
+  background-color: var(--ec-surface);
+}
+
+:root[data-theme="dark"] .bg-white\/80 {
+  background-color: rgba(var(--ec-surface-rgb), 0.82);
+  background: color-mix(in srgb, var(--ec-surface) 82%, transparent);
+}
+
+:root[data-theme="dark"] .bg-white\/70 {
+  background-color: rgba(var(--ec-surface-rgb), 0.72);
+  background: color-mix(in srgb, var(--ec-surface) 72%, transparent);
+}
+
+:root[data-theme="dark"] .bg-gray-100,
+:root[data-theme="dark"] .bg-gray-50 {
+  background-color: rgba(var(--ec-surface-rgb), 0.86);
+  background: color-mix(in srgb, var(--ec-surface) 86%, transparent);
+}
+
+:root[data-theme="dark"] .hover\:bg-white\/80:hover {
+  background-color: rgba(var(--ec-surface-rgb), 0.86);
+  background: color-mix(in srgb, var(--ec-surface) 86%, transparent);
+}
+
+:root[data-theme="dark"] .hover\:bg-gray-100:hover,
+:root[data-theme="dark"] .hover\:bg-gray-50:hover {
+  background-color: rgba(var(--ec-surface-rgb), 0.78);
+  background: color-mix(in srgb, var(--ec-surface) 78%, transparent);
+}
+
+:root[data-theme="dark"] .border-black,
+:root[data-theme="dark"] .border-black\/5,
+:root[data-theme="dark"] .border-gray-300,
+:root[data-theme="dark"] .border-gray-300\/70,
+:root[data-theme="dark"] .border-gray-200,
+:root[data-theme="dark"] .border-white\/50 {
+  border-color: var(--ec-border);
+}
+
+:root[data-theme="dark"] .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+:root[data-theme="dark"] .divide-black\/5 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--ec-border);
+}
+
+:root[data-theme="dark"] .ring-black\/5,
+:root[data-theme="dark"] .ring-black\/10 {
+  --tw-ring-color: var(--ec-border);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .text-black,
+  :root:not([data-theme]) .text-gray-900,
+  :root:not([data-theme]) .text-gray-800,
+  :root:not([data-theme]) .text-gray-700 {
+    color: var(--ec-text);
+  }
+
+  :root:not([data-theme]) .text-gray-600,
+  :root:not([data-theme]) .text-gray-500 {
+    color: var(--ec-muted);
+  }
+
+  :root:not([data-theme]) .text-gray-400 {
+    color: var(--ec-muted);
+    color: color-mix(in srgb, var(--ec-muted) 72%, transparent);
+  }
+
+  :root:not([data-theme]) .placeholder\:text-gray-400::placeholder {
+    color: var(--ec-muted);
+    color: color-mix(in srgb, var(--ec-muted) 72%, transparent);
+  }
+
+  :root:not([data-theme]) .bg-white {
+    background-color: var(--ec-surface);
+  }
+
+  :root:not([data-theme]) .bg-white\/80 {
+    background-color: rgba(var(--ec-surface-rgb), 0.82);
+    background: color-mix(in srgb, var(--ec-surface) 82%, transparent);
+  }
+
+  :root:not([data-theme]) .bg-white\/70 {
+    background-color: rgba(var(--ec-surface-rgb), 0.72);
+    background: color-mix(in srgb, var(--ec-surface) 72%, transparent);
+  }
+
+  :root:not([data-theme]) .bg-gray-100,
+  :root:not([data-theme]) .bg-gray-50 {
+    background-color: rgba(var(--ec-surface-rgb), 0.86);
+    background: color-mix(in srgb, var(--ec-surface) 86%, transparent);
+  }
+
+  :root:not([data-theme]) .hover\:bg-white\/80:hover {
+    background-color: rgba(var(--ec-surface-rgb), 0.86);
+    background: color-mix(in srgb, var(--ec-surface) 86%, transparent);
+  }
+
+  :root:not([data-theme]) .hover\:bg-gray-100:hover,
+  :root:not([data-theme]) .hover\:bg-gray-50:hover {
+    background-color: rgba(var(--ec-surface-rgb), 0.78);
+    background: color-mix(in srgb, var(--ec-surface) 78%, transparent);
+  }
+
+  :root:not([data-theme]) .border-black,
+  :root:not([data-theme]) .border-black\/5,
+  :root:not([data-theme]) .border-gray-300,
+  :root:not([data-theme]) .border-gray-300\/70,
+  :root:not([data-theme]) .border-gray-200,
+  :root:not([data-theme]) .border-white\/50 {
+    border-color: var(--ec-border);
+  }
+
+  :root:not([data-theme]) .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+  :root:not([data-theme]) .divide-black\/5 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--ec-border);
+  }
+
+  :root:not([data-theme]) .ring-black\/5,
+  :root:not([data-theme]) .ring-black\/10 {
+    --tw-ring-color: var(--ec-border);
+  }
+}
+
+/* ---------------- Emerald Cash UI helpers ---------------- */
+
+.ec-glassBtn {
+  background-color: rgba(var(--ec-surface-rgb), 0.62);
+  background: color-mix(in srgb, var(--ec-surface) 62%, transparent);
+  border: 1px solid var(--ec-border);
+  border: 1px solid color-mix(in srgb, var(--ec-border) 85%, transparent);
+  color: var(--ec-text);
+}
+
+.ec-glassBtn:hover {
+  background-color: rgba(var(--ec-surface-rgb), 0.76);
+  background: color-mix(in srgb, var(--ec-surface) 76%, transparent);
+}
+
+.ec-glassPanel {
+  background-color: rgba(var(--ec-surface-rgb), 0.72);
+  background: color-mix(in srgb, var(--ec-surface) 72%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.ec-glassPanelSoft {
+  background-color: rgba(var(--ec-surface-rgb), 0.58);
+  background: color-mix(in srgb, var(--ec-surface) 58%, transparent);
+}
+
+.ec-glassRow {
+  background-color: rgba(var(--ec-surface-rgb), 0.62);
+  background: color-mix(in srgb, var(--ec-surface) 62%, transparent);
+}
+
+.ec-glassRowAlt {
+  background-color: rgba(var(--ec-surface-rgb), 0.48);
+  background: color-mix(in srgb, var(--ec-surface) 48%, transparent);
+}
+
+.ec-glassRow:hover,
+.ec-glassRowAlt:hover {
+  background-color: rgba(var(--ec-surface-rgb), 0.74);
+  background: color-mix(in srgb, var(--ec-surface) 74%, transparent);
+}
+
+.ec-shell {
+  min-height: 100vh;
+  padding: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ec-appShell {
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.ec-card {
+  width: min(980px, 100%);
+  background-color: rgba(var(--ec-surface-rgb), 0.82);
+  background: color-mix(in srgb, var(--ec-surface) 82%, transparent);
+  border: 1px solid var(--ec-border);
+  border: 1px solid color-mix(in srgb, var(--ec-border) 85%, transparent);
+  border-radius: 18px;
+  box-shadow: var(--ec-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.ec-authCard {
+  width: min(460px, 100%);
+  padding: 22px;
+}
+
+.ec-brandRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ec-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--ec-green-700), var(--ec-green-600));
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--ec-green-700) 26%, transparent);
+}
+
+.ec-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.ec-subtitle {
+  margin: 4px 0 0;
+  color: var(--ec-muted);
+  font-size: 13px;
+}
+
+.ec-form {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.ec-input,
+.ec-select {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ec-border);
+  background-color: rgba(var(--ec-surface-rgb), 0.92);
+  background: color-mix(in srgb, var(--ec-surface) 92%, transparent);
+  color: var(--ec-text);
+  font-size: 14px;
+  outline: none;
+}
+
+.ec-select {
+  cursor: pointer;
+}
+
+.ec-input:focus,
+.ec-select:focus {
+  border-color: var(--ec-green-600);
+  box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.18);
+}
+
+.ec-btn {
+  border: 1px solid var(--ec-border);
+  background-color: rgba(var(--ec-surface-rgb), 0.92);
+  background: color-mix(in srgb, var(--ec-surface) 92%, transparent);
+  color: var(--ec-text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.ec-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ec-btnPrimary {
+  border: none;
+  background: linear-gradient(135deg, var(--ec-green-700), var(--ec-green-600));
+  color: #ffffff;
+}
+
+.ec-btnPrimary:hover {
+  filter: brightness(1.03);
+}
+
+.ec-btnDanger {
+  border-color: #c41e3a;
+  color: var(--ec-red-700);
+  background-color: var(--ec-red-50);
+  background: color-mix(in srgb, var(--ec-red-50) 75%, var(--ec-surface));
+}
+
+.ec-error {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ec-border);
+  border: 1px solid color-mix(in srgb, var(--ec-red-600) 45%, var(--ec-border));
+  background-color: var(--ec-red-50);
+  background: color-mix(in srgb, var(--ec-red-50) 85%, var(--ec-surface));
+  color: var(--ec-red-700);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.ec-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ec-table th {
+  text-align: left;
+  padding: 12px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--ec-green-700), var(--ec-green-600));
+  border-bottom: 1px solid rgba(4, 120, 87, 0.65);
+}
+
+.ec-table td {
+  padding: 12px 10px;
+  border-top: 1px solid var(--ec-border);
+  font-size: 13px;
+  color: var(--ec-text);
+}
+
+.ec-table tbody tr:nth-child(even) {
+  background-color: var(--ec-green-50);
+  background: color-mix(in srgb, var(--ec-green-50) 35%, transparent);
+}
+
+.ec-table a {
+  color: var(--ec-green-700);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.ec-table a:hover {
+  text-decoration: underline;
+}
