@@ -33,6 +33,26 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 - `delete` (POST JSON: `{ "action": "delete", "id": "<VehicleId>" }`)
 - `uploadImage` (POST JSON: `{ "action": "uploadImage", ... }`) *(optional, for file uploads)*
 
+### Google Sheet columns (order matters)
+
+Make sure row 1 in your `Vehicles` sheet uses this column order:
+
+1. `#`
+2. `Image`
+3. `Category`
+4. `Brand`
+5. `Model`
+6. `Year`
+7. `Plate`
+8. `MARKET PRICE`
+9. `D.O.C.40%`
+10. `Vehicles70%`
+11. `Tax Type`
+12. `Condition`
+13. `Body Type`
+14. `Color`
+15. `Time`
+
 ### Drive folders (per Category)
 
 When uploading an image file from the UI, the app will call Apps Script `action=uploadImage` and save the image into the correct Google Drive folder based on `Category`:

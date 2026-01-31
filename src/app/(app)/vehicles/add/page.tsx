@@ -1,12 +1,13 @@
 "use client";
 
-import type { Vehicle } from "@/lib/types";
-import { fileToDataUrl } from "@/lib/fileToDataUrl";
-import { derivePrices } from "@/lib/pricing";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
 import { useAuthUser } from "@/app/components/AuthContext";
 import ImageZoom from "@/app/components/ImageZoom";
+import { getCambodiaNowString } from "@/lib/cambodiaTime";
+import { fileToDataUrl } from "@/lib/fileToDataUrl";
+import { derivePrices } from "@/lib/pricing";
+import type { Vehicle } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
 
 const ADD_DRAFT_KEY = "vms.addVehicleDraft.v1";
 
@@ -18,6 +19,7 @@ function AddVehicleInner() {
   const router = useRouter();
   const user = useAuthUser();
   const isAdmin = user.role === "Admin";
+  const [cambodiaNow, setCambodiaNow] = useState(() => getCambodiaNowString());
   const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Vehicle>>({
@@ -35,6 +37,11 @@ function AddVehicleInner() {
     Price70: null,
     Image: "",
   });
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setCambodiaNow(getCambodiaNowString()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     try {
@@ -105,10 +112,15 @@ function AddVehicleInner() {
     setLoading(true);
 
     try {
+      const payload: Partial<Vehicle> = {
+        ...formData,
+        Time: getCambodiaNowString(),
+      };
+
       const res = await fetch("/api/vehicles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (res.status === 401) {
@@ -247,6 +259,17 @@ function AddVehicleInner() {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Time (Cambodia)</label>
+            <input
+              type="text"
+              readOnly
+              value={cambodiaNow}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-gray-900"
+            />
+            <p className="text-xs text-gray-500 mt-2">Saved automatically when you add the vehicle.</p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
             <input
               type="text"
@@ -325,7 +348,7 @@ function AddVehicleInner() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">D.O.C.1 40%</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">D.O.C.40%</label>
             <input
               type="number"
               readOnly
@@ -336,7 +359,7 @@ function AddVehicleInner() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle 70%</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Vehicles70%</label>
             <input
               type="number"
               readOnly

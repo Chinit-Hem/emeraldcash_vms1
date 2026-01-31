@@ -15,6 +15,20 @@ const nextConfig = {
     // multiple lockfiles exist on the machine.
     root: __dirname,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "drive.google.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+        pathname: "/**",
+      },
+    ],
+  },
   poweredByHeader: false,
   allowedDevOrigins: ["http://10.1.85.109:3000"],
   async headers() {

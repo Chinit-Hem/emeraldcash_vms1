@@ -1,13 +1,18 @@
 "use client";
 
-import { extractDriveFileId } from "@/lib/drive";
+import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
+import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
-import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { tokenizeQuery } from "@/lib/vehicleSearch";
 import { useRouter } from "next/navigation";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useAuthUser } from "@/app/components/AuthContext";
+import FilterField from "@/app/components/filters/FilterField";
+import FilterInput from "@/app/components/filters/FilterInput";
+import FilterSelect, { type SelectOption } from "@/app/components/filters/FilterSelect";
 
 let vehiclesCache: Vehicle[] | null = null;
 
@@ -15,9 +20,121 @@ type VehicleListProps = {
   category?: string;
 };
 
-function normalizeCategory(value: unknown) {
+function normalizeString(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
+
+function normalizeCategoryKey(value: unknown) {
+  const raw = normalizeString(value);
+  if (!raw) return "";
+  if (raw === "car") return "cars";
+  if (raw === "motorcycle") return "motorcycles";
+  if (raw === "tuktuk" || raw === "tuk-tuk") return "tuk tuk";
+  return raw;
+}
+
+function toIntOrNull(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toNumberOrNull(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replaceAll(",", ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function parseVehicleDateTimeParts(rawValue: unknown): { dateKey: string; timeMinutes: number | null } {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return { dateKey: "", timeMinutes: null };
+
+  // Formats supported:
+  // - YYYY-MM-DD HH:mm:ss
+  // - YYYY-MM-DDTHH:mm:ss
+  // - MM/DD/YYYY HH:mm:ss
+  let match = raw.match(
+    /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/
+  );
+  if (match) {
+    const year = Number.parseInt(match[1] ?? "", 10);
+    const month = Number.parseInt(match[2] ?? "", 10);
+    const day = Number.parseInt(match[3] ?? "", 10);
+    const hour = match[4] ? Number.parseInt(match[4], 10) : null;
+    const minute = match[5] ? Number.parseInt(match[5], 10) : null;
+
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+      return { dateKey: "", timeMinutes: null };
+    }
+
+    const dateKey = `${year}-${pad2(month)}-${pad2(day)}`;
+    const timeMinutes = hour != null && minute != null ? hour * 60 + minute : null;
+    return { dateKey, timeMinutes };
+  }
+
+  match = raw.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/
+  );
+  if (match) {
+    const month = Number.parseInt(match[1] ?? "", 10);
+    const day = Number.parseInt(match[2] ?? "", 10);
+    const year = Number.parseInt(match[3] ?? "", 10);
+    const hour = match[4] ? Number.parseInt(match[4], 10) : null;
+    const minute = match[5] ? Number.parseInt(match[5], 10) : null;
+
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+      return { dateKey: "", timeMinutes: null };
+    }
+
+    const dateKey = `${year}-${pad2(month)}-${pad2(day)}`;
+    const timeMinutes = hour != null && minute != null ? hour * 60 + minute : null;
+    return { dateKey, timeMinutes };
+  }
+
+  return { dateKey: "", timeMinutes: null };
+}
+
+function parseTimeToMinutes(value: string): number | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hour = Number.parseInt(match[1] ?? "", 10);
+  const minute = Number.parseInt(match[2] ?? "", 10);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  if (hour < 0 || hour > 23) return null;
+  if (minute < 0 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+type VehicleFilters = {
+  id: string;
+  query: string;
+  brand: string;
+  category: string;
+  yearFrom: string;
+  yearTo: string;
+  priceMin: string;
+  priceMax: string;
+  condition: string;
+  taxType: string;
+  dateFrom: string;
+  dateTo: string;
+  timeFrom: string;
+  timeTo: string;
+};
+
+const CATEGORY_OPTIONS: SelectOption[] = [
+  { label: "Cars", value: "Cars" },
+  { label: "Motorcycles", value: "Motorcycles" },
+  { label: "Tuk Tuk", value: "Tuk Tuk" },
+];
 
 export default function VehicleList({ category }: VehicleListProps) {
   const router = useRouter();
@@ -26,11 +143,23 @@ export default function VehicleList({ category }: VehicleListProps) {
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => vehiclesCache ?? []);
   const [loading, setLoading] = useState(() => vehiclesCache == null);
   const [error, setError] = useState("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [condition, setCondition] = useState("");
-  const [yearFrom, setYearFrom] = useState("");
-  const [yearTo, setYearTo] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<VehicleFilters>(() => ({
+    id: "",
+    query: "",
+    brand: "",
+    category: String(category ?? "").trim(),
+    yearFrom: "",
+    yearTo: "",
+    priceMin: "",
+    priceMax: "",
+    condition: "",
+    taxType: "",
+    dateFrom: "",
+    dateTo: "",
+    timeFrom: "",
+    timeTo: "",
+  }));
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,66 +189,168 @@ export default function VehicleList({ category }: VehicleListProps) {
     };
   }, [router]);
 
-  const searchIndex = useMemo(() => {
+  const fixedCategory = String(category ?? "").trim();
+  const categoryFixed = !!fixedCategory;
+
+  useEffect(() => {
+    // Keep the category filter in sync with the route filter (Sidebar).
+    if (!categoryFixed) return;
+    setFilters((prev) => {
+      if (normalizeCategoryKey(prev.category) === normalizeCategoryKey(fixedCategory)) return prev;
+      return { ...prev, category: fixedCategory };
+    });
+  }, [categoryFixed, fixedCategory]);
+
+  const debouncedQuery = useDebouncedValue(filters.query, 200);
+  const queryTokens = useMemo(() => tokenizeQuery(debouncedQuery), [debouncedQuery]);
+
+  const brandOptions = useMemo<SelectOption[]>(() => {
+    const set = new Set<string>();
+    for (const vehicle of vehicles) {
+      const value = String(vehicle.Brand || "").trim();
+      if (value) set.add(value);
+    }
+    return Array.from(set)
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => ({ label: value, value }));
+  }, [vehicles]);
+
+  const taxTypeOptions = useMemo<SelectOption[]>(() => {
+    const set = new Set<string>();
+    for (const vehicle of vehicles) {
+      const value = String(vehicle.TaxType || "").trim();
+      if (value) set.add(value);
+    }
+    return Array.from(set)
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => ({ label: value, value }));
+  }, [vehicles]);
+
+  const plateModelIndex = useMemo(() => {
     const map = new Map<string, string>();
     for (const vehicle of vehicles) {
-      map.set(vehicle.VehicleId, vehicleSearchText(vehicle));
+      map.set(vehicle.VehicleId, `${vehicle.Plate || ""} ${vehicle.Model || ""}`.trim().toLowerCase());
     }
     return map;
   }, [vehicles]);
 
-  const deferredQuery = useDeferredValue(query);
-  const queryTokens = useMemo(() => tokenizeQuery(deferredQuery), [deferredQuery]);
-  const conditionNormalized = condition.trim().toLowerCase();
-  const yearFromNumber = useMemo(() => {
-    if (!yearFrom.trim()) return null;
-    const parsed = Number.parseInt(yearFrom, 10);
-    return Number.isFinite(parsed) ? parsed : null;
-  }, [yearFrom]);
-  const yearToNumber = useMemo(() => {
-    if (!yearTo.trim()) return null;
-    const parsed = Number.parseInt(yearTo, 10);
-    return Number.isFinite(parsed) ? parsed : null;
-  }, [yearTo]);
+  const timeIndex = useMemo(() => {
+    const map = new Map<string, { dateKey: string; timeMinutes: number | null }>();
+    for (const vehicle of vehicles) {
+      map.set(vehicle.VehicleId, parseVehicleDateTimeParts(vehicle.Time));
+    }
+    return map;
+  }, [vehicles]);
 
   const categoryFilteredVehicles = useMemo(() => {
-    if (!category) return vehicles;
-    const categoryNormalized = normalizeCategory(category);
-    return vehicles.filter((v) => normalizeCategory(v.Category) === categoryNormalized);
-  }, [vehicles, category]);
+    const selected = String(filters.category || "").trim();
+    if (!selected) return vehicles;
+    const key = normalizeCategoryKey(selected);
+    if (!key) return vehicles;
+    return vehicles.filter((v) => normalizeCategoryKey(v.Category) === key);
+  }, [vehicles, filters.category]);
 
   const filteredVehicles = useMemo(() => {
     let current = categoryFilteredVehicles;
 
-    if (conditionNormalized) {
-      current = current.filter((vehicle) => vehicle.Condition?.toLowerCase() === conditionNormalized);
+    const idFilter = filters.id.trim();
+    if (idFilter) {
+      current = current.filter((vehicle) => String(vehicle.VehicleId || "").includes(idFilter));
     }
 
-    if (yearFromNumber !== null) {
-      current = current.filter((vehicle) => (vehicle.Year ?? 0) >= yearFromNumber);
+    const brandFilter = normalizeString(filters.brand);
+    if (brandFilter) {
+      current = current.filter((vehicle) => normalizeString(vehicle.Brand) === brandFilter);
     }
 
-    if (yearToNumber !== null) {
-      current = current.filter((vehicle) => (vehicle.Year ?? 9999) <= yearToNumber);
+    const conditionFilter = normalizeString(filters.condition);
+    if (conditionFilter) {
+      current = current.filter((vehicle) => normalizeString(vehicle.Condition) === conditionFilter);
+    }
+
+    const taxTypeFilter = normalizeString(filters.taxType);
+    if (taxTypeFilter) {
+      current = current.filter((vehicle) => normalizeString(vehicle.TaxType) === taxTypeFilter);
+    }
+
+    const yearFromNumber = toIntOrNull(filters.yearFrom);
+    const yearToNumber = toIntOrNull(filters.yearTo);
+    if (yearFromNumber != null) {
+      current = current.filter((vehicle) => vehicle.Year != null && vehicle.Year >= yearFromNumber);
+    }
+    if (yearToNumber != null) {
+      current = current.filter((vehicle) => vehicle.Year != null && vehicle.Year <= yearToNumber);
+    }
+
+    const priceMin = toNumberOrNull(filters.priceMin);
+    const priceMax = toNumberOrNull(filters.priceMax);
+    if (priceMin != null) {
+      current = current.filter((vehicle) => vehicle.PriceNew != null && vehicle.PriceNew >= priceMin);
+    }
+    if (priceMax != null) {
+      current = current.filter((vehicle) => vehicle.PriceNew != null && vehicle.PriceNew <= priceMax);
+    }
+
+    const dateFrom = filters.dateFrom.trim();
+    const dateTo = filters.dateTo.trim();
+    const timeFromMinutes = parseTimeToMinutes(filters.timeFrom);
+    const timeToMinutes = parseTimeToMinutes(filters.timeTo);
+
+    if (dateFrom || dateTo || timeFromMinutes != null || timeToMinutes != null) {
+      current = current.filter((vehicle) => {
+        const meta = timeIndex.get(vehicle.VehicleId) ?? { dateKey: "", timeMinutes: null };
+        const dateKey = meta.dateKey;
+        const timeMinutes = meta.timeMinutes;
+
+        if (dateFrom && (!dateKey || dateKey < dateFrom)) return false;
+        if (dateTo && (!dateKey || dateKey > dateTo)) return false;
+
+        if (timeFromMinutes != null && (timeMinutes == null || timeMinutes < timeFromMinutes)) return false;
+        if (timeToMinutes != null && (timeMinutes == null || timeMinutes > timeToMinutes)) return false;
+
+        return true;
+      });
     }
 
     if (queryTokens.length === 0) return current;
 
     return current.filter((vehicle) => {
-      const haystack = searchIndex.get(vehicle.VehicleId) ?? vehicleSearchText(vehicle);
+      const haystack = plateModelIndex.get(vehicle.VehicleId) ?? "";
       return queryTokens.every((token) => haystack.includes(token));
     });
-  }, [categoryFilteredVehicles, conditionNormalized, queryTokens, yearFromNumber, yearToNumber, searchIndex]);
+  }, [categoryFilteredVehicles, filters, plateModelIndex, queryTokens, timeIndex]);
 
-  const hasSearch = queryTokens.length > 0 || !!conditionNormalized || yearFromNumber !== null || yearToNumber !== null;
-  const showSearch = isSearchOpen || hasSearch;
+  const activeFiltersCount = useMemo(() => {
+    const fixedKey = normalizeCategoryKey(fixedCategory);
+    let count = 0;
+    for (const [key, value] of Object.entries(filters)) {
+      const trimmed = String(value ?? "").trim();
+      if (!trimmed) continue;
+      if (key === "category" && categoryFixed && normalizeCategoryKey(trimmed) === fixedKey) continue;
+      count++;
+    }
+    return count;
+  }, [filters, fixedCategory, categoryFixed]);
+  const hasFilters = activeFiltersCount > 0;
 
-  const clearSearch = () => {
-    setQuery("");
-    setCondition("");
-    setYearFrom("");
-    setYearTo("");
-    setIsSearchOpen(false);
+  const clearFilters = () => {
+    setFilters({
+      id: "",
+      query: "",
+      brand: "",
+      category: categoryFixed ? fixedCategory : "",
+      yearFrom: "",
+      yearTo: "",
+      priceMin: "",
+      priceMax: "",
+      condition: "",
+      taxType: "",
+      dateFrom: "",
+      dateTo: "",
+      timeFrom: "",
+      timeTo: "",
+    });
+    setFiltersOpen(false);
   };
 
   const handleDelete = async (vehicle: Vehicle) => {
@@ -165,17 +396,23 @@ export default function VehicleList({ category }: VehicleListProps) {
               <button
                 type="button"
                 onClick={() => {
-                  if (showSearch) clearSearch();
-                  else setIsSearchOpen(true);
+                  setFiltersOpen((prev) => !prev);
                 }}
                 className="ec-btn ec-btnPrimary w-full sm:w-auto text-sm"
               >
-                {showSearch ? "Hide Search" : "Advanced Search"}
+                <span className="inline-flex items-center gap-2">
+                  <span>{filtersOpen ? "Hide Filters" : "Show Filters"}</span>
+                  {activeFiltersCount > 0 ? (
+                    <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-2 rounded-full bg-white/20 text-white text-xs font-extrabold">
+                      {activeFiltersCount}
+                    </span>
+                  ) : null}
+                </span>
               </button>
-              {hasSearch ? (
+              {hasFilters ? (
                 <button
                   type="button"
-                  onClick={clearSearch}
+                  onClick={clearFilters}
                   className="ec-btn w-full sm:w-auto text-sm"
                 >
                   Clear
@@ -189,92 +426,180 @@ export default function VehicleList({ category }: VehicleListProps) {
           </div>
         </div>
 
-        {showSearch ? (
+        {filtersOpen ? (
           <div className="ec-glassPanelSoft px-4 pb-4 border-b border-black/5 print:hidden">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-              <div className="relative md:col-span-12">
-                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
-                    aria-hidden="true"
-                  >
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search all data (brand, model, plate, year, color...)"
-                  className="ec-input w-full pl-10 pr-12"
-                />
-                {query ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery("")}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-                    aria-label="Clear search"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4"
-                      aria-hidden="true"
-                    >
-                      <path d="M18 6 6 18" />
-                      <path d="M6 6l12 12" />
-                    </svg>
-                  </button>
-                ) : null}
+              <div className="md:col-span-12">
+                <FilterField id="vms-filter-query" label="Search (Plate / Model)">
+                  <FilterInput
+                    id="vms-filter-query"
+                    value={filters.query}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, query: value }))}
+                    placeholder="Type plate or model..."
+                    inputMode="search"
+                  />
+                </FilterField>
               </div>
 
-              <div className="md:col-span-4">
-                <select
-                  aria-label="Filter by condition"
-                  value={condition}
-                  onChange={(e) => setCondition(e.target.value)}
-                  className="ec-select w-full"
-                >
-                  <option value="">All Conditions</option>
-                  <option value="New">New</option>
-                  <option value="Used">Used</option>
-                  <option value="Damaged">Damaged</option>
-                </select>
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-id" label="Id">
+                  <FilterInput
+                    id="vms-filter-id"
+                    value={filters.id}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, id: value }))}
+                    placeholder="e.g. 1"
+                    inputMode="numeric"
+                  />
+                </FilterField>
               </div>
 
-              <div className="md:col-span-4">
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={yearFrom}
-                  onChange={(e) => setYearFrom(e.target.value)}
-                  placeholder="Year from"
-                  className="ec-input w-full"
-                />
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-brand" label="Brand">
+                  <FilterSelect
+                    id="vms-filter-brand"
+                    value={filters.brand}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, brand: value }))}
+                    options={brandOptions}
+                    placeholder="All Brands"
+                  />
+                </FilterField>
               </div>
 
-              <div className="md:col-span-4">
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={yearTo}
-                  onChange={(e) => setYearTo(e.target.value)}
-                  placeholder="Year to"
-                  className="ec-input w-full"
-                />
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-category" label="Category">
+                  <FilterSelect
+                    id="vms-filter-category"
+                    value={filters.category}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, category: value }))}
+                    options={CATEGORY_OPTIONS}
+                    placeholder="All Categories"
+                    disabled={categoryFixed}
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-condition" label="Condition">
+                  <FilterSelect
+                    id="vms-filter-condition"
+                    value={filters.condition}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, condition: value }))}
+                    options={[
+                      { label: "New", value: "New" },
+                      { label: "Used", value: "Used" },
+                      { label: "Damaged", value: "Damaged" },
+                    ]}
+                    placeholder="All Conditions"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-taxType" label="Tax Type">
+                  <FilterSelect
+                    id="vms-filter-taxType"
+                    value={filters.taxType}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, taxType: value }))}
+                    options={taxTypeOptions}
+                    placeholder="All Tax Types"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-yearFrom" label="Year From">
+                  <FilterInput
+                    id="vms-filter-yearFrom"
+                    value={filters.yearFrom}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, yearFrom: value }))}
+                    placeholder="e.g. 2018"
+                    type="number"
+                    inputMode="numeric"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-yearTo" label="Year To">
+                  <FilterInput
+                    id="vms-filter-yearTo"
+                    value={filters.yearTo}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, yearTo: value }))}
+                    placeholder="e.g. 2026"
+                    type="number"
+                    inputMode="numeric"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-priceMin" label="Price Min (Market)">
+                  <FilterInput
+                    id="vms-filter-priceMin"
+                    value={filters.priceMin}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, priceMin: value }))}
+                    placeholder="e.g. 1000"
+                    type="number"
+                    inputMode="decimal"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-priceMax" label="Price Max (Market)">
+                  <FilterInput
+                    id="vms-filter-priceMax"
+                    value={filters.priceMax}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, priceMax: value }))}
+                    placeholder="e.g. 20000"
+                    type="number"
+                    inputMode="decimal"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-dateFrom" label="Date From">
+                  <FilterInput
+                    id="vms-filter-dateFrom"
+                    value={filters.dateFrom}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, dateFrom: value }))}
+                    type="date"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-dateTo" label="Date To">
+                  <FilterInput
+                    id="vms-filter-dateTo"
+                    value={filters.dateTo}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, dateTo: value }))}
+                    type="date"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-timeFrom" label="Added Time From">
+                  <FilterInput
+                    id="vms-filter-timeFrom"
+                    value={filters.timeFrom}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, timeFrom: value }))}
+                    type="time"
+                  />
+                </FilterField>
+              </div>
+
+              <div className="md:col-span-3">
+                <FilterField id="vms-filter-timeTo" label="Added Time To">
+                  <FilterInput
+                    id="vms-filter-timeTo"
+                    value={filters.timeTo}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, timeTo: value }))}
+                    type="time"
+                  />
+                </FilterField>
               </div>
             </div>
           </div>
@@ -287,17 +612,38 @@ export default function VehicleList({ category }: VehicleListProps) {
             const price40 = vehicle.Price40 ?? derived.Price40;
             const price70 = vehicle.Price70 ?? derived.Price70;
             const rowClass = index % 2 === 0 ? "ec-glassRow" : "ec-glassRowAlt";
+            const vehicleId = vehicle.VehicleId;
+            const displayNo = vehicleId || String(index + 1);
+            const imageFileId = extractDriveFileId(vehicle.Image);
+            const thumbUrl = imageFileId ? driveThumbnailUrl(imageFileId, "w100-h100") : vehicle.Image;
 
             return (
               <div
-                key={vehicle.VehicleId}
-                onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`)}
-                className={`p-4 cursor-pointer transition-colors active:opacity-95 ${rowClass}`}
+                key={vehicleId || `row-${index}`}
+                onClick={() => {
+                  if (!vehicleId) return;
+                  router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+                }}
+                className={`p-4 ${vehicleId ? "cursor-pointer" : ""} transition-colors active:opacity-95 ${rowClass}`}
               >
                 <div className="flex items-start justify-between gap-3">
+                  <div className="shrink-0">
+                    {thumbUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={thumbUrl}
+                        alt={`${vehicle.Brand} ${vehicle.Model}`}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-14 w-14 rounded-xl object-cover ring-1 ring-black/10 bg-white"
+                      />
+                    ) : (
+                      <div className="h-14 w-14 rounded-xl bg-black/5 ring-1 ring-black/10" />
+                    )}
+                  </div>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-gray-900 truncate">
-                      {index + 1}. {vehicle.Brand} {vehicle.Model}
+                      {displayNo}. {vehicle.Brand} {vehicle.Model}
                     </div>
                     <div className="mt-1 text-xs text-gray-600 truncate">
                       {vehicle.Category} • {vehicle.Year || "-"} • {vehicle.Plate}
@@ -305,14 +651,28 @@ export default function VehicleList({ category }: VehicleListProps) {
                   </div>
                   <div className="text-right text-xs tabular-nums text-gray-700 whitespace-nowrap">
                     <div>
-                      {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}{" "}
+                      <span className="font-extrabold text-blue-700">
+                        {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
+                      </span>{" "}
                       <span className="text-gray-500">market</span>
                     </div>
                     <div className="mt-0.5 text-gray-600">
-                      {price40 == null ? "-" : `$${price40.toLocaleString()}`}{" "}
-                      <span className="text-gray-400">D.O.C.1 40%</span>{" "}
-                      {price70 == null ? "" : `• $${price70.toLocaleString()}`}{" "}
-                      {price70 == null ? null : <span className="text-gray-400">Vehicle 70%</span>}
+                      <span className="font-extrabold text-orange-700">
+                        {price40 == null ? "-" : `$${price40.toLocaleString()}`}
+                      </span>{" "}
+                      <span className="text-gray-400">D.O.C.40%</span>{" "}
+                      {price70 == null ? (
+                        ""
+                      ) : (
+                        <>
+                          {" "}
+                          •{" "}
+                          <span className="font-extrabold text-emerald-700">
+                            {`$${price70.toLocaleString()}`}
+                          </span>
+                        </>
+                      )}{" "}
+                      {price70 == null ? null : <span className="text-gray-400">Vehicles70%</span>}
                     </div>
                   </div>
                 </div>
@@ -320,8 +680,12 @@ export default function VehicleList({ category }: VehicleListProps) {
                 <div className="mt-3 flex gap-3" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
-                    onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`)}
-                    className="ec-btn px-3 py-2 text-blue-600 text-sm"
+                    onClick={() => {
+                      if (!vehicleId) return;
+                      router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+                    }}
+                    disabled={!vehicleId}
+                    className="ec-btn ec-btnBlue px-3 py-2 text-sm"
                   >
                     View
                   </button>
@@ -329,16 +693,20 @@ export default function VehicleList({ category }: VehicleListProps) {
                     <>
                       <button
                         type="button"
-                        onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/edit`)}
-                        className="ec-btn px-3 py-2 text-green-700 text-sm"
+                        onClick={() => {
+                          if (!vehicleId) return;
+                          router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`);
+                        }}
+                        disabled={!vehicleId}
+                        className="ec-btn ec-btnPrimary px-3 py-2 text-sm"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(vehicle)}
-                        disabled={deletingId === vehicle.VehicleId}
-                        className="ec-btn px-3 py-2 text-red-600 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        disabled={!vehicleId || deletingId === vehicle.VehicleId}
+                        className="ec-btn ec-btnRed px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {deletingId === vehicle.VehicleId ? "Deleting..." : "Delete"}
                       </button>
@@ -356,34 +724,52 @@ export default function VehicleList({ category }: VehicleListProps) {
             <thead className="bg-gradient-to-r from-green-800/95 via-green-700/95 to-green-600/95">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  #
+                  ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  Category
+                  IMAGE
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  Brand
+                  CATEGORY
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  Model
+                  BRAND
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  Year
+                  MODEL
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  Plate
+                  YEAR
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                  PLATE
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  Market Price
+                  MARKET PRICE
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  D.O.C.1 40%
+                  D.O.C.40%
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  Vehicle 70%
+                  VEHICLES70%
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  Actions
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                  TAX TYPE
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                  CONDITION
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                  BODY TYPE
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                  COLOR
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                  TIME
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider print:hidden">
+                  ACTIONS
                 </th>
               </tr>
             </thead>
@@ -393,15 +779,36 @@ export default function VehicleList({ category }: VehicleListProps) {
                 const price40 = vehicle.Price40 ?? derived.Price40;
                 const price70 = vehicle.Price70 ?? derived.Price70;
                 const rowClass = index % 2 === 0 ? "ec-glassRow" : "ec-glassRowAlt";
+                const vehicleId = vehicle.VehicleId;
+                const displayNo = vehicleId || String(index + 1);
+                const imageFileId = extractDriveFileId(vehicle.Image);
+                const thumbUrl = imageFileId ? driveThumbnailUrl(imageFileId, "w100-h100") : vehicle.Image;
 
                 return (
                   <tr
-                    key={vehicle.VehicleId}
-                    onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`)}
-                    className={`${rowClass} cursor-pointer transition-colors`}
+                    key={vehicleId || `row-${index}`}
+                    onClick={() => {
+                      if (!vehicleId) return;
+                      router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+                    }}
+                    className={`${rowClass} ${vehicleId ? "cursor-pointer" : ""} transition-colors`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {index + 1}
+                      {displayNo}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {thumbUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={thumbUrl}
+                          alt={`${vehicle.Brand} ${vehicle.Model}`}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-10 w-10 rounded-lg object-cover ring-1 ring-black/10 bg-white"
+                        />
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {vehicle.Category}
@@ -418,42 +825,70 @@ export default function VehicleList({ category }: VehicleListProps) {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
                       {vehicle.Plate}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums font-extrabold text-blue-700">
                       {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums font-extrabold text-orange-700">
                       {price40 == null ? "-" : `$${price40.toLocaleString()}`}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums font-extrabold text-emerald-700">
                       {price70 == null ? "-" : `$${price70.toLocaleString()}`}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {vehicle.TaxType || "-"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {vehicle.Condition || "-"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {vehicle.BodyType || "-"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {vehicle.Color || "-"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
+                      {normalizeCambodiaTimeString(vehicle.Time) || "-"}
+                    </td>
                     <td
-                      className="px-6 py-4 whitespace-nowrap text-sm space-x-2"
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 print:hidden"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <button
-                        onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`)}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        View
-                      </button>
-                      {isAdmin ? (
-                        <>
-                          <button
-                            onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/edit`)}
-                            className="text-green-700 hover:text-green-900 font-medium"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(vehicle)}
-                            disabled={deletingId === vehicle.VehicleId}
-                            className="text-red-600 hover:text-red-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {deletingId === vehicle.VehicleId ? "Deleting..." : "Delete"}
-                          </button>
-                        </>
-                      ) : null}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!vehicleId) return;
+                            router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+                          }}
+                          disabled={!vehicleId}
+                          className="ec-btn ec-btnBlue px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          View
+                        </button>
+                        {isAdmin ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!vehicleId) return;
+                                router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`);
+                              }}
+                              disabled={!vehicleId}
+                              className="ec-btn ec-btnPrimary px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(vehicle)}
+                              disabled={!vehicleId || deletingId === vehicleId}
+                              className="ec-btn ec-btnRed px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {deletingId === vehicleId ? "Deleting..." : "Delete"}
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -466,7 +901,7 @@ export default function VehicleList({ category }: VehicleListProps) {
             {queryTokens.length > 0 ? (
               <div>
                 <p className="font-medium text-gray-800">
-                  No results for &quot;{query.trim()}&quot;
+                  No results for &quot;{filters.query.trim()}&quot;
                 </p>
                 <p className="text-sm text-gray-600 mt-1">Try a different keyword or clear the search.</p>
               </div>

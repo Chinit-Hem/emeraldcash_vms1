@@ -1,4 +1,5 @@
 import { parseSessionCookie, validateSession } from "@/lib/auth";
+import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import type { Vehicle } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -12,6 +13,8 @@ import {
   toVehicle,
 } from "./_shared";
 
+const TEN_MINUTES_SECONDS = 60 * 10;
+
 function requireSession(req: NextRequest) {
   const sessionCookie = req.cookies.get("session")?.value;
   if (!sessionCookie) return null;
@@ -22,47 +25,110 @@ function requireSession(req: NextRequest) {
   return session;
 }
 
-export async function GET(req: NextRequest) {
-  const session = requireSession(req);
-  if (!session) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
+function cacheHeaders() {
+  return {
+    "Cache-Control": `public, max-age=0, s-maxage=${TEN_MINUTES_SECONDS}, stale-while-revalidate=${TEN_MINUTES_SECONDS}`,
+  };
+}
 
+export async function GET() {
   const cached = getCachedVehicles();
   if (cached) {
-    return NextResponse.json({ ok: true, data: cached });
+    return NextResponse.json({ ok: true, data: cached }, { headers: cacheHeaders() });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) {
     return NextResponse.json(
-      { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local" },
+      { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars" },
       { status: 500 }
     );
   }
 
   try {
-    const res = await fetch(appsScriptUrl(baseUrl, "getVehicles"), { cache: "no-store" });
+    const toIntOrNull = (value: unknown): number | null => {
+      if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : null;
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const parsed = Number.parseInt(trimmed, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { ok: false, error: `Apps Script error: ${res.status}` },
-        { status: 502 }
-      );
+    const fetchVehiclesPage = async (offset: number, limit: number) => {
+      const url = new URL(appsScriptUrl(baseUrl, "getVehicles"));
+      url.searchParams.set("limit", String(limit));
+      url.searchParams.set("offset", String(offset));
+
+      const res = await fetch(url.toString(), {
+        cache: "force-cache",
+        next: { revalidate: TEN_MINUTES_SECONDS },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Apps Script error: ${res.status}`);
+      }
+
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (json.ok === false) {
+        const message = typeof json.error === "string" && json.error.trim() ? json.error.trim() : "Apps Script ok=false";
+        throw new Error(message);
+      }
+
+      const rows = (Array.isArray(json.data) ? (json.data as unknown[]) : [])
+        .filter((row) => row && typeof row === "object") as Record<string, unknown>[];
+
+      const metaRaw = json.meta && typeof json.meta === "object" ? (json.meta as Record<string, unknown>) : null;
+      const meta = metaRaw
+        ? {
+            total: toIntOrNull(metaRaw.total),
+            limit: toIntOrNull(metaRaw.limit),
+            offset: toIntOrNull(metaRaw.offset),
+          }
+        : null;
+
+      return { rows, meta };
+    };
+
+    // Many Apps Script implementations paginate by default. Fetch all pages (max 500/page).
+    const requestedLimit = 500;
+    const maxPages = 50; // 50 * 500 = 25k rows safety cap
+
+    let offset = 0;
+    let total: number | null = null;
+    let lastMetaOffset: number | null = null;
+    const allRows: Record<string, unknown>[] = [];
+
+    for (let page = 0; page < maxPages; page++) {
+      const { rows, meta } = await fetchVehiclesPage(offset, requestedLimit);
+      allRows.push(...rows);
+
+      if (!meta) {
+        // No pagination metadata => assume this is the full list.
+        break;
+      }
+
+      if (meta.total != null && meta.total >= 0) total ??= meta.total;
+
+      const effectiveLimit = meta.limit && meta.limit > 0 ? meta.limit : requestedLimit;
+      const effectiveOffset = meta.offset != null && meta.offset >= 0 ? meta.offset : offset;
+
+      // Guard: if offset doesn't move, stop to avoid infinite loops.
+      if (lastMetaOffset != null && effectiveOffset === lastMetaOffset) break;
+      lastMetaOffset = effectiveOffset;
+
+      if (rows.length === 0) break;
+      if (rows.length < effectiveLimit) break;
+      if (total != null && allRows.length >= total) break;
+
+      offset = effectiveOffset + effectiveLimit;
+      if (total != null && offset >= total) break;
     }
 
-    const data = await res.json();
-
-    if (data.ok === false) {
-      return NextResponse.json({ ok: false, error: data.error }, { status: 500 });
-    }
-
-    const vehicles = (Array.isArray(data.data) ? (data.data as Record<string, unknown>[]) : [])
-      .filter((row) => row && typeof row === "object")
-      .map((row) => toVehicle(row)) as Vehicle[];
+    const vehicles = allRows.map((row) => toVehicle(row)) as Vehicle[];
 
     setCachedVehicles(vehicles);
-    return NextResponse.json({ ok: true, data: vehicles });
+    return NextResponse.json({ ok: true, data: vehicles }, { headers: cacheHeaders() });
   } catch (e: unknown) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "Fetch failed" },
@@ -82,10 +148,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) {
     return NextResponse.json(
-      { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local" },
+      { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars" },
       { status: 500 }
     );
   }
@@ -108,11 +174,8 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const vehicleIdRaw = body.VehicleId;
-    const vehicleId =
-      typeof vehicleIdRaw === "string" && vehicleIdRaw.trim() ? vehicleIdRaw.trim() : crypto.randomUUID();
-
-    const payload = toAppsScriptPayload({ ...body, VehicleId: vehicleId });
+    const payload = toAppsScriptPayload(body);
+    payload.Time = normalizeCambodiaTimeString(payload.Time) || getCambodiaNowString();
 
     const imageData = parseImageDataUrl(payload.Image);
     if (imageData) {
@@ -125,12 +188,10 @@ export async function POST(req: NextRequest) {
       }
 
       const ext = extensionFromMimeType(imageData.mimeType);
-      const parts = [
-        vehicleId,
-        safePart(payload.Category),
-        safePart(payload.Brand),
-        safePart(payload.Model),
-      ].filter(Boolean);
+      const fileNameId = crypto.randomUUID().split("-")[0];
+      const parts = [fileNameId, safePart(payload.Category), safePart(payload.Brand), safePart(payload.Model)].filter(
+        Boolean
+      );
       const fileName = `${parts.join("-")}.${ext}`;
 
       const uploadRes = await fetch(baseUrl, {
@@ -204,10 +265,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const data = await res.json();
-
+    const data = await res.json().catch(() => ({}));
     if (data.ok === false) {
-      return NextResponse.json({ ok: false, error: data.error }, { status: 500 });
+      return NextResponse.json({ ok: false, error: data.error || "Apps Script returned ok=false" }, { status: 500 });
     }
 
     clearCachedVehicles();

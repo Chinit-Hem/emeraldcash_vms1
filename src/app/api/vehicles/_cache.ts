@@ -9,10 +9,11 @@ let cache: VehiclesCache | null = null;
 
 function cacheTtlMs(): number {
   const raw = process.env.VEHICLES_CACHE_TTL_MS;
-  if (!raw) return 10_000;
+  // Default 10 minutes.
+  if (!raw) return 10 * 60 * 1000;
 
   const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) return 10_000;
+  if (!Number.isFinite(parsed) || parsed < 0) return 10 * 60 * 1000;
   return parsed;
 }
 
@@ -34,4 +35,3 @@ export function setCachedVehicles(data: Vehicle[]): void {
 export function clearCachedVehicles(): void {
   cache = null;
 }
-

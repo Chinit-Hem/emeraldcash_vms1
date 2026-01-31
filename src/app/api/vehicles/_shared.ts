@@ -68,6 +68,21 @@ function pick(row: Record<string, unknown>, keys: string[]): unknown {
     const value = row[key];
     if (value !== undefined) return value;
   }
+
+  const normalizeKey = (value: string) => value.toLowerCase().replace(/\s+/g, "");
+  const normalizedRow = new Map<string, unknown>();
+  for (const [key, value] of Object.entries(row)) {
+    const normalized = normalizeKey(key);
+    if (!normalized || normalizedRow.has(normalized)) continue;
+    normalizedRow.set(normalized, value);
+  }
+
+  for (const key of keys) {
+    const normalized = normalizeKey(key);
+    const value = normalizedRow.get(normalized);
+    if (value !== undefined) return value;
+  }
+
   return undefined;
 }
 
@@ -113,9 +128,11 @@ export function toVehicle(row: Record<string, unknown>): Vehicle {
 
   const year = toNumberOrNull(pick(row, ["Year"]));
   const priceNew = toNumberOrNull(pick(row, ["PriceNew", "Market Price", "Price New", "Price (New)"]));
-  const price40 = toNumberOrNull(pick(row, ["Price40", "D.O.C.1 40%", "Price 40%", "Price 40", "Price40%"]));
+  const price40 = toNumberOrNull(
+    pick(row, ["Price40", "D.O.C.40%", "D.O.C.1 40%", "Price 40%", "Price 40", "Price40%"])
+  );
   const price70 = toNumberOrNull(
-    pick(row, ["Price70", "Vehicle 70%", "Vihicle 70%", "Price 70%", "Price 70", "Price70%"])
+    pick(row, ["Price70", "Vehicles70%", "Vehicle 70%", "Vihicle 70%", "Price 70%", "Price 70", "Price70%"])
   );
   const derived = derivePrices(priceNew);
 
@@ -158,10 +175,10 @@ export function toAppsScriptPayload(
   const priceNew = toNumberOrNull(pick(input, ["PriceNew", "Market Price", "Price New", "Price (New)"]));
   const derived = derivePrices(priceNew);
   const price40 =
-    toNumberOrNull(pick(input, ["Price40", "D.O.C.1 40%", "Price 40%", "Price 40", "Price40%"])) ??
+    toNumberOrNull(pick(input, ["Price40", "D.O.C.40%", "D.O.C.1 40%", "Price 40%", "Price 40", "Price40%"])) ??
     derived.Price40;
   const price70 =
-    toNumberOrNull(pick(input, ["Price70", "Vehicle 70%", "Vihicle 70%", "Price 70%", "Price 70", "Price70%"])) ??
+    toNumberOrNull(pick(input, ["Price70", "Vehicles70%", "Vehicle 70%", "Vihicle 70%", "Price 70%", "Price 70", "Price70%"])) ??
     derived.Price70;
 
   const taxType = toStringValue(pick(input, ["TaxType", "Tax Type"]));
@@ -194,8 +211,10 @@ export function toAppsScriptPayload(
   payload["Market Price"] = priceNew ?? "";
   payload["Price 40%"] = price40 ?? "";
   payload["D.O.C.1 40%"] = price40 ?? "";
+  payload["D.O.C.40%"] = price40 ?? "";
   payload["Price 70%"] = price70 ?? "";
   payload["Vehicle 70%"] = price70 ?? "";
+  payload["Vehicles70%"] = price70 ?? "";
   payload["Tax Type"] = taxType;
   payload["Body Type"] = bodyType;
 

@@ -67,9 +67,11 @@ function killPid(pid, signal) {
 }
 
 const lockPath = path.join(process.cwd(), ".next", "dev", "lock");
+const nextDir = path.join(process.cwd(), ".next");
 const cwd = process.cwd();
 
 const hasLockFile = fs.existsSync(lockPath);
+const hasNextDir = fs.existsSync(nextDir);
 
 const projectDevPids = listProjectNextDevPids(cwd);
 const port3000Pids = listPidsFromLsof(["-t", "-iTCP:3000", "-sTCP:LISTEN"]);
@@ -114,6 +116,12 @@ try {
   // ignore
 }
 
+try {
+  fs.rmSync(nextDir, { recursive: true, force: true });
+} catch {
+  // ignore
+}
+
 if (uniquePidsToKill.length > 0) {
   console.log(`Stopped Next dev processes: ${uniquePidsToKill.join(", ")}.`);
 }
@@ -122,4 +130,10 @@ if (hasLockFile) {
   console.log("Removed .next/dev/lock.");
 } else {
   console.log("No .next/dev/lock found.");
+}
+
+if (hasNextDir) {
+  console.log("Removed .next directory.");
+} else {
+  console.log("No .next directory found.");
 }

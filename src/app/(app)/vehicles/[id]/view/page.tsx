@@ -1,9 +1,10 @@
 "use client";
 
 import type { Vehicle } from "@/lib/types";
+import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import ImageZoom from "@/app/components/ImageZoom";
 import { useAuthUser } from "@/app/components/AuthContext";
 
@@ -13,6 +14,7 @@ export default function ViewVehiclePage() {
 
 function ViewVehicleInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthUser();
   const isAdmin = user.role === "Admin";
   const params = useParams<{ id: string }>();
@@ -21,6 +23,12 @@ function ViewVehicleInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const autoPrintDoneRef = useRef(false);
+
+  const shouldAutoPrint = (() => {
+    const value = searchParams?.get("print") ?? "";
+    return value === "1" || value.toLowerCase() === "true";
+  })();
 
   useEffect(() => {
     if (!id) return;
@@ -53,6 +61,16 @@ function ViewVehicleInner() {
       alive = false;
     };
   }, [id, router]);
+
+  useEffect(() => {
+    if (!shouldAutoPrint) return;
+    if (!vehicle) return;
+    if (autoPrintDoneRef.current) return;
+    autoPrintDoneRef.current = true;
+
+    const timeout = window.setTimeout(() => window.print(), 150);
+    return () => window.clearTimeout(timeout);
+  }, [shouldAutoPrint, vehicle]);
 
   if (loading) {
     return (
@@ -196,14 +214,14 @@ function ViewVehicleInner() {
           </div>
 
           <div className="border-l-4 border-lime-600 pl-4">
-            <p className="text-gray-600 text-sm font-medium">D.O.C.1 40%</p>
+            <p className="text-gray-600 text-sm font-medium">D.O.C.40%</p>
             <p className="text-lg font-semibold text-gray-800">
               ${vehicle.Price40?.toLocaleString() || "N/A"}
             </p>
           </div>
 
           <div className="border-l-4 border-emerald-600 pl-4">
-            <p className="text-gray-600 text-sm font-medium">Vehicle 70%</p>
+            <p className="text-gray-600 text-sm font-medium">Vehicles70%</p>
             <p className="text-lg font-semibold text-gray-800">
               ${vehicle.Price70?.toLocaleString() || "N/A"}
             </p>
@@ -211,7 +229,9 @@ function ViewVehicleInner() {
 
           <div className="border-l-4 border-gray-600 pl-4 md:col-span-2">
             <p className="text-gray-600 text-sm font-medium">Added Time</p>
-            <p className="text-lg font-semibold text-gray-800">{vehicle.Time}</p>
+            <p className="text-lg font-semibold text-gray-800 font-mono">
+              {normalizeCambodiaTimeString(vehicle.Time)}
+            </p>
           </div>
         </div>
 

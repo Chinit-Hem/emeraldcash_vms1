@@ -24,28 +24,31 @@ const SHEET_NAME = "Vehicles";
 
 // Column headers (must match row 1 in your sheet)
 const HEADERS = [
-  "VehicleId",
+  "#",
+  "Image",
   "Category",
   "Brand",
   "Model",
   "Year",
   "Plate",
-  "Market Price",
-  "Price Used",
+  "MARKET PRICE",
+  "D.O.C.40%",
+  "Vehicles70%",
   "Tax Type",
   "Condition",
   "Body Type",
   "Color",
-  "Image",
   "Time",
-  "D.O.C.1 40%",
-  "Vehicle 70%",
 ];
 
 // Optional: default Drive folders per Category (used if uploadImage is called without folderId)
 const DRIVE_FOLDER_CARS = "1UKgtZ_sSNSVy3p-8WBwBrploVL9IDxec";
 const DRIVE_FOLDER_MOTORCYCLES = "10OcxTtK6ZqQj5cvPMNNIP4VsaVneGiYP";
 const DRIVE_FOLDER_TUKTUK = "18oDOlZXE9JGE5EDZ7yL6oBRVG6SgVYdP";
+
+// Timezone settings
+const CAMBODIA_TIMEZONE = "Asia/Phnom_Penh";
+const CAMBODIA_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
 /* ----------------- ROUTES ----------------- */
 
@@ -133,18 +136,61 @@ function ensureHeaderRow_(sh) {
     return;
   }
 
+  function normalizeHeaderCell_(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
   const renameMap = {
-    "Price New": "Market Price",
-    "Price 40%": "D.O.C.1 40%",
-    "Price 70%": "Vehicle 70%",
-    "Vihicle 70%": "Vehicle 70%",
+    "VehicleId": "#",
+    "Vehicle ID": "#",
+    "VehicleID": "#",
+    "Id": "#",
+    "id": "#",
+    "IMAGE": "Image",
+    "CATEGORY": "Category",
+    "BRAND": "Brand",
+    "MODEL": "Model",
+    "YEAR": "Year",
+    "PLATE": "Plate",
+    "Market Price": "MARKET PRICE",
+    "Price New": "MARKET PRICE",
+    "MarketPrice": "MARKET PRICE",
+    "MARKETPRICE": "MARKET PRICE",
+    "D.O.C.1 40%": "D.O.C.40%",
+    "Price 40%": "D.O.C.40%",
+    "Price 40": "D.O.C.40%",
+    "D.O.C. 40%": "D.O.C.40%",
+    "D.O.C.40": "D.O.C.40%",
+    "DOC 40%": "D.O.C.40%",
+    "Price 70%": "Vehicles70%",
+    "Price 70": "Vehicles70%",
+    "Vehicle 70%": "Vehicles70%",
+    "Vehicles 70%": "Vehicles70%",
+    "Vehicle70%": "Vehicles70%",
+    "VEHICLES70%": "Vehicles70%",
+    "Vihicle 70%": "Vehicles70%",
+    "Image URL": "Image",
+    "ImageURL": "Image",
+    "TaxType": "Tax Type",
+    "TAX TYPE": "Tax Type",
+    "CONDITION": "Condition",
+    "BodyType": "Body Type",
+    "BODY TYPE": "Body Type",
+    "COLOR": "Color",
+    "TIME": "Time",
   };
 
   let needsUpdate = false;
   const next = firstRow.slice(0, HEADERS.length);
   for (let i = 0; i < HEADERS.length; i++) {
-    const existing = String(next[i] || "").trim();
-    const rename = renameMap[existing];
+    const raw = String(next[i] || "");
+    const existing = raw.trim();
+    const normalized = normalizeHeaderCell_(raw);
+
+    const rename =
+      renameMap[existing] ||
+      renameMap[normalized] ||
+      renameMap[normalized.replace(/\s+/g, "")];
     if (rename && rename === HEADERS[i]) {
       next[i] = HEADERS[i];
       needsUpdate = true;
@@ -156,6 +202,415 @@ function ensureHeaderRow_(sh) {
   if (needsUpdate) {
     sh.getRange(1, 1, 1, HEADERS.length).setValues([next]);
   }
+}
+
+function nowCambodiaString_() {
+  return Utilities.formatDate(new Date(), CAMBODIA_TIMEZONE, CAMBODIA_TIME_FORMAT);
+}
+
+function normalizeCambodiaTime_(value) {
+  if (value == null) return "";
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, CAMBODIA_TIMEZONE, CAMBODIA_TIME_FORMAT);
+  }
+
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  // If it's ISO-ish, convert it to Cambodia local time.
+  const looksIso = raw.indexOf("T") !== -1 || /Z$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw);
+  if (looksIso) {
+    try {
+      const dt = new Date(raw);
+      if (!isNaN(dt.getTime())) {
+        return Utilities.formatDate(dt, CAMBODIA_TIMEZONE, CAMBODIA_TIME_FORMAT);
+      }
+    } catch {
+      // ignore and return raw
+    }
+  }
+
+  return raw;
+}
+
+function nextNumericVehicleId_(sh) {
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return 1;
+
+  const values = sh.getRange(2, 1, lastRow - 1, 1).getValues().flat();
+  let max = 0;
+
+  for (const value of values) {
+    const n = toNumber_(value);
+    if (n == null) continue;
+    const int = Math.floor(n);
+    if (int > max) max = int;
+  }
+
+  return max + 1;
+}
+
+/* ----------------- ONE-TIME MIGRATION ----------------- */
+
+/**
+ * One-time helper: create a new tab with the correct column order:
+ *   #, Image, Category, Brand, Model, Year, Plate, MARKET PRICE, D.O.C.40%, Vehicles70%, Tax Type, Condition, Body Type, Color, Time
+ *
+ * How to use:
+ * 1) Open Apps Script editor
+ * 2) Run migrateVehiclesSheetToNewSchema()
+ * 3) Verify the new tab, then rename it to "Vehicles" (and keep the old as backup)
+ */
+function migrateVehiclesSheetToNewSchema() {
+  const id = String(SPREADSHEET_ID || "").trim();
+  const useOpenById = id && id !== "PASTE_YOUR_SHEET_ID_HERE";
+  const ss = useOpenById
+    ? SpreadsheetApp.openById(id)
+    : SpreadsheetApp.getActiveSpreadsheet();
+
+  const source =
+    ss.getSheetByName(SHEET_NAME) ||
+    (SHEET_NAME !== "Vehicles" ? ss.getSheetByName("Vehicles") : null) ||
+    ss.getSheets()[0];
+
+  if (!source) throw new Error("Sheet not found: " + SHEET_NAME);
+
+  const lastRow = source.getLastRow();
+  const lastCol = source.getLastColumn();
+  if (lastRow < 1 || lastCol < 1) throw new Error("No data found");
+
+  const values = source.getRange(1, 1, lastRow, lastCol).getValues();
+  const headerRow = values[0] || [];
+
+  const normalizeKey_ = function (value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "");
+  };
+
+  const headerIndex = new Map();
+  for (let c = 0; c < headerRow.length; c++) {
+    const key = normalizeKey_(headerRow[c]);
+    if (!key || headerIndex.has(key)) continue;
+    headerIndex.set(key, c);
+  }
+
+  function findColumn_(candidates) {
+    for (const candidate of candidates) {
+      const idx = headerIndex.get(normalizeKey_(candidate));
+      if (idx !== undefined) return idx;
+    }
+    return -1;
+  }
+
+  const col = {
+    "#": findColumn_(["#", "VehicleId", "Vehicle ID", "VehicleID", "Id", "id"]),
+    "Image": findColumn_(["Image", "IMAGE", "Image URL", "ImageURL"]),
+    "Category": findColumn_(["Category", "CATEGORY"]),
+    "Brand": findColumn_(["Brand", "BRAND"]),
+    "Model": findColumn_(["Model", "MODEL"]),
+    "Year": findColumn_(["Year", "YEAR"]),
+    "Plate": findColumn_(["Plate", "PLATE"]),
+    "MARKET PRICE": findColumn_(["MARKET PRICE", "Market Price", "MarketPrice", "MARKETPRICE", "Price New", "PriceNew", "Price (New)"]),
+    "D.O.C.40%": findColumn_(["D.O.C.40%", "D.O.C. 40%", "D.O.C.1 40%", "Price 40%", "Price40%", "Price40", "DOC 40%"]),
+    "Vehicles70%": findColumn_(["Vehicles70%", "VEHICLES70%", "Vehicles 70%", "Vehicle 70%", "Price 70%", "Price70%", "Price70", "Vihicle 70%"]),
+    "Tax Type": findColumn_(["Tax Type", "TAX TYPE", "TaxType"]),
+    "Condition": findColumn_(["Condition", "CONDITION"]),
+    "Body Type": findColumn_(["Body Type", "BODY TYPE", "BodyType"]),
+    "Color": findColumn_(["Color", "COLOR"]),
+    "Time": findColumn_(["Time", "TIME"]),
+  };
+
+  const marketPriceIndex = HEADERS.indexOf("MARKET PRICE");
+  const docIndex = HEADERS.indexOf("D.O.C.40%");
+  const vehicle70Index = HEADERS.indexOf("Vehicles70%");
+  const timeIndex = HEADERS.indexOf("Time");
+
+  const output = [];
+  for (let r = 1; r < values.length; r++) {
+    const srcRow = values[r] || [];
+    const isEmpty = srcRow.every(function (v) { return String(v || "").trim() === ""; });
+    if (isEmpty) continue;
+
+    const outRow = HEADERS.map(function (h) {
+      const idx = col[h];
+      return idx >= 0 ? srcRow[idx] : "";
+    });
+
+    const idRaw = String(outRow[0] || "").trim();
+    if (!idRaw) outRow[0] = String(output.length + 1);
+
+    outRow[timeIndex] = normalizeCambodiaTime_(outRow[timeIndex]) || nowCambodiaString_();
+
+    const priceNew = toNumber_(outRow[marketPriceIndex]);
+    if (priceNew != null) {
+      const hasDoc = String(outRow[docIndex] ?? "").trim() !== "";
+      const has70 = String(outRow[vehicle70Index] ?? "").trim() !== "";
+      if (!hasDoc) outRow[docIndex] = roundTo_(priceNew * 0.4, 2);
+      if (!has70) outRow[vehicle70Index] = roundTo_(priceNew * 0.7, 2);
+    }
+
+    output.push(outRow);
+  }
+
+  const ts = Utilities.formatDate(new Date(), CAMBODIA_TIMEZONE, "yyyyMMdd-HHmmss");
+  const targetName = `${SHEET_NAME}-migrated-${ts}`.slice(0, 99);
+  const existing = ss.getSheetByName(targetName);
+  if (existing) throw new Error("Target sheet already exists: " + targetName);
+
+  const target = ss.insertSheet(targetName);
+  target.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  if (output.length > 0) {
+    target.getRange(2, 1, output.length, HEADERS.length).setValues(output);
+  }
+
+  try {
+    target.setFrozenRows(1);
+  } catch {
+    // ignore
+  }
+  try {
+    target.autoResizeColumns(1, HEADERS.length);
+  } catch {
+    // ignore
+  }
+  try {
+    target.getRange(1, 1, Math.max(1, output.length + 1), HEADERS.length).createFilter();
+  } catch {
+    // ignore
+  }
+
+  console.log(`Created sheet "${targetName}" with ${output.length} rows.`);
+  return { ok: true, sheet: targetName, rows: output.length };
+}
+
+/**
+ * Fix an existing Vehicles sheet IN PLACE so columns + data align to:
+ *   #, Image, Category, Brand, Model, Year, Plate, MARKET PRICE, D.O.C.40%, Vehicles70%, Tax Type, Condition, Body Type, Color, Time
+ *
+ * It will:
+ * - Create a backup tab first
+ * - Rename known/legacy headers (incl. headers with line breaks)
+ * - Reorder columns to the correct order
+ * - Move misplaced Image links out of the Color column (when detected)
+ * - Fill missing # values (incrementing)
+ * - Fill missing D.O.C.40% and Vehicles70% from MARKET PRICE
+ */
+function fixVehiclesSheetToSchemaInPlace() {
+  const id = String(SPREADSHEET_ID || "").trim();
+  const useOpenById = id && id !== "PASTE_YOUR_SHEET_ID_HERE";
+  const ss = useOpenById
+    ? SpreadsheetApp.openById(id)
+    : SpreadsheetApp.getActiveSpreadsheet();
+
+  const sheet =
+    ss.getSheetByName(SHEET_NAME) ||
+    (SHEET_NAME !== "Vehicles" ? ss.getSheetByName("Vehicles") : null) ||
+    ss.getSheets()[0];
+
+  if (!sheet) throw new Error("Sheet not found: " + SHEET_NAME);
+
+  const ts = Utilities.formatDate(new Date(), CAMBODIA_TIMEZONE, "yyyyMMdd-HHmmss");
+  const backupName = `${sheet.getName()}-backup-${ts}`.slice(0, 99);
+  sheet.copyTo(ss).setName(backupName);
+
+  function normalizeKey_(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "");
+  }
+
+  const renameMap = {
+    "VehicleId": "#",
+    "Vehicle ID": "#",
+    "VehicleID": "#",
+    "Id": "#",
+    "id": "#",
+    "IMAGE": "Image",
+    "Image URL": "Image",
+    "ImageURL": "Image",
+    "CATEGORY": "Category",
+    "BRAND": "Brand",
+    "MODEL": "Model",
+    "YEAR": "Year",
+    "PLATE": "Plate",
+    "Market Price": "MARKET PRICE",
+    "Price New": "MARKET PRICE",
+    "MarketPrice": "MARKET PRICE",
+    "MARKETPRICE": "MARKET PRICE",
+    "D.O.C.1 40%": "D.O.C.40%",
+    "Price 40%": "D.O.C.40%",
+    "Price 40": "D.O.C.40%",
+    "D.O.C. 40%": "D.O.C.40%",
+    "D.O.C.40": "D.O.C.40%",
+    "DOC 40%": "D.O.C.40%",
+    "Price 70%": "Vehicles70%",
+    "Price 70": "Vehicles70%",
+    "Vehicle 70%": "Vehicles70%",
+    "Vehicles 70%": "Vehicles70%",
+    "Vehicle70%": "Vehicles70%",
+    "VEHICLES70%": "Vehicles70%",
+    "Vihicle 70%": "Vehicles70%",
+    "TaxType": "Tax Type",
+    "TAX TYPE": "Tax Type",
+    "CONDITION": "Condition",
+    "BodyType": "Body Type",
+    "BODY TYPE": "Body Type",
+    "COLOR": "Color",
+    "TIME": "Time",
+  };
+  const renameMapNormalized = {};
+  Object.keys(renameMap).forEach(function (key) {
+    renameMapNormalized[normalizeKey_(key)] = renameMap[key];
+  });
+  HEADERS.forEach(function (h) {
+    renameMapNormalized[normalizeKey_(h)] = h;
+  });
+
+  function canonicalHeader_(value) {
+    const raw = String(value || "");
+    const trimmed = raw.replace(/\s+/g, " ").trim();
+    if (!trimmed) return "";
+    const direct = renameMap[trimmed];
+    if (direct) return direct;
+    const normalized = renameMapNormalized[normalizeKey_(trimmed)];
+    return normalized || trimmed;
+  }
+
+  function looksLikeImageUrl_(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return false;
+    if (/^https?:\/\//i.test(raw)) return true;
+    return raw.indexOf("drive.google.com") !== -1;
+  }
+
+  let lastCol = sheet.getLastColumn();
+  if (lastCol < 1) lastCol = HEADERS.length;
+
+  // Canonicalize existing headers (don’t assume order).
+  const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const canonicalRow = headerRow.map(function (cell) {
+    const canonical = canonicalHeader_(cell);
+    return HEADERS.indexOf(canonical) !== -1 ? canonical : String(cell || "").trim();
+  });
+  sheet.getRange(1, 1, 1, lastCol).setValues([canonicalRow]);
+
+  // Ensure required headers exist.
+  let currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function (v) {
+    return String(v || "").trim();
+  });
+  for (const header of HEADERS) {
+    if (currentHeaders.indexOf(header) !== -1) continue;
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    currentHeaders.push(header);
+  }
+
+  // Reorder columns to match HEADERS.
+  currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function (v) {
+    return String(v || "").trim();
+  });
+  const maxRows = sheet.getMaxRows();
+  for (let targetIndex = 1; targetIndex <= HEADERS.length; targetIndex++) {
+    const header = HEADERS[targetIndex - 1];
+    const currentIndex = currentHeaders.indexOf(header) + 1;
+    if (currentIndex === 0) continue;
+    if (currentIndex === targetIndex) continue;
+
+    sheet.moveColumns(sheet.getRange(1, currentIndex, maxRows, 1), targetIndex);
+
+    const moved = currentHeaders.splice(currentIndex - 1, 1)[0];
+    currentHeaders.splice(targetIndex - 1, 0, moved);
+  }
+  sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { ok: true, backup: backupName, changedImages: 0, filledIds: 0, filledPrices: 0 };
+
+  const imageCol = HEADERS.indexOf("Image") + 1;
+  const colorCol = HEADERS.indexOf("Color") + 1;
+  const idCol = HEADERS.indexOf("#") + 1;
+  const marketCol = HEADERS.indexOf("MARKET PRICE") + 1;
+  const docCol = HEADERS.indexOf("D.O.C.40%") + 1;
+  const vehicle70Col = HEADERS.indexOf("Vehicles70%") + 1;
+  const timeCol = HEADERS.indexOf("Time") + 1;
+
+  const rows = lastRow - 1;
+  const idValues = sheet.getRange(2, idCol, rows, 1).getValues();
+  const imageValues = sheet.getRange(2, imageCol, rows, 1).getValues();
+  const colorValues = sheet.getRange(2, colorCol, rows, 1).getValues();
+  const marketValues = sheet.getRange(2, marketCol, rows, 1).getValues();
+  const docValues = sheet.getRange(2, docCol, rows, 1).getValues();
+  const vehicle70Values = sheet.getRange(2, vehicle70Col, rows, 1).getValues();
+  const timeValues = sheet.getRange(2, timeCol, rows, 1).getValues();
+
+  let maxId = 0;
+  for (let r = 0; r < rows; r++) {
+    const n = toNumber_(idValues[r][0]);
+    if (n == null) continue;
+    const int = Math.floor(n);
+    if (int > maxId) maxId = int;
+  }
+  let nextId = maxId + 1;
+
+  let changedImages = 0;
+  let filledIds = 0;
+  let filledPrices = 0;
+
+  for (let r = 0; r < rows; r++) {
+    // Fill missing IDs.
+    const idRaw = String(idValues[r][0] || "").trim();
+    if (!idRaw) {
+      idValues[r][0] = String(nextId++);
+      filledIds++;
+    }
+
+    // Move misplaced Image links out of Color.
+    const img = String(imageValues[r][0] || "").trim();
+    const colVal = String(colorValues[r][0] || "").trim();
+    if (!img && looksLikeImageUrl_(colVal)) {
+      imageValues[r][0] = colVal;
+      colorValues[r][0] = "";
+      changedImages++;
+    }
+
+    // Ensure Time in Cambodia format.
+    timeValues[r][0] = normalizeCambodiaTime_(timeValues[r][0]) || nowCambodiaString_();
+
+    // Fill derived prices if missing.
+    const priceNew = toNumber_(marketValues[r][0]);
+    if (priceNew != null) {
+      const hasDoc = String(docValues[r][0] ?? "").trim() !== "";
+      const has70 = String(vehicle70Values[r][0] ?? "").trim() !== "";
+      if (!hasDoc) {
+        docValues[r][0] = roundTo_(priceNew * 0.4, 2);
+        filledPrices++;
+      }
+      if (!has70) {
+        vehicle70Values[r][0] = roundTo_(priceNew * 0.7, 2);
+        filledPrices++;
+      }
+    }
+  }
+
+  sheet.getRange(2, idCol, rows, 1).setValues(idValues);
+  sheet.getRange(2, imageCol, rows, 1).setValues(imageValues);
+  sheet.getRange(2, colorCol, rows, 1).setValues(colorValues);
+  sheet.getRange(2, timeCol, rows, 1).setValues(timeValues);
+  sheet.getRange(2, docCol, rows, 1).setValues(docValues);
+  sheet.getRange(2, vehicle70Col, rows, 1).setValues(vehicle70Values);
+
+  return {
+    ok: true,
+    backup: backupName,
+    changedImages,
+    filledIds,
+    filledPrices,
+  };
 }
 
 function getVehicles_() {
@@ -188,12 +643,10 @@ function getById_(id) {
 function addRow_(data) {
   const sh = getSheet_();
 
-  const now = new Date().toISOString();
-  const vehicleId = String(data.VehicleId || data["VehicleId"] || data.id || "").trim() || String(Date.now());
-
   const byHeader = normalizeToHeaders_(data);
-  byHeader["VehicleId"] = vehicleId;
-  byHeader["Time"] = String(byHeader["Time"] || now);
+  const providedId = String(byHeader["#"] || "").trim();
+  byHeader["#"] = providedId || String(nextNumericVehicleId_(sh));
+  byHeader["Time"] = normalizeCambodiaTime_(byHeader["Time"]) || nowCambodiaString_();
   computeDerivedPrices_(byHeader);
 
   sh.appendRow(headersToRow_(byHeader));
@@ -217,8 +670,8 @@ function updateRow_(id, data) {
 
   const updates = normalizeToHeaders_(data);
   const merged = Object.assign({}, existingByHeader, updates);
-  merged["VehicleId"] = existingByHeader["VehicleId"];
-  merged["Time"] = String(updates["Time"] || new Date().toISOString());
+  merged["#"] = existingByHeader["#"];
+  merged["Time"] = normalizeCambodiaTime_(updates["Time"]) || normalizeCambodiaTime_(existingByHeader["Time"]);
   computeDerivedPrices_(merged);
 
   sh.getRange(rowNumber, 1, 1, HEADERS.length).setValues([headersToRow_(merged)]);
@@ -341,22 +794,21 @@ function headersToRow_(byHeader) {
 
 function headerToFriendly_(byHeader) {
   return {
-    VehicleId: byHeader["VehicleId"],
+    VehicleId: byHeader["#"],
     Category: byHeader["Category"],
     Brand: byHeader["Brand"],
     Model: byHeader["Model"],
     Year: byHeader["Year"],
     Plate: byHeader["Plate"],
-    PriceNew: byHeader["Market Price"],
-    Price40: byHeader["D.O.C.1 40%"],
-    Price70: byHeader["Vehicle 70%"],
-    PriceUsed: byHeader["Price Used"],
+    PriceNew: byHeader["MARKET PRICE"],
+    Price40: byHeader["D.O.C.40%"],
+    Price70: byHeader["Vehicles70%"],
     TaxType: byHeader["Tax Type"],
     Condition: byHeader["Condition"],
     BodyType: byHeader["Body Type"],
     Color: byHeader["Color"],
     Image: byHeader["Image"],
-    Time: byHeader["Time"],
+    Time: normalizeCambodiaTime_(byHeader["Time"]),
   };
 }
 
@@ -371,22 +823,35 @@ function normalizeToHeaders_(data) {
   }
 
   HEADERS.forEach(function (h) {
-    if (h === "Market Price") {
-      const primary = pickValue_("Market Price", "PriceNew");
-      out[h] = primary !== "" ? primary : pickValue_("Price New", "PriceNew");
-    } else if (h === "D.O.C.1 40%") {
-      const primary = pickValue_("D.O.C.1 40%", "Price40");
-      out[h] = primary !== "" ? primary : pickValue_("Price 40%", "Price40");
-    } else if (h === "Vehicle 70%") {
-      const primary = pickValue_("Vehicle 70%", "Price70");
+    if (h === "#") {
+      const primary =
+        pickValue_("#", "VehicleId") ||
+        pickValue_("VehicleId", "VehicleId") ||
+        pickValue_("Vehicle ID", "VehicleId") ||
+        pickValue_("VehicleID", "VehicleId") ||
+        pickValue_("Id", "VehicleId") ||
+        pickValue_("id", "VehicleId");
+      out[h] = primary;
+    } else if (h === "MARKET PRICE") {
+      const primary = pickValue_("MARKET PRICE", "PriceNew");
+      out[h] = primary !== "" ? primary : pickValue_("Market Price", "PriceNew");
+    } else if (h === "D.O.C.40%") {
+      const primary = pickValue_("D.O.C.40%", "Price40");
       if (primary !== "") {
         out[h] = primary;
       } else {
-        const legacy = pickValue_("Vihicle 70%", "Price70");
+        const legacy = pickValue_("D.O.C.1 40%", "Price40");
+        out[h] = legacy !== "" ? legacy : pickValue_("Price 40%", "Price40");
+      }
+    } else if (h === "Vehicles70%") {
+      const primary = pickValue_("Vehicles70%", "Price70");
+      if (primary !== "") {
+        out[h] = primary;
+      } else {
+        const legacy = pickValue_("Vehicle 70%", "Price70");
         out[h] = legacy !== "" ? legacy : pickValue_("Price 70%", "Price70");
       }
     }
-    else if (h === "Price Used") out[h] = pickValue_("Price Used", "PriceUsed");
     else if (h === "Tax Type") out[h] = pickValue_("Tax Type", "TaxType");
     else if (h === "Body Type") out[h] = pickValue_("Body Type", "BodyType");
     else out[h] = pickValue_(h, h);
@@ -396,15 +861,15 @@ function normalizeToHeaders_(data) {
 }
 
 function computeDerivedPrices_(byHeader) {
-  const priceNew = toNumber_(byHeader["Market Price"]);
+  const priceNew = toNumber_(byHeader["MARKET PRICE"]);
   if (priceNew == null) {
-    byHeader["D.O.C.1 40%"] = "";
-    byHeader["Vehicle 70%"] = "";
+    byHeader["D.O.C.40%"] = "";
+    byHeader["Vehicles70%"] = "";
     return;
   }
 
-  byHeader["D.O.C.1 40%"] = roundTo_(priceNew * 0.4, 2);
-  byHeader["Vehicle 70%"] = roundTo_(priceNew * 0.7, 2);
+  byHeader["D.O.C.40%"] = roundTo_(priceNew * 0.4, 2);
+  byHeader["Vehicles70%"] = roundTo_(priceNew * 0.7, 2);
 }
 
 function toNumber_(value) {

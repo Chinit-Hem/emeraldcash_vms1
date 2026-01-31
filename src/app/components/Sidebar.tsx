@@ -80,26 +80,6 @@ function IconAdd({ active }: { active: boolean }) {
   );
 }
 
-function IconCategories() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-3.5 w-3.5 text-gray-500"
-      aria-hidden="true"
-    >
-      <path d="M4 6h16" />
-      <path d="M4 12h16" />
-      <path d="M4 18h16" />
-    </svg>
-  );
-}
-
 function IconCar({ active }: { active: boolean }) {
   return (
     <svg
@@ -177,8 +157,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [dashboardMenuOpen, setDashboardMenuOpen] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [vehiclesMenuOpen, setVehiclesMenuOpen] = useState(() => pathname.startsWith("/vehicles"));
 
   const handleLogout = async () => {
     try {
@@ -191,17 +170,14 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
     }
   };
 
-  const categories = ["Cars", "Motorcycles", "Tuk Tuk"];
   const isAdmin = user.role === "Admin";
 
   const activeCategory = pathname === "/vehicles" ? searchParams?.get("category") || "" : "";
 
-  const showMenuItems = pathname !== "/" || dashboardMenuOpen;
-
   const isDashboardActive = pathname === "/";
-  const isVehiclesActive = pathname === "/vehicles" && !activeCategory;
+  const isVehiclesSectionActive = pathname.startsWith("/vehicles");
+  const isAllVehiclesActive = pathname === "/vehicles" && !activeCategory;
   const isAddActive = pathname === "/vehicles/add";
-  const showDashboardHint = isDashboardActive && !dashboardMenuOpen;
 
   const navButtonClasses = useMemo(() => {
     const base =
@@ -241,12 +217,6 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           <div>
             <button
               onClick={() => {
-                if (pathname === "/") {
-                  setDashboardMenuOpen((prev) => !prev);
-                  return;
-                }
-
-                setDashboardMenuOpen(true);
                 router.push("/");
                 onNavigate?.();
               }}
@@ -256,91 +226,95 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
                 className={`${navButtonClasses.activePill} ${isDashboardActive ? navButtonClasses.activePillOn : ""}`}
                 aria-hidden="true"
               />
-              <span className={`${navButtonClasses.label} flex items-center justify-between w-full`}>
-                <span className="flex items-center gap-3">
-                  <IconDashboard active={isDashboardActive} />
-                  <span>Dashboard</span>
-                </span>
-                {isDashboardActive ? (
-                  <span className="text-xs font-extrabold tracking-wide text-white/90">
-                    {dashboardMenuOpen ? "Hide ▾" : "Menu ▸"}
+                <span className={`${navButtonClasses.label} flex items-center justify-between w-full`}>
+                  <span className="flex items-center gap-3">
+                    <IconDashboard active={isDashboardActive} />
+                    <span>Dashboard</span>
                   </span>
-                ) : null}
-              </span>
+                </span>
             </button>
           </div>
 
-          {showDashboardHint ? (
-            <div className="px-4 -mt-1 text-[11px] text-gray-500">
-              Click <span className="font-semibold text-gray-700">Dashboard</span> to open the menu.
-            </div>
-          ) : null}
-
-          {showMenuItems ? (
-            <div>
-              <button
-                onClick={() => {
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!vehiclesMenuOpen && !pathname.startsWith("/vehicles")) {
                   router.push("/vehicles");
                   onNavigate?.();
-                }}
-                className={isVehiclesActive ? navButtonClasses.active : navButtonClasses.inactive}
-              >
-                <span
-                  className={`${navButtonClasses.activePill} ${isVehiclesActive ? navButtonClasses.activePillOn : ""}`}
-                  aria-hidden="true"
-                />
-                <span className={`${navButtonClasses.label} flex items-center gap-3`}>
-                  <IconVehicles active={isVehiclesActive} />
+                }
+                setVehiclesMenuOpen((prev) => !prev);
+              }}
+              className={isVehiclesSectionActive ? navButtonClasses.active : navButtonClasses.inactive}
+            >
+              <span
+                className={`${navButtonClasses.activePill} ${
+                  isVehiclesSectionActive ? navButtonClasses.activePillOn : ""
+                }`}
+                aria-hidden="true"
+              />
+              <span className={`${navButtonClasses.label} flex items-center justify-between w-full`}>
+                <span className="flex items-center gap-3">
+                  <IconVehicles active={isVehiclesSectionActive} />
                   <span>All Vehicles</span>
                 </span>
-              </button>
-            </div>
-          ) : null}
-
-          {showMenuItems && isAdmin ? (
-            <div>
-              <button
-                onClick={() => {
-                  router.push("/vehicles/add");
-                  onNavigate?.();
-                }}
-                className={isAddActive ? navButtonClasses.active : navButtonClasses.inactive}
-              >
                 <span
-                  className={`${navButtonClasses.activePill} ${isAddActive ? navButtonClasses.activePillOn : ""}`}
-                  aria-hidden="true"
-                />
-                <span className={`${navButtonClasses.label} flex items-center gap-3`}>
-                  <IconAdd active={isAddActive} />
-                  <span>Add Vehicle</span>
+                  className={`text-xs font-extrabold tracking-wide ${
+                    isVehiclesSectionActive ? "text-white/90" : "text-gray-500"
+                  }`}
+                >
+                  {vehiclesMenuOpen ? "Hide ▾" : "Show ▸"}
                 </span>
-              </button>
-            </div>
-          ) : null}
+              </span>
+            </button>
 
-          {/* Categories */}
-          {showMenuItems ? (
-            <div className="pt-4">
-              <button
-                type="button"
-                onClick={() => setCategoriesOpen((prev) => !prev)}
-                className="w-full px-4 py-2 text-left rounded-lg hover:bg-gray-50 transition flex items-center justify-between"
-              >
-                <span className="text-xs font-extrabold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                  <IconCategories />
-                  <span>CATEGORIES</span>
-                </span>
-                <span className="text-xs font-extrabold tracking-wide text-gray-500">
-                  {categoriesOpen ? "Hide ▾" : "Show ▸"}
-                </span>
-              </button>
+            {vehiclesMenuOpen ? (
+              <div className="mt-2 space-y-2">
+                <button
+                  onClick={() => {
+                    router.push("/vehicles");
+                    onNavigate?.();
+                  }}
+                  className={isAllVehiclesActive ? navButtonClasses.active : navButtonClasses.inactive}
+                >
+                  <span
+                    className={`${navButtonClasses.activePill} ${
+                      isAllVehiclesActive ? navButtonClasses.activePillOn : ""
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className={`${navButtonClasses.label} flex items-center gap-3`}>
+                    <IconVehicles active={isAllVehiclesActive} />
+                    <span>All Vehicles</span>
+                  </span>
+                </button>
 
-              {categoriesOpen ? (
-                <div className="mt-2 space-y-2">
-                  {categories.map((cat) => {
+                {isAdmin ? (
+                  <button
+                    onClick={() => {
+                      router.push("/vehicles/add");
+                      onNavigate?.();
+                    }}
+                    className={isAddActive ? navButtonClasses.active : navButtonClasses.inactive}
+                  >
+                    <span
+                      className={`${navButtonClasses.activePill} ${
+                        isAddActive ? navButtonClasses.activePillOn : ""
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <span className={`${navButtonClasses.label} flex items-center gap-3`}>
+                      <IconAdd active={isAddActive} />
+                      <span>Add Vehicle</span>
+                    </span>
+                  </button>
+                ) : null}
+
+                {(() => {
+                  const categories = ["Cars", "Motorcycles", "Tuk Tuk"];
+                  return categories.map((cat) => {
                     const isActive =
-                      pathname === "/vehicles" &&
-                      normalizeCategory(activeCategory) === normalizeCategory(cat);
+                      pathname === "/vehicles" && normalizeCategory(activeCategory) === normalizeCategory(cat);
 
                     const categoryNormalized = normalizeCategory(cat);
                     const icon =
@@ -369,15 +343,15 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
                         />
                         <span className={`${navButtonClasses.label} flex items-center gap-3`}>
                           {icon}
-                          <span>{cat}</span>
+                          <span>{cat === "Tuk Tuk" ? "TukTuks" : cat}</span>
                         </span>
                       </button>
                     );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+                  });
+                })()}
+              </div>
+            ) : null}
+          </div>
         </nav>
 
         {/* Divider */}

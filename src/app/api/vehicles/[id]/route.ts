@@ -1,4 +1,5 @@
 import { parseSessionCookie, validateSession } from "@/lib/auth";
+import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
 import type { NextRequest } from "next/server";
@@ -22,6 +23,69 @@ function requireSession(req: NextRequest) {
   if (!session || !validateSession(session)) return null;
 
   return session;
+}
+
+function toIntOrNull(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function fetchAllVehicleRows(baseUrl: string, cache: RequestCache): Promise<Record<string, unknown>[]> {
+  const requestedLimit = 500;
+  const maxPages = 50; // 50 * 500 = 25k rows safety cap
+
+  let offset = 0;
+  let total: number | null = null;
+  let lastMetaOffset: number | null = null;
+  const allRows: Record<string, unknown>[] = [];
+
+  for (let page = 0; page < maxPages; page++) {
+    const url = new URL(appsScriptUrl(baseUrl, "getVehicles"));
+    url.searchParams.set("limit", String(requestedLimit));
+    url.searchParams.set("offset", String(offset));
+
+    const res = await fetch(url.toString(), { cache });
+    if (!res.ok) throw new Error(`Failed to fetch vehicles: ${res.status}`);
+
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (json.ok === false) {
+      const message = typeof json.error === "string" && json.error.trim() ? json.error.trim() : "Apps Script ok=false";
+      throw new Error(message);
+    }
+
+    const rows = (Array.isArray(json.data) ? (json.data as unknown[]) : [])
+      .filter((row) => row && typeof row === "object") as Record<string, unknown>[];
+    allRows.push(...rows);
+
+    const metaRaw = json.meta && typeof json.meta === "object" ? (json.meta as Record<string, unknown>) : null;
+    if (!metaRaw) break;
+
+    const meta = {
+      total: toIntOrNull(metaRaw.total),
+      limit: toIntOrNull(metaRaw.limit),
+      offset: toIntOrNull(metaRaw.offset),
+    };
+
+    if (meta.total != null && meta.total >= 0) total ??= meta.total;
+    const effectiveLimit = meta.limit && meta.limit > 0 ? meta.limit : requestedLimit;
+    const effectiveOffset = meta.offset != null && meta.offset >= 0 ? meta.offset : offset;
+
+    if (lastMetaOffset != null && effectiveOffset === lastMetaOffset) break;
+    lastMetaOffset = effectiveOffset;
+
+    if (rows.length === 0) break;
+    if (rows.length < effectiveLimit) break;
+    if (total != null && allRows.length >= total) break;
+
+    offset = effectiveOffset + effectiveLimit;
+    if (total != null && offset >= total) break;
+  }
+
+  return allRows;
 }
 
 export async function GET(
@@ -77,25 +141,8 @@ export async function GET(
     }
 
     // Fallback: fetch list and search by id (works with older Apps Script versions).
-    const res = await fetch(appsScriptUrl(baseUrl, "getVehicles"), { cache: "no-store" });
-
-    if (!res.ok) {
-      return NextResponse.json(
-        { ok: false, error: `Failed to fetch vehicle: ${res.status}` },
-        { status: 502 }
-      );
-    }
-
-    const data = await res.json();
-
-    if (data.ok === false) {
-      return NextResponse.json({ ok: false, error: data.error }, { status: 404 });
-    }
-
-    const rows = Array.isArray(data.data) ? (data.data as Record<string, unknown>[]) : [];
-    const match = rows.find(
-      (row) => row && typeof row === "object" && String((row as Record<string, unknown>).VehicleId) === id
-    );
+    const rows = await fetchAllVehicleRows(baseUrl, "no-store");
+    const match = rows.find((row) => String(row.VehicleId ?? row.VehicleID ?? row.Id ?? row.id ?? "") === id);
 
     if (!match) {
       return NextResponse.json({ ok: false, error: "Vehicle not found" }, { status: 404 });
@@ -154,6 +201,9 @@ export async function PUT(
   try {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const payload = toAppsScriptPayload(body, { vehicleId: id });
+    const normalizedTime = normalizeCambodiaTimeString(payload.Time);
+    if (normalizedTime) payload.Time = normalizedTime;
+    else delete payload.Time;
 
     const imageData = parseImageDataUrl(payload.Image);
     if (imageData) {
@@ -296,26 +346,11 @@ export async function DELETE(
     if (!imageFileId) {
       // Fallback: list fetch (older Apps Script versions without getById).
       try {
-        const listRes = await fetch(appsScriptUrl(baseUrl, "getVehicles"), { cache: "no-store" });
-        if (listRes.ok) {
-          const listJson = await listRes.json().catch(() => ({}));
-          const rows = Array.isArray(listJson?.data) ? (listJson.data as Record<string, unknown>[]) : [];
-          const match = rows.find(
-            (row) =>
-              row &&
-              typeof row === "object" &&
-              String(
-                (row as Record<string, unknown>).VehicleId ??
-                  (row as Record<string, unknown>).VehicleID ??
-                  (row as Record<string, unknown>).Id ??
-                  (row as Record<string, unknown>).id ??
-                  ""
-              ) === id
-          );
-          if (match) {
-            const vehicle = toVehicle(match);
-            imageFileId = extractDriveFileId(vehicle.Image);
-          }
+        const rows = await fetchAllVehicleRows(baseUrl, "no-store");
+        const match = rows.find((row) => String(row.VehicleId ?? row.VehicleID ?? row.Id ?? row.id ?? "") === id);
+        if (match) {
+          const vehicle = toVehicle(match);
+          imageFileId = extractDriveFileId(vehicle.Image);
         }
       } catch {
         // ignore fallback errors; deletion should still proceed
