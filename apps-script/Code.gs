@@ -42,6 +42,7 @@ const HEADERS = [
 ];
 
 // Optional: default Drive folders per Category (used if uploadImage is called without folderId)
+// CarsVMS, MotorcyclesVMS, TukTuksVMS - must support action=uploadImage in doPost
 const DRIVE_FOLDER_CARS = "1UKgtZ_sSNSVy3p-8WBwBrploVL9IDxec";
 const DRIVE_FOLDER_MOTORCYCLES = "10OcxTtK6ZqQj5cvPMNNIP4VsaVneGiYP";
 const DRIVE_FOLDER_TUKTUK = "18oDOlZXE9JGE5EDZ7yL6oBRVG6SgVYdP";
@@ -69,16 +70,31 @@ function doGet(e) {
     return jsonOut_({ ok: true, data: found });
   }
 
+  if (action === "uploadImage") {
+    return jsonOut_({ ok: false, error: "uploadImage requires POST with JSON body (action, folderId, data, mimeType, fileName). Do not use GET." });
+  }
+
   return jsonOut_({ ok: false, error: "Unknown action", action: action });
 }
 
 function doPost(e) {
   try {
-    const raw = (e && e.postData && e.postData.contents) ? e.postData.contents : "{}";
-    const payload = JSON.parse(raw || "{}");
-    const action = String(payload.action || (e && e.parameter && e.parameter.action) || "").trim();
+    var raw = (e && e.postData && e.postData.contents) ? e.postData.contents : "{}";
+    if (typeof raw !== "string") raw = "{}";
+    var payload = {};
+    try {
+      payload = JSON.parse(raw || "{}");
+    } catch (parseErr) {
+      return jsonOut_({ ok: false, error: "Invalid JSON body" });
+    }
+    if (!payload || typeof payload !== "object") payload = {};
+    var action = String(payload.action || (e && e.parameter && e.parameter.action) || "").trim();
+    var actionLower = action.toLowerCase().replace(/\s+/g, "");
 
-    if (action === "uploadImage") return jsonOut_(uploadImage_(payload));
+    // DO NOT REMOVE: image upload to Drive (TukTuksVMS, MotorcyclesVMS, CarsVMS)
+    if (actionLower === "uploadimage" || action === "uploadImage") {
+      return jsonOut_(uploadImage_(payload));
+    }
 
     if (action === "add") {
       const created = addRow_(payload.data || {});
@@ -724,23 +740,24 @@ function deleteRow_(id, payload) {
 /* ----------------- DRIVE: uploadImage ----------------- */
 
 function uploadImage_(payload) {
-  const token = payload && payload.token ? String(payload.token) : "";
-  const expectedToken = PropertiesService.getScriptProperties().getProperty("APPS_SCRIPT_UPLOAD_TOKEN") || "";
+  if (!payload || typeof payload !== "object") payload = {};
+  var token = String(payload.token || "").trim();
+  var expectedToken = PropertiesService.getScriptProperties().getProperty("APPS_SCRIPT_UPLOAD_TOKEN") || "";
   if (expectedToken && token !== expectedToken) {
     return { ok: false, error: "Forbidden" };
   }
 
-  let folderId = payload && payload.folderId ? String(payload.folderId) : "";
+  var folderId = String(payload.folderId || "").trim();
   if (!folderId) {
-    const category = String((payload && (payload.category || payload.Category)) || "").trim();
+    var category = String(payload.category || payload.Category || "").trim();
     folderId = folderIdForCategory_(category);
   }
-  const data = payload && payload.data ? String(payload.data) : "";
-  const mimeType = payload && payload.mimeType ? String(payload.mimeType) : "image/jpeg";
-  const fileName = payload && payload.fileName ? String(payload.fileName) : ("vehicle-" + new Date().getTime() + ".jpg");
+  var data = String(payload.data || "");
+  var mimeType = String(payload.mimeType || "image/jpeg").trim() || "image/jpeg";
+  var fileName = String(payload.fileName || "").trim() || ("vehicle-" + new Date().getTime() + ".jpg");
 
-  if (!folderId) return { ok: false, error: "Missing folderId" };
-  if (!data) return { ok: false, error: "Missing data" };
+  if (!folderId) return { ok: false, error: "Missing folderId or category (Cars, Motorcycles, Tuk Tuk)" };
+  if (!data) return { ok: false, error: "Missing data (base64 image)" };
 
   try {
     const folder = DriveApp.getFolderById(folderId);

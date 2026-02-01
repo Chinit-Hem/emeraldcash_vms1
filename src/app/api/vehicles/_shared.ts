@@ -2,6 +2,25 @@ import type { Vehicle } from "@/lib/types";
 import { driveThumbnailUrl } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 
+/** Fetch with timeout to avoid ETIMEDOUT when calling Apps Script (e.g. large image upload). */
+export async function fetchAppsScript(
+  url: string,
+  options: RequestInit & { timeoutMs?: number } = {}
+): Promise<Response> {
+  const { timeoutMs = 30000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 const DEFAULT_DRIVE_FOLDER_CARS = "1UKgtZ_sSNSVy3p-8WBwBrploVL9IDxec";
 const DEFAULT_DRIVE_FOLDER_MOTORCYCLES = "10OcxTtK6ZqQj5cvPMNNIP4VsaVneGiYP";
 const DEFAULT_DRIVE_FOLDER_TUKTUK = "18oDOlZXE9JGE5EDZ7yL6oBRVG6SgVYdP";

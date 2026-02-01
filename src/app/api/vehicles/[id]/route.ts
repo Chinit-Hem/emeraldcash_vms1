@@ -10,6 +10,7 @@ import {
   appsScriptUrl,
   driveFolderIdForCategory,
   driveThumbnailUrl,
+  fetchAppsScript,
   parseImageDataUrl,
   toAppsScriptPayload,
   toVehicle,
@@ -219,7 +220,7 @@ export async function PUT(
       const parts = [id, safePart(payload.Category), safePart(payload.Brand), safePart(payload.Model)].filter(Boolean);
       const fileName = `${parts.join("-")}.${ext}`;
 
-      const uploadRes = await fetch(baseUrl, {
+      const uploadRes = await fetchAppsScript(baseUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -232,15 +233,16 @@ export async function PUT(
           data: imageData.base64Data,
         }),
         cache: "no-store",
+        timeoutMs: 90000,
       });
 
-      const uploadJson = await uploadRes.json().catch(() => ({}));
-      if (!uploadRes.ok || uploadJson.ok === false) {
-        const message =
-          typeof uploadJson?.error === "string" && uploadJson.error.trim()
-            ? uploadJson.error.trim()
-            : `Image upload failed (${uploadRes.status}).`;
-
+      const uploadJson = (await uploadRes.json().catch(() => ({}))) as Record<string, unknown>;
+      const uploadOk = uploadRes.ok && (uploadJson?.ok === true || uploadJson?.ok !== false);
+      const hasError = typeof uploadJson?.error === "string" && String(uploadJson.error).trim();
+      if (!uploadOk || hasError) {
+        const message = hasError
+          ? String(uploadJson.error).trim()
+          : `Image upload failed (${uploadRes.status}).`;
         return NextResponse.json(
           {
             ok: false,
@@ -252,14 +254,15 @@ export async function PUT(
         );
       }
 
+      const dataObj = uploadJson?.data && typeof uploadJson.data === "object" ? (uploadJson.data as Record<string, unknown>) : {};
       const uploadedUrlCandidate =
         uploadJson?.url ??
-        uploadJson?.data?.url ??
-        uploadJson?.data?.thumbnailUrl ??
+        dataObj?.url ??
+        dataObj?.thumbnailUrl ??
         uploadJson?.thumbnailUrl ??
-        uploadJson?.data?.imageUrl;
+        dataObj?.imageUrl;
 
-      const uploadedFileIdCandidate = uploadJson?.fileId ?? uploadJson?.data?.fileId;
+      const uploadedFileIdCandidate = uploadJson?.fileId ?? dataObj?.fileId;
 
       if (typeof uploadedUrlCandidate === "string" && uploadedUrlCandidate.trim()) {
         payload.Image = uploadedUrlCandidate.trim();
@@ -276,11 +279,12 @@ export async function PUT(
       }
     }
 
-    const res = await fetch(baseUrl, {
+    const res = await fetchAppsScript(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update", id, data: payload }),
       cache: "no-store",
+      timeoutMs: 30000,
     });
 
     const data = await res.json();
@@ -291,11 +295,14 @@ export async function PUT(
 
     clearCachedVehicles();
     return NextResponse.json({ ok: true, data });
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : "Unknown error" },
-      { status: 500 }
-    );
+  } catch (e: unknown) {
+    const message =
+      e instanceof Error && e.name === "AbortError"
+        ? "Request to Apps Script timed out. Try again or use a smaller image."
+        : e instanceof Error
+          ? e.message
+          : "Unknown error";
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
 
@@ -331,7 +338,7 @@ export async function DELETE(
         const byIdUrl = new URL(baseUrl);
         byIdUrl.searchParams.set("action", "getById");
         byIdUrl.searchParams.set("id", id);
-        const byIdRes = await fetch(byIdUrl.toString(), { cache: "no-store" });
+        const byIdRes = await fetchAppsScript(byIdUrl.toString(), { cache: "no-store", timeoutMs: 15000 });
         if (byIdRes.ok) {
           const byIdJson = await byIdRes.json().catch(() => ({}));
           if (byIdJson?.ok !== false && byIdJson?.data && typeof byIdJson.data === "object") {
@@ -366,11 +373,12 @@ export async function DELETE(
     };
     if (imageFileId) deletePayload.imageFileId = imageFileId;
 
-    const res = await fetch(baseUrl, {
+    const res = await fetchAppsScript(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(deletePayload),
       cache: "no-store",
+      timeoutMs: 30000,
     });
 
     const data = await res.json();
@@ -380,10 +388,13 @@ export async function DELETE(
 
     clearCachedVehicles();
     return NextResponse.json({ ok: true, data: data.data ?? null });
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : "Unknown error" },
-      { status: 500 }
-    );
+  } catch (e: unknown) {
+    const message =
+      e instanceof Error && e.name === "AbortError"
+        ? "Request to Apps Script timed out."
+        : e instanceof Error
+          ? e.message
+          : "Unknown error";
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }

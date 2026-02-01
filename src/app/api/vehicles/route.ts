@@ -8,6 +8,7 @@ import {
   appsScriptUrl,
   driveFolderIdForCategory,
   driveThumbnailUrl,
+  fetchAppsScript,
   parseImageDataUrl,
   toAppsScriptPayload,
   toVehicle,
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
       );
       const fileName = `${parts.join("-")}.${ext}`;
 
-      const uploadRes = await fetch(baseUrl, {
+      const uploadRes = await fetchAppsScript(baseUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -207,15 +208,16 @@ export async function POST(req: NextRequest) {
           data: imageData.base64Data,
         }),
         cache: "no-store",
+        timeoutMs: 90000,
       });
 
-      const uploadJson = await uploadRes.json().catch(() => ({}));
-      if (!uploadRes.ok || uploadJson.ok === false) {
-        const message =
-          typeof uploadJson?.error === "string" && uploadJson.error.trim()
-            ? uploadJson.error.trim()
-            : `Image upload failed (${uploadRes.status}).`;
-
+      const uploadJson = (await uploadRes.json().catch(() => ({}))) as Record<string, unknown>;
+      const uploadOk = uploadRes.ok && (uploadJson?.ok === true || uploadJson?.ok !== false);
+      const hasError = typeof uploadJson?.error === "string" && String(uploadJson.error).trim();
+      if (!uploadOk || hasError) {
+        const message = hasError
+          ? String(uploadJson.error).trim()
+          : `Image upload failed (${uploadRes.status}).`;
         return NextResponse.json(
           {
             ok: false,
@@ -227,14 +229,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const dataObj = uploadJson?.data && typeof uploadJson.data === "object" ? (uploadJson.data as Record<string, unknown>) : {};
       const uploadedUrlCandidate =
         uploadJson?.url ??
-        uploadJson?.data?.url ??
-        uploadJson?.data?.thumbnailUrl ??
+        dataObj?.url ??
+        dataObj?.thumbnailUrl ??
         uploadJson?.thumbnailUrl ??
-        uploadJson?.data?.imageUrl;
+        dataObj?.imageUrl;
 
-      const uploadedFileIdCandidate = uploadJson?.fileId ?? uploadJson?.data?.fileId;
+      const uploadedFileIdCandidate = uploadJson?.fileId ?? dataObj?.fileId;
 
       if (typeof uploadedUrlCandidate === "string" && uploadedUrlCandidate.trim()) {
         payload.Image = uploadedUrlCandidate.trim();
@@ -251,11 +254,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const res = await fetch(baseUrl, {
+    const res = await fetchAppsScript(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "add", data: payload }),
       cache: "no-store",
+      timeoutMs: 30000,
     });
 
     if (!res.ok) {
@@ -273,9 +277,12 @@ export async function POST(req: NextRequest) {
     clearCachedVehicles();
     return NextResponse.json({ ok: true, data: data.data ?? null });
   } catch (e: unknown) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : "Fetch failed" },
-      { status: 500 }
-    );
+    const message =
+      e instanceof Error && e.name === "AbortError"
+        ? "Request to Apps Script timed out. Try again or use a smaller image."
+        : e instanceof Error
+          ? e.message
+          : "Fetch failed";
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }

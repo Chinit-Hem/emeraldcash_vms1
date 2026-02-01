@@ -51,6 +51,7 @@ const REQUIRED_HEADERS = [
 ];
 
 // Optional: default Drive folders per Category (used if uploadImage is called without folderId)
+// CarsVMS, MotorcyclesVMS, TukTuksVMS - must support action=uploadImage in doPost
 const DRIVE_FOLDER_CARS = "1UKgtZ_sSNSVy3p-8WBwBrploVL9IDxec";
 const DRIVE_FOLDER_MOTORCYCLES = "10OcxTtK6ZqQj5cvPMNNIP4VsaVneGiYP";
 const DRIVE_FOLDER_TUKTUK = "18oDOlZXE9JGE5EDZ7yL6oBRVG6SgVYdP";
@@ -171,14 +172,31 @@ function doGet(e) {
     return jsonOut_({ status: 200, ok: true, data: found });
   }
 
+  if (action === "uploadImage") {
+    return jsonOut_({ status: 400, ok: false, error: "uploadImage requires POST with JSON body. Do not use GET." });
+  }
+
   return jsonOut_({ status: 400, ok: false, error: "Unknown action", action });
 }
 
 function doPost(e) {
   try {
-    const raw = (e && e.postData && e.postData.contents) ? e.postData.contents : "{}";
-    const payload = JSON.parse(raw || "{}");
-    const action = String(payload.action || (e && e.parameter && e.parameter.action) || "").trim();
+    var raw = (e && e.postData && e.postData.contents) ? e.postData.contents : "{}";
+    if (typeof raw !== "string") raw = "{}";
+    var payload = {};
+    try {
+      payload = JSON.parse(raw || "{}");
+    } catch (parseErr) {
+      return jsonOut_({ status: 400, ok: false, error: "Invalid JSON body" });
+    }
+    if (!payload || typeof payload !== "object") payload = {};
+    var action = String(payload.action || (e && e.parameter && e.parameter.action) || "").trim();
+    var actionLower = action.toLowerCase().replace(/\s+/g, "");
+
+    // DO NOT REMOVE: image upload to Drive (TukTuksVMS, MotorcyclesVMS, CarsVMS)
+    if (actionLower === "uploadimage" || action === "uploadImage") {
+      return jsonOut_(uploadImage_(payload));
+    }
 
     if (action === "add") {
       const created = addRow_(payload.data || {});
@@ -198,8 +216,6 @@ function doPost(e) {
       const deleted = deleteRow_(id);
       return jsonOut_({ status: 200, ok: true, data: deleted });
     }
-
-    if (action === "uploadImage") return jsonOut_(uploadImage_(payload));
 
     return jsonOut_({ status: 400, ok: false, error: "Unknown action: " + action });
   } catch (err) {
@@ -732,37 +748,39 @@ function nextNumericId_(sh, idColIndex0) {
 /* ----------------- DRIVE: uploadImage ----------------- */
 
 function uploadImage_(payload) {
-  const token = payload && payload.token ? String(payload.token) : "";
-  const expectedToken = PropertiesService.getScriptProperties().getProperty("APPS_SCRIPT_UPLOAD_TOKEN") || "";
+  if (!payload || typeof payload !== "object") payload = {};
+  var token = String(payload.token || "").trim();
+  var expectedToken = PropertiesService.getScriptProperties().getProperty("APPS_SCRIPT_UPLOAD_TOKEN") || "";
   if (expectedToken && token !== expectedToken) {
     return { ok: false, error: "Forbidden" };
   }
 
-  let folderId = payload && payload.folderId ? String(payload.folderId) : "";
+  var folderId = String(payload.folderId || "").trim();
   if (!folderId) {
-    const category = String((payload && (payload.category || payload.Category)) || "").trim();
+    var category = String(payload.category || payload.Category || "").trim();
     folderId = folderIdForCategory_(category);
   }
-  const data = payload && payload.data ? String(payload.data) : "";
-  const mimeType = payload && payload.mimeType ? String(payload.mimeType) : "image/jpeg";
-  const fileName = payload && payload.fileName ? String(payload.fileName) : ("vehicle-" + new Date().getTime() + ".jpg");
+  var data = String(payload.data || "");
+  var mimeType = String(payload.mimeType || "image/jpeg").trim() || "image/jpeg";
+  var fileName = String(payload.fileName || "").trim() || ("vehicle-" + new Date().getTime() + ".jpg");
 
-  if (!folderId) return { ok: false, error: "Missing folderId" };
-  if (!data) return { ok: false, error: "Missing data" };
+  if (!folderId) return { ok: false, error: "Missing folderId or category (Cars, Motorcycles, Tuk Tuk)" };
+  if (!data) return { ok: false, error: "Missing data (base64 image)" };
 
   try {
-    const folder = DriveApp.getFolderById(folderId);
-    const bytes = Utilities.base64Decode(data);
-    const blob = Utilities.newBlob(bytes, mimeType, fileName);
-    const file = folder.createFile(blob);
+    var folder = DriveApp.getFolderById(folderId);
+    var bytes = Utilities.base64Decode(data);
+    var blob = Utilities.newBlob(bytes, mimeType, fileName);
+    var file = folder.createFile(blob);
 
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-    const fileId = file.getId();
-    const thumbnailUrl = "https://drive.google.com/thumbnail?id=" + encodeURIComponent(fileId) + "&sz=w1000-h1000";
+    var fileId = file.getId();
+    var thumbnailUrl = "https://drive.google.com/thumbnail?id=" + encodeURIComponent(fileId) + "&sz=w1000-h1000";
 
     return {
       ok: true,
+      status: 200,
       data: {
         fileId: fileId,
         thumbnailUrl: thumbnailUrl,
