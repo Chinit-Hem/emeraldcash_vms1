@@ -50,6 +50,11 @@ const REQUIRED_HEADERS = [
   "created_at",
 ];
 
+// Optional: default Drive folders per Category (used if uploadImage is called without folderId)
+const DRIVE_FOLDER_CARS = "1UKgtZ_sSNSVy3p-8WBwBrploVL9IDxec";
+const DRIVE_FOLDER_MOTORCYCLES = "10OcxTtK6ZqQj5cvPMNNIP4VsaVneGiYP";
+const DRIVE_FOLDER_TUKTUK = "18oDOlZXE9JGE5EDZ7yL6oBRVG6SgVYdP";
+
 // Pagination defaults (Apps Script web apps should keep responses small).
 const DEFAULT_PAGE_LIMIT = 200;
 const MAX_PAGE_LIMIT = 500;
@@ -193,6 +198,8 @@ function doPost(e) {
       const deleted = deleteRow_(id);
       return jsonOut_({ status: 200, ok: true, data: deleted });
     }
+
+    if (action === "uploadImage") return jsonOut_(uploadImage_(payload));
 
     return jsonOut_({ status: 400, ok: false, error: "Unknown action: " + action });
   } catch (err) {
@@ -720,6 +727,61 @@ function nextNumericId_(sh, idColIndex0) {
     if (int > max) max = int;
   }
   return max + 1;
+}
+
+/* ----------------- DRIVE: uploadImage ----------------- */
+
+function uploadImage_(payload) {
+  const token = payload && payload.token ? String(payload.token) : "";
+  const expectedToken = PropertiesService.getScriptProperties().getProperty("APPS_SCRIPT_UPLOAD_TOKEN") || "";
+  if (expectedToken && token !== expectedToken) {
+    return { ok: false, error: "Forbidden" };
+  }
+
+  let folderId = payload && payload.folderId ? String(payload.folderId) : "";
+  if (!folderId) {
+    const category = String((payload && (payload.category || payload.Category)) || "").trim();
+    folderId = folderIdForCategory_(category);
+  }
+  const data = payload && payload.data ? String(payload.data) : "";
+  const mimeType = payload && payload.mimeType ? String(payload.mimeType) : "image/jpeg";
+  const fileName = payload && payload.fileName ? String(payload.fileName) : ("vehicle-" + new Date().getTime() + ".jpg");
+
+  if (!folderId) return { ok: false, error: "Missing folderId" };
+  if (!data) return { ok: false, error: "Missing data" };
+
+  try {
+    const folder = DriveApp.getFolderById(folderId);
+    const bytes = Utilities.base64Decode(data);
+    const blob = Utilities.newBlob(bytes, mimeType, fileName);
+    const file = folder.createFile(blob);
+
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const fileId = file.getId();
+    const thumbnailUrl = "https://drive.google.com/thumbnail?id=" + encodeURIComponent(fileId) + "&sz=w1000-h1000";
+
+    return {
+      ok: true,
+      data: {
+        fileId: fileId,
+        thumbnailUrl: thumbnailUrl,
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+}
+
+function folderIdForCategory_(category) {
+  const normalized = String(category || "").trim().toLowerCase();
+  if (!normalized) return "";
+
+  if (normalized === "car" || normalized === "cars") return DRIVE_FOLDER_CARS;
+  if (normalized === "motorcycle" || normalized === "motorcycles") return DRIVE_FOLDER_MOTORCYCLES;
+  if (normalized === "tuktuk" || normalized === "tuk tuk" || normalized === "tuk-tuk") return DRIVE_FOLDER_TUKTUK;
+
+  return "";
 }
 
 /* ----------------- RESPONSE ----------------- */
