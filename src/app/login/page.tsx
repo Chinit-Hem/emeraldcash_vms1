@@ -1,9 +1,9 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import styles from "./page.module.css";
 import ThemeToggle from "@/app/components/ThemeToggle";
 
 export default function LoginPage() {
@@ -81,14 +81,6 @@ export default function LoginPage() {
 
           {error ? <div className="ec-error">{error}</div> : null}
         </form>
-
-        <div className={styles.demoUsersContainer}>
-          Demo users:
-          <ul className={styles.demoUsersList}>
-            <li>admin / 1234 (Admin)</li>
-            <li>staff / 1234 (Staff)</li>
-          </ul>
-        </div>
       </section>
     </main>
   );
