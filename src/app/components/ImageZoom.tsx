@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useState } from "react";
+import React, { useState } from "react";
 
 interface ImageZoomProps {
   src: string;
@@ -38,7 +38,7 @@ export default function ImageZoom({ src, alt }: ImageZoomProps) {
         >
           <div
             className="relative max-w-4xl max-h-screen flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
           >
             <img
               src={src}

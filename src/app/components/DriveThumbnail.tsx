@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { driveThumbnailUrl } from "@/lib/drive";
 
@@ -97,7 +97,7 @@ export default function DriveThumbnail({
         >
           <div
             className="relative w-[min(92vw,900px)] h-[min(84vh,900px)] rounded-2xl overflow-hidden bg-white ring-1 ring-black/10 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
           >
             <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
               <a

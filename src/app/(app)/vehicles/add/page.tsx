@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useAuthUser } from "@/app/components/AuthContext";
 import ImageZoom from "@/app/components/ImageZoom";
 import { getCambodiaNowString } from "@/lib/cambodiaTime";
@@ -192,7 +193,7 @@ function AddVehicleInner() {
               required
               autoFocus
               value={formData.Category || ""}
-              onChange={(e) => handleChange("Category", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange("Category", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
             >
               <option value="" disabled>
@@ -212,7 +213,7 @@ function AddVehicleInner() {
               type="text"
               required
               value={formData.Brand || ""}
-              onChange={(e) => handleChange("Brand", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Brand", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
             />
           </div>
@@ -223,7 +224,7 @@ function AddVehicleInner() {
               type="text"
               required
               value={formData.Model || ""}
-              onChange={(e) => handleChange("Model", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Model", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
             />
           </div>
@@ -234,7 +235,7 @@ function AddVehicleInner() {
               type="text"
               required
               value={formData.Plate || ""}
-              onChange={(e) => handleChange("Plate", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Plate", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent font-mono text-gray-900"
             />
           </div>
@@ -244,7 +245,7 @@ function AddVehicleInner() {
             <input
               type="number"
               value={formData.Year ?? ""}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 handleChange(
                   "Year",
                   e.target.value === ""
@@ -274,7 +275,7 @@ function AddVehicleInner() {
             <input
               type="text"
               value={formData.Color || ""}
-              onChange={(e) => handleChange("Color", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Color", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
             />
           </div>
@@ -283,7 +284,7 @@ function AddVehicleInner() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Condition</label>
             <select
               value={formData.Condition || "New"}
-              onChange={(e) => handleChange("Condition", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange("Condition", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
             >
               {conditions.map((cond) => (
@@ -300,7 +301,7 @@ function AddVehicleInner() {
               type="text"
               list="bodyTypesList"
               value={formData.BodyType || ""}
-              onChange={(e) => handleChange("BodyType", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("BodyType", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
               placeholder="Type body type (or choose)"
             />
@@ -317,7 +318,7 @@ function AddVehicleInner() {
               type="text"
               list="taxTypesList"
               value={formData.TaxType || ""}
-              onChange={(e) => handleChange("TaxType", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("TaxType", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
               placeholder="Type tax type (or choose)"
             />
@@ -333,7 +334,7 @@ function AddVehicleInner() {
             <input
               type="number"
               value={formData.PriceNew ?? ""}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 handleChange(
                   "PriceNew",
                   e.target.value === ""
@@ -376,7 +377,7 @@ function AddVehicleInner() {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => handleImageFile(e.target.files?.[0] ?? null)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleImageFile(e.target.files?.[0] ?? null)}
                   className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-green-700 file:text-white file:font-medium hover:file:bg-green-800"
                 />
                 <p className="text-xs text-gray-500 mt-2">
@@ -387,7 +388,7 @@ function AddVehicleInner() {
                 <input
                   type="url"
                   value={formData.Image || ""}
-                  onChange={(e) => handleChange("Image", e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Image", e.target.value)}
                   placeholder="https://..."
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900 placeholder:text-gray-400"
                 />

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
@@ -677,7 +678,7 @@ export default function VehicleList({ category }: VehicleListProps) {
                   </div>
                 </div>
 
-                <div className="mt-3 flex gap-3" onClick={(e) => e.stopPropagation()}>
+                <div className="mt-3 flex gap-3" onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
                   <button
                     type="button"
                     onClick={() => {
@@ -851,7 +852,7 @@ export default function VehicleList({ category }: VehicleListProps) {
                     </td>
                     <td
                       className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 print:hidden"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e: React.MouseEvent<HTMLTableCellElement>) => e.stopPropagation()}
                     >
                       <div className="flex items-center gap-2">
                         <button

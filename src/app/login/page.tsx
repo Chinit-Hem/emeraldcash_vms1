@@ -60,7 +60,7 @@ export default function LoginPage() {
           <input
             className="ec-input"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
             placeholder="Username"
             autoComplete="username"
             required
@@ -68,7 +68,7 @@ export default function LoginPage() {
           <input
             className="ec-input"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
             placeholder="Password"
             type="password"
             autoComplete="current-password"

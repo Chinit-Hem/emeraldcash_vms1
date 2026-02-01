@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 export type SelectOption = { label: string; value: string };
 
 type FilterSelectProps = {
@@ -16,7 +18,7 @@ export default function FilterSelect({ id, value, onChange, options, placeholder
     <select
       id={id}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
       className="ec-select w-full"
       disabled={disabled}
     >
