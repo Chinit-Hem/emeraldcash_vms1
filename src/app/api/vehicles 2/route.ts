@@ -1,0 +1,281 @@
+import { parseSessionCookie, validateSession } from "@/lib/auth";
+import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
+import type { Vehicle } from "@/lib/types";
+import { NextRequest, NextResponse } from "next/server";
+
+import { clearCachedVehicles, getCachedVehicles, setCachedVehicles } from "./_cache";
+import {
+  appsScriptUrl,
+  driveFolderIdForCategory,
+  driveThumbnailUrl,
+  parseImageDataUrl,
+  toAppsScriptPayload,
+  toVehicle,
+} from "./_shared";
+
+const TEN_MINUTES_SECONDS = 60 * 10;
+
+function requireSession(req: NextRequest) {
+  const sessionCookie = req.cookies.get("session")?.value;
+  if (!sessionCookie) return null;
+
+  const session = parseSessionCookie(sessionCookie);
+  if (!session || !validateSession(session)) return null;
+
+  return session;
+}
+
+function cacheHeaders() {
+  return {
+    "Cache-Control": `public, max-age=0, s-maxage=${TEN_MINUTES_SECONDS}, stale-while-revalidate=${TEN_MINUTES_SECONDS}`,
+  };
+}
+
+export async function GET() {
+  const cached = getCachedVehicles();
+  if (cached) {
+    return NextResponse.json({ ok: true, data: cached }, { headers: cacheHeaders() });
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!baseUrl) {
+    return NextResponse.json(
+      { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars" },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const toIntOrNull = (value: unknown): number | null => {
+      if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : null;
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const parsed = Number.parseInt(trimmed, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const fetchVehiclesPage = async (offset: number, limit: number) => {
+      const url = new URL(appsScriptUrl(baseUrl, "getVehicles"));
+      url.searchParams.set("limit", String(limit));
+      url.searchParams.set("offset", String(offset));
+
+      const res = await fetch(url.toString(), {
+        cache: "force-cache",
+        next: { revalidate: TEN_MINUTES_SECONDS },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Apps Script error: ${res.status}`);
+      }
+
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (json.ok === false) {
+        const message = typeof json.error === "string" && json.error.trim() ? json.error.trim() : "Apps Script ok=false";
+        throw new Error(message);
+      }
+
+      const rows = (Array.isArray(json.data) ? (json.data as unknown[]) : [])
+        .filter((row) => row && typeof row === "object") as Record<string, unknown>[];
+
+      const metaRaw = json.meta && typeof json.meta === "object" ? (json.meta as Record<string, unknown>) : null;
+      const meta = metaRaw
+        ? {
+            total: toIntOrNull(metaRaw.total),
+            limit: toIntOrNull(metaRaw.limit),
+            offset: toIntOrNull(metaRaw.offset),
+          }
+        : null;
+
+      return { rows, meta };
+    };
+
+    // Many Apps Script implementations paginate by default. Fetch all pages (max 500/page).
+    const requestedLimit = 500;
+    const maxPages = 50; // 50 * 500 = 25k rows safety cap
+
+    let offset = 0;
+    let total: number | null = null;
+    let lastMetaOffset: number | null = null;
+    const allRows: Record<string, unknown>[] = [];
+
+    for (let page = 0; page < maxPages; page++) {
+      const { rows, meta } = await fetchVehiclesPage(offset, requestedLimit);
+      allRows.push(...rows);
+
+      if (!meta) {
+        // No pagination metadata => assume this is the full list.
+        break;
+      }
+
+      if (meta.total != null && meta.total >= 0) total ??= meta.total;
+
+      const effectiveLimit = meta.limit && meta.limit > 0 ? meta.limit : requestedLimit;
+      const effectiveOffset = meta.offset != null && meta.offset >= 0 ? meta.offset : offset;
+
+      // Guard: if offset doesn't move, stop to avoid infinite loops.
+      if (lastMetaOffset != null && effectiveOffset === lastMetaOffset) break;
+      lastMetaOffset = effectiveOffset;
+
+      if (rows.length === 0) break;
+      if (rows.length < effectiveLimit) break;
+      if (total != null && allRows.length >= total) break;
+
+      offset = effectiveOffset + effectiveLimit;
+      if (total != null && offset >= total) break;
+    }
+
+    const vehicles = allRows.map((row) => toVehicle(row)) as Vehicle[];
+
+    setCachedVehicles(vehicles);
+    return NextResponse.json({ ok: true, data: vehicles }, { headers: cacheHeaders() });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { ok: false, error: e instanceof Error ? e.message : "Fetch failed" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const session = requireSession(req);
+  if (!session) {
+    return NextResponse.json({ ok: false, error: "Invalid or expired session" }, { status: 401 });
+  }
+
+  if (session.role !== "Admin") {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!baseUrl) {
+    return NextResponse.json(
+      { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars" },
+      { status: 500 }
+    );
+  }
+
+  const safePart = (value: unknown) =>
+    String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 32);
+
+  const extensionFromMimeType = (mimeType: string) => {
+    const normalized = mimeType.toLowerCase();
+    if (normalized === "image/png") return "png";
+    if (normalized === "image/webp") return "webp";
+    if (normalized === "image/gif") return "gif";
+    if (normalized === "image/svg+xml") return "svg";
+    return "jpg";
+  };
+
+  try {
+    const payload = toAppsScriptPayload(body);
+    payload.Time = normalizeCambodiaTimeString(payload.Time) || getCambodiaNowString();
+
+    const imageData = parseImageDataUrl(payload.Image);
+    if (imageData) {
+      const folderId = driveFolderIdForCategory(payload.Category);
+      if (!folderId) {
+        return NextResponse.json(
+          { ok: false, error: "Unknown category. Please select Cars, Motorcycles, or Tuk Tuk." },
+          { status: 400 }
+        );
+      }
+
+      const ext = extensionFromMimeType(imageData.mimeType);
+      const fileNameId = crypto.randomUUID().split("-")[0];
+      const parts = [fileNameId, safePart(payload.Category), safePart(payload.Brand), safePart(payload.Model)].filter(
+        Boolean
+      );
+      const fileName = `${parts.join("-")}.${ext}`;
+
+      const uploadRes = await fetch(baseUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "uploadImage",
+          folderId,
+          category: payload.Category,
+          token: process.env.APPS_SCRIPT_UPLOAD_TOKEN,
+          mimeType: imageData.mimeType,
+          fileName,
+          data: imageData.base64Data,
+        }),
+        cache: "no-store",
+      });
+
+      const uploadJson = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok || uploadJson.ok === false) {
+        const message =
+          typeof uploadJson?.error === "string" && uploadJson.error.trim()
+            ? uploadJson.error.trim()
+            : `Image upload failed (${uploadRes.status}).`;
+
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              `${message} ` +
+              `Your Apps Script must support action=uploadImage to save images into Drive folders.`,
+          },
+          { status: 502 }
+        );
+      }
+
+      const uploadedUrlCandidate =
+        uploadJson?.url ??
+        uploadJson?.data?.url ??
+        uploadJson?.data?.thumbnailUrl ??
+        uploadJson?.thumbnailUrl ??
+        uploadJson?.data?.imageUrl;
+
+      const uploadedFileIdCandidate = uploadJson?.fileId ?? uploadJson?.data?.fileId;
+
+      if (typeof uploadedUrlCandidate === "string" && uploadedUrlCandidate.trim()) {
+        payload.Image = uploadedUrlCandidate.trim();
+      } else if (typeof uploadedFileIdCandidate === "string" && uploadedFileIdCandidate.trim()) {
+        payload.Image = driveThumbnailUrl(uploadedFileIdCandidate.trim());
+      } else {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Image upload succeeded but no image URL was returned by Apps Script.",
+          },
+          { status: 502 }
+        );
+      }
+    }
+
+    const res = await fetch(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "add", data: payload }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      return NextResponse.json(
+        { ok: false, error: `Apps Script error: ${res.status}` },
+        { status: 502 }
+      );
+    }
+
+    const data = await res.json().catch(() => ({}));
+    if (data.ok === false) {
+      return NextResponse.json({ ok: false, error: data.error || "Apps Script returned ok=false" }, { status: 500 });
+    }
+
+    clearCachedVehicles();
+    return NextResponse.json({ ok: true, data: data.data ?? null });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { ok: false, error: e instanceof Error ? e.message : "Fetch failed" },
+      { status: 500 }
+    );
+  }
+}
