@@ -3,7 +3,7 @@ import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodi
 import type { Vehicle } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
-import { clearCachedVehicles, getCachedVehicles, setCachedVehicles } from "./_cache";
+import { clearCachedVehicles, getCachedVehicles, setCachedVehicles } from "../vehicles/_cache";
 import {
   appsScriptUrl,
   driveFolderIdForCategory,
@@ -11,7 +11,7 @@ import {
   parseImageDataUrl,
   toAppsScriptPayload,
   toVehicle,
-} from "./_shared";
+} from "../vehicles/_shared";
 
 function requireSession(req: NextRequest) {
   const sessionCookie = req.cookies.get("session")?.value;

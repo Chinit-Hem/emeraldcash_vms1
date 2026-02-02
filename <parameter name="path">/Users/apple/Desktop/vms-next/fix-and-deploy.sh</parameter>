@@ -1,0 +1,53 @@
+<parameter name="content">#!/bin/bash
+
+# Fix and Deploy Script for Emerald Cash VMS
+
+echo "Starting build and deployment process..."
+
+# Step 1: Build the project
+echo "Building project..."
+cd /Users/apple/Desktop/vms-next
+npm run build
+
+if [ $? -eq 0 ]; then
+    echo "Build successful!"
+else
+    echo "Build failed!"
+    exit 1
+fi
+
+# Step 2: Set git remote to correct repository
+echo "Setting up git remote..."
+git remote remove origin 2>/dev/null || true
+git remote add origin https://github.com/Chinit-Hem/emeraldcash.git
+
+# Step 3: Add all changes
+echo "Adding changes..."
+git add .
+
+# Step 4: Commit
+echo "Committing changes..."
+git commit -m "fixed imports, cleaned project, ready for Vercel deploy" || echo "No changes to commit"
+
+# Step 5: Push to GitHub
+echo "Pushing to GitHub..."
+git push -u origin main --force-with-lease
+
+if [ $? -eq 0 ]; then
+    echo "Successfully pushed to GitHub!"
+    echo ""
+    echo "=========================================="
+    echo "READY FOR VERCEL DEPLOYMENT!"
+    echo "=========================================="
+    echo "1. Go to https://vercel.com/dashboard"
+    echo "2. Add New Project"
+    echo "3. Import 'emeraldcash' repository"
+    echo "4. Add these environment variables:"
+    echo "   - NEXT_PUBLIC_API_URL"
+    echo "   - SESSION_SECRET"
+    echo "5. Deploy!"
+else
+    echo "Push failed!"
+    exit 1
+fi
+</parameter>

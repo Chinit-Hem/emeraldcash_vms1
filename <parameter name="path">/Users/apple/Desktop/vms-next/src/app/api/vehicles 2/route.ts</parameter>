@@ -1,8 +1,8 @@
-import { parseSessionCookie, validateSession } from "@/lib/auth";
+<parameter name="content">import { parseSessionCookie, validateSession } from "@/lib/auth";
 import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import type { Vehicle } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
-import { clearCachedVehicles, getCachedVehicles, setCachedVehicles } from "../vehicles/_cache";
+
 import {
   appsScriptUrl,
   driveFolderIdForCategory,
@@ -10,7 +10,7 @@ import {
   parseImageDataUrl,
   toAppsScriptPayload,
   toVehicle,
-} from "../vehicles/_shared";
+} from "../_shared";
 
 const TEN_MINUTES_SECONDS = 60 * 10;
 
@@ -278,4 +278,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
+</parameter>
