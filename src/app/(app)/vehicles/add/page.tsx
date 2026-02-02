@@ -1,14 +1,13 @@
 "use client";
 
-import React from "react";
 import { useAuthUser } from "@/app/components/AuthContext";
 import ImageZoom from "@/app/components/ImageZoom";
 import { getCambodiaNowString } from "@/lib/cambodiaTime";
-import { fileToDataUrl } from "@/lib/fileToDataUrl";
+import { compressImage, formatFileSize } from "@/lib/compressImage";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import React, { useEffect, useState, type FormEvent } from "react";
 
 const ADD_DRAFT_KEY = "vms.addVehicleDraft.v1";
 
@@ -20,9 +19,16 @@ function AddVehicleInner() {
   const router = useRouter();
   const user = useAuthUser();
   const isAdmin = user.role === "Admin";
-  const [cambodiaNow, setCambodiaNow] = useState(() => getCambodiaNowString());
   const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [compressedImage, setCompressedImage] = useState<{
+    file: File;
+    dataUrl: string;
+    originalSize: number;
+    compressedSize: number;
+  } | null>(null);
   const [formData, setFormData] = useState<Partial<Vehicle>>({
     Brand: "",
     Model: "",
@@ -39,10 +45,7 @@ function AddVehicleInner() {
     Image: "",
   });
 
-  useEffect(() => {
-    const interval = window.setInterval(() => setCambodiaNow(getCambodiaNowString()), 1000);
-    return () => window.clearInterval(interval);
-  }, []);
+
 
   useEffect(() => {
     try {
@@ -73,12 +76,15 @@ function AddVehicleInner() {
     return () => window.clearTimeout(timeout);
   }, [formData]);
 
-  const handleChange = (field: keyof Vehicle, value: string | number | null) => {
+  const handleChange = (field: keyof Vehicle, value: string | number | boolean | null) => {
     setFormData((prev) => {
       const next: Partial<Vehicle> = { ...prev, [field]: value };
       if (field === "PriceNew") {
-        const priceNew = typeof value === "number" && Number.isFinite(value) ? value : null;
+        // Validate: price must be positive
+        const rawValue = typeof value === "number" ? value : (typeof value === "string" ? Number.parseFloat(value) : NaN);
+        const priceNew = Number.isFinite(rawValue) && rawValue > 0 ? rawValue : null;
         const derived = derivePrices(priceNew);
+        next.PriceNew = priceNew;
         next.Price40 = derived.Price40;
         next.Price70 = derived.Price70;
       }
@@ -92,17 +98,30 @@ function AddVehicleInner() {
       alert("Please select an image file");
       return;
     }
-    if (file.size > 4 * 1024 * 1024) {
-      alert("Image too large (max 4MB)");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Image too large (max 10MB)");
       return;
     }
 
     setImageLoading(true);
     try {
-      const dataUrl = await fileToDataUrl(file);
-      handleChange("Image", dataUrl);
+      const result = await compressImage(file, {
+        maxWidth: 1280,
+        quality: 0.75,
+        targetMinSizeKB: 250,
+        targetMaxSizeKB: 800,
+      });
+
+      setCompressedImage({
+        file: result.file,
+        dataUrl: result.dataUrl,
+        originalSize: result.originalSize,
+        compressedSize: result.compressedSize,
+      });
+
+      handleChange("Image", result.dataUrl);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to load image");
+      alert(err instanceof Error ? err.message : "Failed to compress image");
     } finally {
       setImageLoading(false);
     }
@@ -110,40 +129,74 @@ function AddVehicleInner() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
 
+    // Immediately reset form and show success
     try {
-      const payload: Partial<Vehicle> = {
-        ...formData,
-        Time: getCambodiaNowString(),
-      };
-
-      const res = await fetch("/api/vehicles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.status === 401) {
-        router.push("/login");
-        return;
-      }
-
-      const json = await res.json().catch(() => ({}));
-      if (res.status === 403) throw new Error("Forbidden");
-      if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to add vehicle");
-      try {
-        sessionStorage.removeItem(ADD_DRAFT_KEY);
-      } catch {
-        // ignore
-      }
-      alert("Vehicle added successfully!");
-      router.push("/vehicles");
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Error adding vehicle");
-    } finally {
-      setLoading(false);
+      sessionStorage.removeItem(ADD_DRAFT_KEY);
+    } catch {
+      // ignore
     }
+
+    setSuccessMessage("Vehicle added successfully!");
+
+    // Reset form for next vehicle
+    setFormData({
+      Brand: "",
+      Model: "",
+      Category: "",
+      Plate: "",
+      Year: null,
+      Color: "",
+      Condition: "New",
+      BodyType: "",
+      TaxType: "",
+      PriceNew: null,
+      Price40: null,
+      Price70: null,
+      Image: "",
+    });
+    setCompressedImage(null);
+
+    // Process the submission in the background
+    (async () => {
+      try {
+        const formDataToSend = new FormData();
+
+        // Add vehicle data
+        Object.entries(formData).forEach(([key, value]) => {
+          if (value != null) {
+            formDataToSend.append(key, String(value));
+          }
+        });
+        formDataToSend.append("Time", getCambodiaNowString());
+
+        // Add compressed image if available
+        if (compressedImage?.file) {
+          formDataToSend.append("image", compressedImage.file);
+        }
+
+        const res = await fetch("/api/vehicles", {
+          method: "POST",
+          body: formDataToSend,
+        });
+
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
+
+        const json = await res.json().catch(() => ({}));
+        if (res.status === 403) throw new Error("Forbidden");
+        if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to add vehicle");
+
+        // Success already shown
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Error adding vehicle");
+      } finally {
+        setSubmitting(false);
+      }
+    })();
   };
 
   const categories = ["Cars", "Motorcycles", "Tuk Tuk"];
@@ -185,6 +238,48 @@ function AddVehicleInner() {
           <p className="text-gray-600 mt-2">Fill in the vehicle details below</p>
         </div>
 
+        {/* Success Message Banner */}
+        {successMessage ? (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5 text-green-600"
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span className="text-green-800 font-medium">{successMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSuccessMessage("")}
+              className="text-green-600 hover:text-green-800 transition"
+              aria-label="Dismiss success message"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="M18 6 6 18" />
+                <path d="M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div>
@@ -212,6 +307,7 @@ function AddVehicleInner() {
             <input
               type="text"
               required
+              maxLength={100}
               value={formData.Brand || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Brand", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
@@ -223,6 +319,7 @@ function AddVehicleInner() {
             <input
               type="text"
               required
+              maxLength={100}
               value={formData.Model || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Model", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
@@ -234,6 +331,7 @@ function AddVehicleInner() {
             <input
               type="text"
               required
+              maxLength={20}
               value={formData.Plate || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Plate", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent font-mono text-gray-900"
@@ -257,17 +355,6 @@ function AddVehicleInner() {
               }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Time (Cambodia)</label>
-            <input
-              type="text"
-              readOnly
-              value={cambodiaNow}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-gray-900"
-            />
-            <p className="text-xs text-gray-500 mt-2">Saved automatically when you add the vehicle.</p>
           </div>
 
           <div>
@@ -333,6 +420,8 @@ function AddVehicleInner() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Market Price</label>
             <input
               type="number"
+              min="0"
+              step="0.01"
               value={formData.PriceNew ?? ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 handleChange(
@@ -381,7 +470,12 @@ function AddVehicleInner() {
                   className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-green-700 file:text-white file:font-medium hover:file:bg-green-800"
                 />
                 <p className="text-xs text-gray-500 mt-2">
-                  {imageLoading ? "Loading image..." : "Max 4MB. Uploaded to Google Drive and saved in Google Sheet."}
+                  {imageLoading
+                    ? "Compressing image..."
+                    : compressedImage
+                    ? `Compressed: ${formatFileSize(compressedImage.compressedSize)} (was ${formatFileSize(compressedImage.originalSize)})`
+                    : "Max 10MB. Images are compressed for fast upload."
+                  }
                 </p>
               </div>
               <div>
@@ -416,10 +510,10 @@ function AddVehicleInner() {
           <div className="col-span-2 flex gap-4">
             <button
               type="submit"
-              disabled={loading}
+              disabled={submitting}
               className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition font-medium"
             >
-              {loading ? "Adding..." : "Add Vehicle"}
+              {submitting ? "Adding..." : "Add Vehicle"}
             </button>
             <button
               type="button"

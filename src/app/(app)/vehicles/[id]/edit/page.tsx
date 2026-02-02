@@ -2,15 +2,15 @@
 
 /// <reference types="react" />
 /// <reference path="../../../../../types/jsx-global.d.ts" />
-import React from "react";
 import { useAuthUser } from "@/app/components/AuthContext";
 import ImageZoom from "@/app/components/ImageZoom";
+import { compressImage, formatFileSize } from "@/lib/compressImage";
 import { fileToDataUrl } from "@/lib/fileToDataUrl";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
 import { useParams, useRouter } from "next/navigation";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const CATEGORY_OPTIONS = ["Cars", "Motorcycles", "Tuk Tuk"] as const;
 const EDIT_DRAFT_PREFIX = "vms.editVehicleDraft.v1:";
@@ -26,12 +26,14 @@ function EditVehicleInner() {
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // Background refresh only
   const [error, setError] = useState("");
   const [jumpQuery, setJumpQuery] = useState("");
   const [formData, setFormData] = useState<Partial<Vehicle>>({});
   const [saving, setSaving] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
+  const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
+  const [successMessage, setSuccessMessage] = useState("");
   const loadedVehicleIdRef = useRef<string | null>(null);
 
   const currentIndex = useMemo(() => vehicles.findIndex((v) => v.VehicleId === id), [id, vehicles]);
@@ -64,10 +66,27 @@ function EditVehicleInner() {
       .slice(0, 8);
   }, [vehicles, id, jumpTokens, searchIndex]);
 
+  // Load from cache immediately on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("vms-vehicles");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setVehicles(parsed as Vehicle[]);
+        }
+      }
+    } catch {
+      // Ignore cache errors
+    }
+  }, []);
+
+  // Fetch fresh data in background
   useEffect(() => {
     let alive = true;
 
     async function fetchVehicles() {
+      setIsRefreshing(true);
       try {
         const res = await fetch("/api/vehicles", { cache: "no-store" });
         if (res.status === 401) {
@@ -77,12 +96,19 @@ function EditVehicleInner() {
         if (!res.ok) throw new Error("Failed to fetch vehicles");
         const data = await res.json();
         if (!alive) return;
-        setVehicles((data.data || []) as Vehicle[]);
+        const nextVehicles = (data.data || []) as Vehicle[];
+        setVehicles(nextVehicles);
+        // Save to localStorage
+        try {
+          localStorage.setItem("vms-vehicles", JSON.stringify(nextVehicles));
+        } catch {
+          // Ignore storage errors
+        }
       } catch (err) {
         if (!alive) return;
         setError(err instanceof Error ? err.message : "Error loading vehicles");
       } finally {
-        if (alive) setLoading(false);
+        if (alive) setIsRefreshing(false);
       }
     }
 
@@ -96,6 +122,9 @@ function EditVehicleInner() {
     if (!currentVehicle || !id) return;
     if (loadedVehicleIdRef.current === id) return;
     loadedVehicleIdRef.current = id;
+
+    // Reset uploaded image file when loading a new vehicle
+    setUploadedImageFile(null);
 
     let next: Partial<Vehicle> = currentVehicle;
     try {
@@ -148,11 +177,15 @@ function EditVehicleInner() {
   };
 
   const handleChange = (field: keyof Vehicle, value: string | number | null) => {
+    setSuccessMessage(""); // Clear success message when editing
     setFormData((prev) => {
       const next: Partial<Vehicle> = { ...prev, [field]: value };
       if (field === "PriceNew") {
-        const priceNew = typeof value === "number" && Number.isFinite(value) ? value : null;
+        // Validate: price must be positive
+        const rawValue = typeof value === "number" ? value : (typeof value === "string" ? Number.parseFloat(value) : NaN);
+        const priceNew = Number.isFinite(rawValue) && rawValue > 0 ? rawValue : null;
         const derived = derivePrices(priceNew);
+        next.PriceNew = priceNew;
         next.Price40 = derived.Price40;
         next.Price70 = derived.Price70;
       }
@@ -165,10 +198,41 @@ function EditVehicleInner() {
 
     setSaving(true);
     try {
+      let body: string | FormData;
+      const headers: Record<string, string> = {};
+
+      if (uploadedImageFile) {
+        // Use FormData for image uploads
+        const formDataToSend = new FormData();
+
+        // Add vehicle data
+        Object.entries(formData).forEach(([key, value]) => {
+          if (value != null && key !== 'Image') { // Don't include the data URL in FormData
+            formDataToSend.append(key, String(value));
+          }
+        });
+        formDataToSend.append("VehicleId", id);
+
+        // Compress and add the image
+        const compressedResult = await compressImage(uploadedImageFile, {
+          maxWidth: 1280,
+          quality: 0.75,
+          targetMinSizeKB: 250,
+          targetMaxSizeKB: 800,
+        });
+        formDataToSend.append("image", compressedResult.file);
+
+        body = formDataToSend;
+      } else {
+        // Use JSON for non-image updates
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify({ ...formData, VehicleId: id });
+      }
+
       const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, VehicleId: id }),
+        headers,
+        body,
       });
 
       if (res.status === 401) {
@@ -186,8 +250,7 @@ function EditVehicleInner() {
         // ignore
       }
 
-      alert("Vehicle saved successfully!");
-      router.push(`/vehicles/${encodeURIComponent(id)}/view`);
+      setSuccessMessage("Vehicle saved successfully!");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Error saving vehicle");
     } finally {
@@ -195,15 +258,7 @@ function EditVehicleInner() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="flex items-center justify-center h-[60vh] text-gray-700">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error) {
+  if (error && vehicles.length === 0) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-3xl mx-auto ec-glassPanel rounded-2xl shadow-xl ring-1 ring-black/5 p-6 text-red-700">
@@ -244,7 +299,7 @@ function EditVehicleInner() {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-3xl mx-auto ec-glassPanel rounded-2xl shadow-xl ring-1 ring-black/5 p-6 text-center text-gray-700">
-          {vehicles.length === 0 ? "No vehicles found" : "Vehicle not found"}
+          {vehicles.length === 0 ? "No vehicles found" : `Vehicle "${id}" not found`}
         </div>
       </div>
     );
@@ -272,6 +327,7 @@ function EditVehicleInner() {
     try {
       const dataUrl = await fileToDataUrl(file);
       setFormData((prev) => ({ ...prev, Image: dataUrl }));
+      setUploadedImageFile(file);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to load image");
     } finally {
@@ -282,14 +338,65 @@ function EditVehicleInner() {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto ec-glassPanel rounded-2xl shadow-xl ring-1 ring-black/5 p-4 sm:p-6 lg:p-8">
+        {/* Success Message Banner */}
+        {successMessage ? (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5 text-green-600"
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span className="text-green-800 font-medium">{successMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSuccessMessage("")}
+              className="text-green-600 hover:text-green-800 transition"
+              aria-label="Dismiss success message"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="M18 6 6 18" />
+                <path d="M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
+
         {/* Header with Navigation */}
         <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start mb-8">
           <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">
               Edit: {currentVehicle.Brand} {currentVehicle.Model}
             </h1>
-            <p className="text-gray-600 mt-2">
-              Vehicle {currentIndex + 1} of {vehicles.length}
+            <p className="text-gray-600 mt-2 flex items-center gap-2">
+              <span>Vehicle {currentIndex + 1} of {vehicles.length}</span>
+              {isRefreshing && (
+                <span className="flex items-center gap-1 text-xs text-blue-600">
+                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Syncing...
+                </span>
+              )}
             </p>
           </div>
           <div className="flex gap-2">
@@ -382,13 +489,67 @@ function EditVehicleInner() {
           </p>
         </div>
 
-        {/* Image Section */}
+        {/* Image Section - Show ImageZoom when image exists, otherwise show prominent upload area */}
         {imageUrl ? (
           <div className="mb-8">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Vehicle Image</h2>
             <ImageZoom src={imageUrl} alt={`${currentVehicle.Brand} ${currentVehicle.Model}`} />
           </div>
-        ) : null}
+        ) : (
+          <div className="mb-8">
+            <div className="bg-amber-50 border-2 border-dashed border-amber-300 rounded-xl p-8 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-16 w-16 bg-amber-100 rounded-full flex items-center justify-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-8 w-8 text-amber-600"
+                    aria-hidden="true"
+                  >
+                    <rect width="18" height="18" x="3" y="3" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="m21 15-5-5L5 21" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-amber-800">No Image Uploaded</h3>
+                  <p className="text-amber-700 mt-1">This vehicle needs an image. Upload one below.</p>
+                </div>
+                <div className="w-full max-w-md mt-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleImageFile(e.target.files?.[0] ?? null)}
+                    title="Upload vehicle image"
+                    className="block w-full text-sm text-gray-700 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-green-700 file:text-white file:font-medium hover:file:bg-green-800"
+                  />
+                  <p className="text-xs text-amber-600 mt-2">
+                    {imageLoading
+                      ? "Compressing image..."
+                      : uploadedImageFile
+                      ? `Ready to upload: ${formatFileSize(uploadedImageFile.size)} (will be compressed on save)`
+                      : "Max 4MB. Images are compressed for fast upload."}
+                  </p>
+                </div>
+                <div className="w-full max-w-md">
+                  <p className="text-sm text-amber-700 text-center mb-2">or paste an image URL</p>
+                  <input
+                    type="url"
+                    value={formData.Image ?? ""}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Image", e.target.value)}
+                    placeholder="https://..."
+                    className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-900 placeholder:text-gray-400"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Form */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -508,6 +669,8 @@ function EditVehicleInner() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Market Price</label>
             <input
               type="number"
+              min="0"
+              step="0.01"
               value={formData.PriceNew ?? ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 handleChange(
@@ -560,8 +723,10 @@ function EditVehicleInner() {
               />
               <p className="text-xs text-gray-500 mt-2">
                 {imageLoading
-                  ? "Loading image..."
-                  : "Max 4MB. Uploaded to Google Drive and saved in Google Sheet."}
+                  ? "Compressing image..."
+                  : uploadedImageFile
+                  ? `Ready to upload: ${formatFileSize(uploadedImageFile.size)} (will be compressed on save)`
+                  : "Max 4MB. Images are compressed for fast upload."}
               </p>
             </div>
             <div>
@@ -575,7 +740,10 @@ function EditVehicleInner() {
               {formData.Image ? (
                 <button
                   type="button"
-                  onClick={() => handleChange("Image", "")}
+                  onClick={() => {
+                    handleChange("Image", "");
+                    setUploadedImageFile(null);
+                  }}
                   className="mt-2 text-sm text-gray-600 hover:text-gray-800"
                 >
                   Clear image

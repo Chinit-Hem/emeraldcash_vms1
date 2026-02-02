@@ -1,6 +1,6 @@
-import type { Vehicle } from "@/lib/types";
 import { driveThumbnailUrl } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
+import type { Vehicle } from "@/lib/types";
 
 /** Fetch with timeout to avoid ETIMEDOUT when calling Apps Script (e.g. large image upload). */
 export async function fetchAppsScript(
@@ -161,6 +161,7 @@ export function toVehicle(row: Record<string, unknown>): Vehicle {
   const color = toStringValue(pick(row, ["Color"]));
   const image = toStringValue(pick(row, ["Image", "ImageURL", "Image URL"]));
   const time = toStringValue(pick(row, ["Time", "Added Time"]));
+  const fast = pick(row, ["Fast"]) === "true" || pick(row, ["Fast"]) === true;
 
   return {
     VehicleId: vehicleId,
@@ -178,6 +179,7 @@ export function toVehicle(row: Record<string, unknown>): Vehicle {
     Color: color,
     Image: image,
     Time: time,
+    Fast: fast,
   };
 }
 
@@ -202,6 +204,7 @@ export function toAppsScriptPayload(
 
   const taxType = toStringValue(pick(input, ["TaxType", "Tax Type"]));
   const bodyType = toStringValue(pick(input, ["BodyType", "Body Type"]));
+  const fast = pick(input, ["Fast"]) === "true" || pick(input, ["Fast"]) === true;
 
   const payload: Record<string, unknown> = {
     VehicleId: vehicleId,
@@ -216,6 +219,7 @@ export function toAppsScriptPayload(
     Color: toStringValue(pick(input, ["Color"])),
     Image: toStringValue(pick(input, ["Image", "ImageURL", "Image URL"])),
     Time: toStringValue(pick(input, ["Time"])),
+    Fast: fast,
 
     // Compatibility keys (camelCase)
     PriceNew: priceNew ?? "",

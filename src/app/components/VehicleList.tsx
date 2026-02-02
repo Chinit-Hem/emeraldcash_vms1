@@ -1,21 +1,18 @@
 "use client";
 
-import React from "react";
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { tokenizeQuery } from "@/lib/vehicleSearch";
+import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { useAuthUser } from "@/app/components/AuthContext";
 import FilterField from "@/app/components/filters/FilterField";
 import FilterInput from "@/app/components/filters/FilterInput";
 import FilterSelect, { type SelectOption } from "@/app/components/filters/FilterSelect";
-
-let vehiclesCache: Vehicle[] | null = null;
 
 type VehicleListProps = {
   category?: string;
@@ -129,6 +126,7 @@ type VehicleFilters = {
   dateTo: string;
   timeFrom: string;
   timeTo: string;
+  withoutImage: boolean;
 };
 
 const CATEGORY_OPTIONS: SelectOption[] = [
@@ -141,10 +139,12 @@ export default function VehicleList({ category }: VehicleListProps) {
   const router = useRouter();
   const user = useAuthUser();
   const isAdmin = user.role === "Admin";
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => vehiclesCache ?? []);
-  const [loading, setLoading] = useState(() => vehiclesCache == null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false); // Background refresh only, not initial load
   const [error, setError] = useState("");
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Map<string, Vehicle>>(new Map());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [hasLoadedFromCache, setHasLoadedFromCache] = useState(false);
   const [filters, setFilters] = useState<VehicleFilters>(() => ({
     id: "",
     query: "",
@@ -160,28 +160,59 @@ export default function VehicleList({ category }: VehicleListProps) {
     dateTo: "",
     timeFrom: "",
     timeTo: "",
+    withoutImage: false,
   }));
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Load from cache immediately on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("vms-vehicles");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setVehicles(parsed as Vehicle[]);
+          setHasLoadedFromCache(true);
+        }
+      }
+    } catch {
+      // Ignore cache errors
+    }
+  }, []);
+
+  // Fetch fresh data in background
   useEffect(() => {
     let alive = true;
 
     async function fetchVehicles() {
+      setIsRefreshing(true);
       try {
         const res = await fetch("/api/vehicles", { cache: "no-store" });
         if (res.status === 401) {
           router.push("/login");
           return;
         }
-        if (!res.ok) throw new Error("Failed to fetch vehicles");
         const data = await res.json();
+        if (!data.ok) {
+          throw new Error(data.error || "Failed to fetch vehicles");
+        }
         const nextVehicles = (data.data || []) as Vehicle[];
-        vehiclesCache = nextVehicles;
-        if (alive) setVehicles(nextVehicles);
+        if (alive) {
+          setVehicles(nextVehicles);
+          setHasLoadedFromCache(true);
+          // Clear optimistic updates since we have fresh data
+          setOptimisticUpdates(new Map());
+          // Save to localStorage
+          try {
+            localStorage.setItem("vms-vehicles", JSON.stringify(nextVehicles));
+          } catch {
+            // Ignore storage errors
+          }
+        }
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Error loading vehicles");
       } finally {
-        if (alive) setLoading(false);
+        if (alive) setIsRefreshing(false);
       }
     }
     fetchVehicles();
@@ -227,10 +258,10 @@ export default function VehicleList({ category }: VehicleListProps) {
       .map((value) => ({ label: value, value }));
   }, [vehicles]);
 
-  const plateModelIndex = useMemo(() => {
+  const searchIndex = useMemo(() => {
     const map = new Map<string, string>();
     for (const vehicle of vehicles) {
-      map.set(vehicle.VehicleId, `${vehicle.Plate || ""} ${vehicle.Model || ""}`.trim().toLowerCase());
+      map.set(vehicle.VehicleId, vehicleSearchText(vehicle));
     }
     return map;
   }, [vehicles]);
@@ -252,7 +283,15 @@ export default function VehicleList({ category }: VehicleListProps) {
   }, [vehicles, filters.category]);
 
   const filteredVehicles = useMemo(() => {
-    let current = categoryFilteredVehicles;
+    // Apply optimistic updates
+    let current = categoryFilteredVehicles.map((vehicle) => {
+      const optimistic = optimisticUpdates.get(vehicle.VehicleId);
+      return optimistic || vehicle;
+    }).filter((vehicle) => {
+      // Filter out optimistically deleted vehicles
+      const optimistic = optimisticUpdates.get(vehicle.VehicleId);
+      return !optimistic || !optimistic._deleted;
+    });
 
     const idFilter = filters.id.trim();
     if (idFilter) {
@@ -313,13 +352,24 @@ export default function VehicleList({ category }: VehicleListProps) {
       });
     }
 
+    // Filter for vehicles without images
+    if (filters.withoutImage) {
+      current = current.filter((vehicle) => {
+        const imageValue = vehicle.Image;
+        if (!imageValue || !String(imageValue).trim()) return true;
+        // Check if it's a valid Drive URL (has a file ID)
+        const fileId = extractDriveFileId(imageValue);
+        return !fileId;
+      });
+    }
+
     if (queryTokens.length === 0) return current;
 
     return current.filter((vehicle) => {
-      const haystack = plateModelIndex.get(vehicle.VehicleId) ?? "";
+      const haystack = searchIndex.get(vehicle.VehicleId) ?? "";
       return queryTokens.every((token) => haystack.includes(token));
     });
-  }, [categoryFilteredVehicles, filters, plateModelIndex, queryTokens, timeIndex]);
+  }, [categoryFilteredVehicles, filters, searchIndex, queryTokens, timeIndex]);
 
   const activeFiltersCount = useMemo(() => {
     const fixedKey = normalizeCategoryKey(fixedCategory);
@@ -350,6 +400,7 @@ export default function VehicleList({ category }: VehicleListProps) {
       dateTo: "",
       timeFrom: "",
       timeTo: "",
+      withoutImage: false,
     });
     setFiltersOpen(false);
   };
@@ -377,7 +428,6 @@ export default function VehicleList({ category }: VehicleListProps) {
       if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to delete vehicle");
 
       setVehicles((prev) => prev.filter((v) => v.VehicleId !== vehicleId));
-      vehiclesCache = (vehiclesCache ?? vehicles).filter((v) => v.VehicleId !== vehicleId);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -385,7 +435,6 @@ export default function VehicleList({ category }: VehicleListProps) {
     }
   };
 
-  if (loading) return <div className="text-center py-8">Loading vehicles...</div>;
   if (error) return <div className="text-red-600 py-8">{error}</div>;
 
   return (
@@ -419,6 +468,32 @@ export default function VehicleList({ category }: VehicleListProps) {
                   Clear
                 </button>
               ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters((prev) => ({ ...prev, withoutImage: !prev.withoutImage }));
+                  setFiltersOpen(true);
+                }}
+                className={`ec-btn w-full sm:w-auto text-sm ${filters.withoutImage ? "ec-btnPrimary" : ""}`}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <rect width="18" height="18" x="3" y="3" rx="1" />
+                    <path d="M9 9h6v6H9z" />
+                  </svg>
+                  <span>{filters.withoutImage ? "Show all images" : "Find no image"}</span>
+                </span>
+              </button>
             </div>
 
             <div className="text-sm text-gray-600 whitespace-nowrap text-right sm:text-left">
@@ -431,12 +506,12 @@ export default function VehicleList({ category }: VehicleListProps) {
           <div className="ec-glassPanelSoft px-4 pb-4 border-b border-black/5 print:hidden">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
               <div className="md:col-span-12">
-                <FilterField id="vms-filter-query" label="Search (Plate / Model)">
+                <FilterField id="vms-filter-query" label="Quick Search">
                   <FilterInput
                     id="vms-filter-query"
                     value={filters.query}
                     onChange={(value) => setFilters((prev) => ({ ...prev, query: value }))}
-                    placeholder="Type plate or model..."
+                    placeholder="Search across all fields..."
                     inputMode="search"
                   />
                 </FilterField>
@@ -647,7 +722,7 @@ export default function VehicleList({ category }: VehicleListProps) {
                       {displayNo}. {vehicle.Brand} {vehicle.Model}
                     </div>
                     <div className="mt-1 text-xs text-gray-600 truncate">
-                      {vehicle.Category} • {vehicle.Year || "-"} • {vehicle.Plate}
+                      {vehicle.Category} • {vehicle.Year || "-"} • {vehicle.Plate} • Fast: {vehicle.Fast ? "Yes" : "No"}
                     </div>
                   </div>
                   <div className="text-right text-xs tabular-nums text-gray-700 whitespace-nowrap">
@@ -767,6 +842,9 @@ export default function VehicleList({ category }: VehicleListProps) {
                   COLOR
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                  FAST
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
                   TIME
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider print:hidden">
@@ -783,7 +861,7 @@ export default function VehicleList({ category }: VehicleListProps) {
                 const vehicleId = vehicle.VehicleId;
                 const displayNo = vehicleId || String(index + 1);
                 const imageFileId = extractDriveFileId(vehicle.Image);
-                const thumbUrl = imageFileId ? driveThumbnailUrl(imageFileId, "w100-h100") : vehicle.Image;
+                const thumbUrl = imageFileId ? `${driveThumbnailUrl(imageFileId, "w100-h100")}?t=${Date.now()}` : vehicle.Image;
 
                 return (
                   <tr

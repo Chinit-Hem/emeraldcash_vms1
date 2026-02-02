@@ -1,12 +1,12 @@
 "use client";
 
-import type { Vehicle } from "@/lib/types";
+import { useAuthUser } from "@/app/components/AuthContext";
+import ImageZoom from "@/app/components/ImageZoom";
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
+import type { Vehicle } from "@/lib/types";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import ImageZoom from "@/app/components/ImageZoom";
-import { useAuthUser } from "@/app/components/AuthContext";
 
 export default function ViewVehiclePage() {
   return <ViewVehicleInner />;
@@ -30,12 +30,33 @@ function ViewVehicleInner() {
     return value === "1" || value.toLowerCase() === "true";
   })();
 
+  // Load from cache immediately
+  useEffect(() => {
+    if (!id) return;
+
+    // Try to find vehicle in cache first
+    try {
+      const cached = localStorage.getItem("vms-vehicles");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          const found = (parsed as Vehicle[]).find((v) => v.VehicleId === id);
+          if (found) {
+            setVehicle(found);
+            setLoading(false);
+          }
+        }
+      }
+    } catch {
+      // Ignore cache errors
+    }
+  }, [id]);
+
+  // Fetch fresh data in background
   useEffect(() => {
     if (!id) return;
     let alive = true;
-    setLoading(true);
     setError("");
-    setVehicle(null);
 
     async function fetchVehicle() {
       try {
@@ -47,10 +68,30 @@ function ViewVehicleInner() {
         if (!res.ok) throw new Error("Failed to fetch vehicle");
         const data = await res.json();
         if (!alive) return;
-        setVehicle(data.data || data.vehicle);
+        const fetchedVehicle = data.data || data.vehicle;
+        setVehicle(fetchedVehicle);
+        // Update cache
+        try {
+          const cached = localStorage.getItem("vms-vehicles");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              const index = parsed.findIndex((v: Vehicle) => v.VehicleId === id);
+              if (index >= 0) {
+                parsed[index] = fetchedVehicle;
+                localStorage.setItem("vms-vehicles", JSON.stringify(parsed));
+              }
+            }
+          }
+        } catch {
+          // Ignore cache update errors
+        }
       } catch (err) {
         if (!alive) return;
-        setError(err instanceof Error ? err.message : "Error loading vehicle");
+        // Only set error if we didn't have cached data
+        if (!vehicle) {
+          setError(err instanceof Error ? err.message : "Error loading vehicle");
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -60,7 +101,7 @@ function ViewVehicleInner() {
     return () => {
       alive = false;
     };
-  }, [id, router]);
+  }, [id, router, vehicle]);
 
   useEffect(() => {
     if (!shouldAutoPrint) return;

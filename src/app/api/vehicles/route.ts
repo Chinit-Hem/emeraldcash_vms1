@@ -148,13 +148,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) {
     return NextResponse.json(
       { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars" },
       { status: 500 }
     );
+  }
+
+  // Handle both FormData (new) and JSON (legacy) requests
+  let body: Record<string, unknown>;
+  let uploadedImageFile: File | null = null;
+
+  const contentType = req.headers.get("content-type") || "";
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await req.formData();
+    body = {};
+    for (const [key, value] of formData.entries()) {
+      if (key === "image" && value instanceof File) {
+        uploadedImageFile = value;
+      } else {
+        body[key] = value;
+      }
+    }
+  } else {
+    body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   }
 
   const safePart = (value: unknown) =>

@@ -96,6 +96,10 @@ function doPost(e) {
       return jsonOut_(uploadImage_(payload));
     }
 
+    if (actionLower === "deleteimage" || action === "deleteImage") {
+      return jsonOut_(deleteImage_(payload));
+    }
+
     if (action === "add") {
       const created = addRow_(payload.data || {});
       return jsonOut_({ ok: true, data: created });
@@ -752,23 +756,48 @@ function uploadImage_(payload) {
     var category = String(payload.category || payload.Category || "").trim();
     folderId = folderIdForCategory_(category);
   }
-  var data = String(payload.data || "");
-  var mimeType = String(payload.mimeType || "image/jpeg").trim() || "image/jpeg";
-  var fileName = String(payload.fileName || "").trim() || ("vehicle-" + new Date().getTime() + ".jpg");
 
   if (!folderId) return { ok: false, error: "Missing folderId or category (Cars, Motorcycles, Tuk Tuk)" };
-  if (!data) return { ok: false, error: "Missing data (base64 image)" };
 
   try {
     const folder = DriveApp.getFolderById(folderId);
-    const bytes = Utilities.base64Decode(data);
-    const blob = Utilities.newBlob(bytes, mimeType, fileName);
-    const file = folder.createFile(blob);
+
+    var file;
+    var fileId;
+    var thumbnailUrl;
+
+    // Check if we have a blob (FormData upload) or base64 data (legacy JSON upload)
+    if (payload.blob && payload.blob instanceof Blob) {
+      // New FormData upload
+      var blob = payload.blob;
+      var fileName = String(payload.fileName || "").trim();
+      if (!fileName) {
+        // Generate unique filename: vehicle_<id>_<timestamp>.webp
+        var vehicleId = String(payload.vehicleId || payload.id || "").trim();
+        if (!vehicleId) vehicleId = "temp";
+        var timestamp = new Date().getTime();
+        fileName = "vehicle_" + vehicleId + "_" + timestamp + ".webp";
+      }
+
+      file = folder.createFile(blob);
+      file.setName(fileName);
+    } else {
+      // Legacy base64 upload
+      var data = String(payload.data || "");
+      var mimeType = String(payload.mimeType || "image/jpeg").trim() || "image/jpeg";
+      var fileName = String(payload.fileName || "").trim() || ("vehicle-" + new Date().getTime() + ".jpg");
+
+      if (!data) return { ok: false, error: "Missing data (base64 image)" };
+
+      const bytes = Utilities.base64Decode(data);
+      const blob = Utilities.newBlob(bytes, mimeType, fileName);
+      file = folder.createFile(blob);
+    }
 
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-    const fileId = file.getId();
-    const thumbnailUrl = "https://drive.google.com/thumbnail?id=" + encodeURIComponent(fileId) + "&sz=w1000-h1000";
+    fileId = file.getId();
+    thumbnailUrl = "https://drive.google.com/thumbnail?id=" + encodeURIComponent(fileId) + "&sz=w1000-h1000";
 
     return {
       ok: true,
@@ -777,6 +806,25 @@ function uploadImage_(payload) {
         thumbnailUrl: thumbnailUrl,
       },
     };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+}
+
+function deleteImage_(payload) {
+  if (!payload || typeof payload !== "object") payload = {};
+  var token = String(payload.token || "").trim();
+  var expectedToken = PropertiesService.getScriptProperties().getProperty("APPS_SCRIPT_UPLOAD_TOKEN") || "";
+  if (expectedToken && token !== expectedToken) {
+    return { ok: false, error: "Forbidden" };
+  }
+
+  var fileId = String(payload.fileId || "").trim();
+  if (!fileId) return { ok: false, error: "Missing fileId" };
+
+  try {
+    DriveApp.getFileById(fileId).setTrashed(true);
+    return { ok: true, data: { deleted: true, fileId: fileId } };
   } catch (err) {
     return { ok: false, error: String(err && err.message ? err.message : err) };
   }
@@ -929,6 +977,79 @@ function extractDriveFileId_(value) {
 }
 
 /* ----------------- RESPONSE ----------------- */
+
+function parseMultipartFormData_(e) {
+  var postData = e.postData;
+  if (!postData || !postData.contents) {
+    return {};
+  }
+
+  var boundary = getBoundary_(postData.type);
+  if (!boundary) {
+    return {};
+  }
+
+  var parts = postData.contents.split("--" + boundary);
+  var payload = {};
+
+  for (var i = 1; i < parts.length - 1; i++) {
+    var part = parts[i].trim();
+    if (!part) continue;
+
+    var lines = part.split("\r\n");
+    var headers = {};
+    var contentStart = 0;
+
+    // Parse headers
+    for (var j = 0; j < lines.length; j++) {
+      var line = lines[j];
+      if (line === "") {
+        contentStart = j + 1;
+        break;
+      }
+
+      var colonIndex = line.indexOf(":");
+      if (colonIndex > 0) {
+        var headerName = line.substring(0, colonIndex).trim().toLowerCase();
+        var headerValue = line.substring(colonIndex + 1).trim();
+        headers[headerName] = headerValue;
+      }
+    }
+
+    // Extract field name from Content-Disposition
+    var contentDisposition = headers["content-disposition"] || "";
+    var fieldNameMatch = contentDisposition.match(/name="([^"]+)"/);
+    if (!fieldNameMatch) continue;
+
+    var fieldName = fieldNameMatch[1];
+    var contentType = headers["content-type"] || "";
+
+    // Extract content
+    var content = lines.slice(contentStart).join("\r\n");
+
+    if (contentType && contentType.indexOf("image/") === 0) {
+      // Handle file upload
+      var fileNameMatch = contentDisposition.match(/filename="([^"]+)"/);
+      var fileName = fileNameMatch ? fileNameMatch[1] : "uploaded_file.webp";
+
+      // Create blob from content
+      var blob = Utilities.newBlob(Utilities.base64Decode(Utilities.base64Encode(content)), contentType, fileName);
+      payload[fieldName] = blob;
+      payload.fileName = fileName;
+    } else {
+      // Handle text field
+      payload[fieldName] = content;
+    }
+  }
+
+  return payload;
+}
+
+function getBoundary_(contentType) {
+  if (!contentType) return null;
+  var match = contentType.match(/boundary=([^;]+)/);
+  return match ? match[1] : null;
+}
 
 function jsonOut_(obj) {
   return ContentService

@@ -21,4 +21,6 @@ export type Vehicle = {
   Color: string;
   Image: string;
   Time: string;
+  Fast: boolean;
+  _deleted?: boolean;
 };

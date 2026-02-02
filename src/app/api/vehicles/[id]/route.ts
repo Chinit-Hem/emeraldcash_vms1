@@ -11,9 +11,8 @@ import {
   driveFolderIdForCategory,
   driveThumbnailUrl,
   fetchAppsScript,
-  parseImageDataUrl,
   toAppsScriptPayload,
-  toVehicle,
+  toVehicle
 } from "../_shared";
 
 function requireSession(req: NextRequest) {
@@ -200,14 +199,31 @@ export async function PUT(
   };
 
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    // Handle both FormData (new) and JSON (legacy) requests
+    let body: Record<string, unknown>;
+    let newImageFile: File | null = null;
+
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      body = {};
+      for (const [key, value] of formData.entries()) {
+        if (key === "image" && value instanceof File) {
+          newImageFile = value;
+        } else {
+          body[key] = value;
+        }
+      }
+    } else {
+      body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    }
     const payload = toAppsScriptPayload(body, { vehicleId: id });
     const normalizedTime = normalizeCambodiaTimeString(payload.Time);
     if (normalizedTime) payload.Time = normalizedTime;
     else delete payload.Time;
 
-    const imageData = parseImageDataUrl(payload.Image);
-    if (imageData) {
+    // Handle image upload/replacement
+    if (newImageFile) {
       const folderId = driveFolderIdForCategory(payload.Category);
       if (!folderId) {
         return NextResponse.json(
@@ -216,9 +232,47 @@ export async function PUT(
         );
       }
 
-      const ext = extensionFromMimeType(imageData.mimeType);
-      const parts = [id, safePart(payload.Category), safePart(payload.Brand), safePart(payload.Model)].filter(Boolean);
-      const fileName = `${parts.join("-")}.${ext}`;
+      // Check if vehicle already has an image and delete it first
+      let existingFileId: string | null = null;
+      try {
+        const byIdUrl = new URL(baseUrl);
+        byIdUrl.searchParams.set("action", "getById");
+        byIdUrl.searchParams.set("id", id);
+        const byIdRes = await fetchAppsScript(byIdUrl.toString(), { cache: "no-store", timeoutMs: 15000 });
+        if (byIdRes.ok) {
+          const byIdJson = await byIdRes.json().catch(() => ({}));
+          if (byIdJson?.ok !== false && byIdJson?.data && typeof byIdJson.data === "object") {
+            const vehicle = toVehicle(byIdJson.data as Record<string, unknown>);
+            existingFileId = extractDriveFileId(vehicle.Image);
+          }
+        }
+      } catch {
+        // ignore, proceed without deleting existing image
+      }
+
+      // Delete existing image if any
+      if (existingFileId) {
+        try {
+          await fetchAppsScript(baseUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "deleteImage",
+              fileId: existingFileId,
+              token: process.env.APPS_SCRIPT_UPLOAD_TOKEN,
+            }),
+            cache: "no-store",
+            timeoutMs: 30000,
+          });
+        } catch {
+          // ignore delete errors, proceed with upload
+        }
+      }
+
+      // Upload new image with standardized filename
+      const fileName = `vehicle_${id}.webp`;
+      const arrayBuffer = await newImageFile.arrayBuffer();
+      const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
       const uploadRes = await fetchAppsScript(baseUrl, {
         method: "POST",
@@ -228,9 +282,9 @@ export async function PUT(
           folderId,
           category: payload.Category,
           token: process.env.APPS_SCRIPT_UPLOAD_TOKEN,
-          mimeType: imageData.mimeType,
+          mimeType: "image/webp",
           fileName,
-          data: imageData.base64Data,
+          data: base64Data,
         }),
         cache: "no-store",
         timeoutMs: 90000,
@@ -287,7 +341,7 @@ export async function PUT(
       timeoutMs: 30000,
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (data.ok === false) {
       return NextResponse.json({ ok: false, error: data.error }, { status: 400 });
@@ -381,7 +435,7 @@ export async function DELETE(
       timeoutMs: 30000,
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (data.ok === false) {
       return NextResponse.json({ ok: false, error: data.error }, { status: 400 });
     }
