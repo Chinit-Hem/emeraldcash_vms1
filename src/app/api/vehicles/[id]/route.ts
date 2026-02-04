@@ -317,7 +317,11 @@ export async function PUT(
       const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
       if (!uploadToken) {
         return NextResponse.json(
-          { ok: false, error: "Missing APPS_SCRIPT_UPLOAD_TOKEN environment variable" },
+          {
+            ok: false,
+            error:
+              "Missing APPS_SCRIPT_UPLOAD_TOKEN. Add it in Vercel env vars to enable image updates.",
+          },
           { status: 500 }
         );
       }
