@@ -4,12 +4,15 @@ This app uses a Google Sheet as the database via a Google Apps Script web app.
 
 ## Getting Started
 
-### 1) Configure the Google Apps Script URL
+### 1) Configure environment variables
 
-Create (or edit) `.env.local` in the project root:
+Create (or edit) `.env.local` in the project root (do **not** commit this file):
 
 ```bash
 NEXT_PUBLIC_API_URL="https://script.google.com/macros/s/<YOUR_SCRIPT_ID>/exec"
+SESSION_SECRET="change-me-please-use-a-long-random-string"
+APPS_SCRIPT_UPLOAD_TOKEN="change-me" # required for image uploads
+APPS_SCRIPT_URL="https://script.google.com/macros/s/<YOUR_SCRIPT_ID>/exec"
 ```
 
 ### 2) Run the dev server
@@ -84,6 +87,17 @@ Set a session signing secret so users cannot change their role by editing cookie
 ```bash
 SESSION_SECRET="change-me-please-use-a-long-random-string"
 ```
+
+### Vercel deployment env vars
+
+In Vercel → Project Settings → Environment Variables, set:
+
+- `NEXT_PUBLIC_API_URL`
+- `SESSION_SECRET`
+- `APPS_SCRIPT_UPLOAD_TOKEN` (required for image uploads)
+- `APPS_SCRIPT_URL` (optional; use same URL if you use one Apps Script)
+
+Select **Production + Preview + Development**, then **Redeploy**.
 
 ### Delete from Drive too (optional)
 
