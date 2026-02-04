@@ -6,6 +6,7 @@ import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
 import { TAX_TYPE_METADATA } from "@/lib/types";
+import { refreshVehicleCache } from "@/lib/vehicleCache";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -168,6 +169,7 @@ function ViewVehicleInner() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to delete vehicle");
 
+      await refreshVehicleCache();
       router.push("/vehicles");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");

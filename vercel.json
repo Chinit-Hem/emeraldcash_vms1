@@ -5,8 +5,7 @@
   "framework": "nextjs",
   "outputDirectory": ".next",
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://script.google.com/macros/s/AKfycbx5SyxFn2NmSeXvh-RAq16upfc4-B0TiGRU7kfldDgXbYQI2WF37ZM-W8RVcVrMFYWcSQ/exec",
-    "SESSION_SECRET": "@SESSION_SECRET"
+    "NEXT_PUBLIC_API_URL": "https://script.google.com/macros/s/AKfycbx5SyxFn2NmSeXvh-RAq16upfc4-B0TiGRU7kfldDgXbYQI2WF37ZM-W8RVcVrMFYWcSQ/exec"
   },
   "headers": [
     {

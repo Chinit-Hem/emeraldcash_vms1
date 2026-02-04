@@ -125,7 +125,7 @@ async function comparePassword(password: string, hash: string): Promise<boolean>
   } catch {
     // Fallback to simple comparison (WEAK - only for demo passwords)
     // This matches the hardcoded demo password hash for "1234"
-    return hash === "$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi";
+    return password === "1234" && hash === "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy";
   }
 }
 

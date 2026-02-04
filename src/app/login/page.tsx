@@ -2,12 +2,13 @@
 
 import React from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import ThemeToggle from "@/app/components/ThemeToggle";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,8 @@ export default function LoginPage() {
       if (!res.ok || json.ok === false)
         throw new Error(json.error || "Login failed");
 
-      router.push("/");
+      const redirectTo = searchParams?.get("redirect") || "/";
+      router.push(redirectTo);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login error");
     } finally {

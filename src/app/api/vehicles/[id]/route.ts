@@ -317,7 +317,7 @@ export async function PUT(
       const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
       if (!uploadToken) {
         return NextResponse.json(
-          { ok: false, error: "Server configuration error" },
+          { ok: false, error: "Missing APPS_SCRIPT_UPLOAD_TOKEN environment variable" },
           { status: 500 }
         );
       }
@@ -472,23 +472,25 @@ export async function DELETE(
       }
     }
 
-    // Validate token
-    const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
-    if (!uploadToken) {
-      return NextResponse.json(
-        { ok: false, error: "Server configuration error" },
-        { status: 500 }
-      );
-    }
-
     const deletePayload: Record<string, unknown> = {
       action: "delete",
       VehicleId: safeId,
       id: safeId,
       vehicleId: safeId,
-      token: uploadToken,
     };
-    if (imageFileId) deletePayload.imageFileId = imageFileId;
+
+    if (imageFileId) {
+      // Validate token only when deleting an image
+      const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
+      if (!uploadToken) {
+        return NextResponse.json(
+          { ok: false, error: "Missing APPS_SCRIPT_UPLOAD_TOKEN environment variable" },
+          { status: 500 }
+        );
+      }
+      deletePayload.token = uploadToken;
+      deletePayload.imageFileId = imageFileId;
+    }
 
     const res = await fetchAppsScript(baseUrl, {
       method: "POST",
@@ -500,6 +502,11 @@ export async function DELETE(
 
     const data = await res.json().catch(() => ({}));
     if (data.ok === false) {
+      const message = typeof data.error === "string" ? data.error : "";
+      if (/not\s*found|missing|already\s*deleted/i.test(message)) {
+        clearCachedVehicles();
+        return NextResponse.json({ ok: true, data: null });
+      }
       return NextResponse.json({ ok: false, error: data.error }, { status: 400 });
     }
 

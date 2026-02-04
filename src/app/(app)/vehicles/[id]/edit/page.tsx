@@ -11,6 +11,7 @@ import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { COLOR_OPTIONS, PLATE_NUMBER_HINTS, PLATE_NUMBER_MAX_LENGTH, TAX_TYPE_METADATA } from "@/lib/types";
 import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
+import { refreshVehicleCache, writeVehicleCache } from "@/lib/vehicleCache";
 import { useParams, useRouter } from "next/navigation";
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
@@ -262,11 +263,28 @@ function EditVehicleInner() {
       if (res.status === 403) throw new Error("Forbidden");
       if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to save vehicle");
 
+      if (currentVehicle) {
+        const updatedVehicle: Vehicle = {
+          ...currentVehicle,
+          ...(formData as Vehicle),
+          VehicleId: currentVehicle.VehicleId,
+        };
+        setVehicles((prev) => {
+          const nextVehicles = prev.map((vehicle) =>
+            vehicle.VehicleId === updatedVehicle.VehicleId ? updatedVehicle : vehicle
+          );
+          writeVehicleCache(nextVehicles);
+          return nextVehicles;
+        });
+      }
+
       try {
         sessionStorage.removeItem(`${EDIT_DRAFT_PREFIX}${id}`);
       } catch {
         // ignore
       }
+
+      await refreshVehicleCache();
 
       // Auto-update market price if enabled
       if (autoUpdateMarketPrice && currentVehicle) {

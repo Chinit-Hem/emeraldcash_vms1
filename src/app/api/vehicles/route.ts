@@ -23,6 +23,37 @@ import {
 
 const TEN_MINUTES_SECONDS = 60 * 10;
 
+function buildCorsHeaders(req: NextRequest) {
+  const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim();
+  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL?.trim();
+  const vercelOrigin = vercelUrl
+    ? vercelUrl.startsWith("http")
+      ? vercelUrl
+      : `https://${vercelUrl}`
+    : "";
+  const requestOrigin = req.headers.get("origin") || "";
+  const allowedOrigin = appOrigin || vercelOrigin || requestOrigin || "*";
+
+  const headers = new Headers({
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+  });
+
+  if (allowedOrigin !== "*") {
+    headers.set("Access-Control-Allow-Credentials", "true");
+  }
+
+  return headers;
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: buildCorsHeaders(req),
+  });
+}
+
 function requireSession(req: NextRequest) {
   const ip = getClientIp(req.headers);
   const userAgent = getClientUserAgent(req.headers);
@@ -58,10 +89,13 @@ function sanitizeNumber(value: unknown): number | null {
   return null;
 }
 
-export async function GET() {
-  const cached = getCachedVehicles();
-  if (cached) {
-    return NextResponse.json({ ok: true, data: cached }, { headers: cacheHeaders() });
+export async function GET(req: NextRequest) {
+  const bypassCache = req.nextUrl.searchParams.get("noCache") === "1";
+  if (!bypassCache) {
+    const cached = getCachedVehicles();
+    if (cached) {
+      return NextResponse.json({ ok: true, data: cached }, { headers: cacheHeaders() });
+    }
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -88,8 +122,8 @@ export async function GET() {
       url.searchParams.set("offset", String(offset));
 
       const res = await fetch(url.toString(), {
-        cache: "force-cache",
-        next: { revalidate: TEN_MINUTES_SECONDS },
+        cache: bypassCache ? "no-store" : "force-cache",
+        next: { revalidate: bypassCache ? 0 : TEN_MINUTES_SECONDS },
       });
 
       if (!res.ok) {
@@ -155,7 +189,8 @@ export async function GET() {
     const vehicles = allRows.map((row) => toVehicle(row)) as Vehicle[];
 
     setCachedVehicles(vehicles);
-    return NextResponse.json({ ok: true, data: vehicles }, { headers: cacheHeaders() });
+    const headers = bypassCache ? { "Cache-Control": "no-store" } : cacheHeaders();
+    return NextResponse.json({ ok: true, data: vehicles }, { headers });
   } catch (e: unknown) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "Fetch failed" },

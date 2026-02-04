@@ -12,6 +12,7 @@ import {
   TAX_TYPE_METADATA,
   type Vehicle
 } from "@/lib/types";
+import { refreshVehicleCache } from "@/lib/vehicleCache";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState, type FormEvent } from "react";
 
@@ -136,72 +137,70 @@ function AddVehicleInner() {
     e.preventDefault();
     setSubmitting(true);
 
-    // Immediately reset form and show success
     try {
-      sessionStorage.removeItem(ADD_DRAFT_KEY);
-    } catch {
-      // ignore
-    }
+      const formDataToSend = new FormData();
 
-    setSuccessMessage("Vehicle added successfully!");
-
-    // Reset form for next vehicle
-    setFormData({
-      Brand: "",
-      Model: "",
-      Category: "",
-      Plate: "",
-      Year: null,
-      Color: "",
-      Condition: "New",
-      BodyType: "",
-      TaxType: "",
-      PriceNew: null,
-      Price40: null,
-      Price70: null,
-      Image: "",
-    });
-    setCompressedImage(null);
-
-    // Process the submission in the background
-    (async () => {
-      try {
-        const formDataToSend = new FormData();
-
-        // Add vehicle data
-        Object.entries(formData).forEach(([key, value]) => {
-          if (value != null) {
-            formDataToSend.append(key, String(value));
-          }
-        });
-        formDataToSend.append("Time", getCambodiaNowString());
-
-        // Add compressed image if available
-        if (compressedImage?.file) {
-          formDataToSend.append("image", compressedImage.file);
+      // Add vehicle data
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value != null) {
+          formDataToSend.append(key, String(value));
         }
+      });
+      formDataToSend.append("Time", getCambodiaNowString());
 
-        const res = await fetch("/api/vehicles", {
-          method: "POST",
-          body: formDataToSend,
-        });
-
-        if (res.status === 401) {
-          router.push("/login");
-          return;
-        }
-
-        const json = await res.json().catch(() => ({}));
-        if (res.status === 403) throw new Error("Forbidden");
-        if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to add vehicle");
-
-        // Success already shown
-      } catch (err) {
-        alert(err instanceof Error ? err.message : "Error adding vehicle");
-      } finally {
-        setSubmitting(false);
+      // Add compressed image if available
+      if (compressedImage?.file) {
+        formDataToSend.append("image", compressedImage.file);
       }
-    })();
+
+      const res = await fetch("/api/vehicles", {
+        method: "POST",
+        body: formDataToSend,
+      });
+
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 403) throw new Error("Forbidden");
+      if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to add vehicle");
+
+      try {
+        sessionStorage.removeItem(ADD_DRAFT_KEY);
+      } catch {
+        // ignore
+      }
+
+      setSuccessMessage("Vehicle added successfully!");
+
+      setFormData({
+        Brand: "",
+        Model: "",
+        Category: "",
+        Plate: "",
+        Year: null,
+        Color: "",
+        Condition: "New",
+        BodyType: "",
+        TaxType: "",
+        PriceNew: null,
+        Price40: null,
+        Price70: null,
+        Image: "",
+      });
+      setCompressedImage(null);
+
+      await refreshVehicleCache();
+      const refreshKey = Date.now();
+      router.push(`/vehicles?refresh=${refreshKey}`);
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error adding vehicle");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const categories = ["Cars", "Motorcycles", "Tuk Tuk"];

@@ -4,6 +4,7 @@ import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
+import { onVehicleCacheUpdate, readVehicleCache, refreshVehicleCache, writeVehicleCache } from "@/lib/vehicleCache";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -143,6 +144,7 @@ export default function VehicleList({ category }: VehicleListProps) {
   const [error, setError] = useState("");
   const [optimisticUpdates, setOptimisticUpdates] = useState<Map<string, Vehicle>>(new Map());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filters, setFilters] = useState<VehicleFilters>(() => ({
     id: "",
     query: "",
@@ -162,20 +164,15 @@ export default function VehicleList({ category }: VehicleListProps) {
   }));
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Load from cache immediately on mount
+  // Load from cache immediately on mount + subscribe to cache updates
   useEffect(() => {
-    try {
-      const cached = localStorage.getItem("vms-vehicles");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          setVehicles(parsed as Vehicle[]);
-        }
-      }
-    } catch {
-      // Ignore cache errors
-    }
+    const cached = readVehicleCache();
+    if (cached) setVehicles(cached);
+    return onVehicleCacheUpdate((nextVehicles) => setVehicles(nextVehicles));
   }, []);
+
+  const searchParams = useSearchParams();
+  const refreshToken = searchParams?.get("refresh") || "";
 
   // Fetch fresh data in background
   useEffect(() => {
@@ -183,7 +180,7 @@ export default function VehicleList({ category }: VehicleListProps) {
 
     async function fetchVehicles() {
       try {
-        const res = await fetch("/api/vehicles", { cache: "no-store" });
+        const res = await fetch("/api/vehicles?noCache=1", { cache: "no-store" });
         if (res.status === 401) {
           router.push("/login");
           return;
@@ -197,12 +194,8 @@ export default function VehicleList({ category }: VehicleListProps) {
           setVehicles(nextVehicles);
           // Clear optimistic updates since we have fresh data
           setOptimisticUpdates(new Map());
-          // Save to localStorage
-          try {
-            localStorage.setItem("vms-vehicles", JSON.stringify(nextVehicles));
-          } catch {
-            // Ignore storage errors
-          }
+          // Save to localStorage + notify listeners
+          writeVehicleCache(nextVehicles);
         }
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Error loading vehicles");
@@ -212,7 +205,28 @@ export default function VehicleList({ category }: VehicleListProps) {
     return () => {
       alive = false;
     };
-  }, [router]);
+  }, [router, refreshToken]);
+
+  useEffect(() => {
+    let mounted = true;
+    const interval = window.setInterval(async () => {
+      if (!mounted) return;
+      setIsRefreshing(true);
+      await refreshVehicleCache();
+      if (mounted) setIsRefreshing(false);
+    }, 15000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshVehicleCache();
+    setIsRefreshing(false);
+  };
 
   const fixedCategory = String(category ?? "").trim();
   const categoryFixed = !!fixedCategory;
@@ -228,7 +242,6 @@ export default function VehicleList({ category }: VehicleListProps) {
 
   // Initialize filters from URL query params (so dashboard links like
   // `/vehicles?withoutImage=true` work).
-  const searchParams = useSearchParams();
   useEffect(() => {
     if (!searchParams) return;
     const withoutImageParam = searchParams.get("withoutImage");
@@ -446,7 +459,11 @@ export default function VehicleList({ category }: VehicleListProps) {
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to delete vehicle");
 
-      setVehicles((prev) => prev.filter((v) => v.VehicleId !== vehicleId));
+      setVehicles((prev) => {
+        const nextVehicles = prev.filter((v) => v.VehicleId !== vehicleId);
+        writeVehicleCache(nextVehicles);
+        return nextVehicles;
+      });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -487,6 +504,14 @@ export default function VehicleList({ category }: VehicleListProps) {
                   Clear
                 </button>
               ) : null}
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="ec-btn w-full sm:w-auto text-sm"
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh"}
+              </button>
               <button
                 type="button"
                 onClick={() => {
