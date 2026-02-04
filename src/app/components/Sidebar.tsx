@@ -1,11 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import type { User } from "@/lib/types";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { clearCachedUser } from "@/app/components/authCache";
+import ChangePasswordModal from "@/app/components/ChangePasswordModal";
 import ThemeToggle from "@/app/components/ThemeToggle";
 
 function normalizeCategory(value: unknown) {
@@ -158,6 +159,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [vehiclesMenuOpen, setVehiclesMenuOpen] = useState(() => pathname.startsWith("/vehicles"));
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -371,6 +373,13 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           </div>
 
           <button
+            onClick={() => setChangePasswordOpen(true)}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+          >
+            Change Password
+          </button>
+
+          <button
             onClick={handleLogout}
             className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
           >
@@ -378,6 +387,8 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           </button>
         </div>
       </div>
+
+      <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
     </aside>
   );
 }
