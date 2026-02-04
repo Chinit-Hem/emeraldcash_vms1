@@ -6,7 +6,7 @@ import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { useAuthUser } from "@/app/components/AuthContext";
@@ -140,11 +140,9 @@ export default function VehicleList({ category }: VehicleListProps) {
   const user = useAuthUser();
   const isAdmin = user.role === "Admin";
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false); // Background refresh only, not initial load
   const [error, setError] = useState("");
   const [optimisticUpdates, setOptimisticUpdates] = useState<Map<string, Vehicle>>(new Map());
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [hasLoadedFromCache, setHasLoadedFromCache] = useState(false);
   const [filters, setFilters] = useState<VehicleFilters>(() => ({
     id: "",
     query: "",
@@ -172,7 +170,6 @@ export default function VehicleList({ category }: VehicleListProps) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
           setVehicles(parsed as Vehicle[]);
-          setHasLoadedFromCache(true);
         }
       }
     } catch {
@@ -185,7 +182,6 @@ export default function VehicleList({ category }: VehicleListProps) {
     let alive = true;
 
     async function fetchVehicles() {
-      setIsRefreshing(true);
       try {
         const res = await fetch("/api/vehicles", { cache: "no-store" });
         if (res.status === 401) {
@@ -199,7 +195,6 @@ export default function VehicleList({ category }: VehicleListProps) {
         const nextVehicles = (data.data || []) as Vehicle[];
         if (alive) {
           setVehicles(nextVehicles);
-          setHasLoadedFromCache(true);
           // Clear optimistic updates since we have fresh data
           setOptimisticUpdates(new Map());
           // Save to localStorage
@@ -211,8 +206,6 @@ export default function VehicleList({ category }: VehicleListProps) {
         }
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Error loading vehicles");
-      } finally {
-        if (alive) setIsRefreshing(false);
       }
     }
     fetchVehicles();
@@ -232,6 +225,29 @@ export default function VehicleList({ category }: VehicleListProps) {
       return { ...prev, category: fixedCategory };
     });
   }, [categoryFixed, fixedCategory]);
+
+  // Initialize filters from URL query params (so dashboard links like
+  // `/vehicles?withoutImage=true` work).
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (!searchParams) return;
+    const withoutImageParam = searchParams.get("withoutImage");
+    const conditionParam = searchParams.get("condition") || "";
+    const brandParam = searchParams.get("brand") || "";
+    const idParam = searchParams.get("id") || "";
+    const queryParam = searchParams.get("query") || searchParams.get("q") || "";
+
+    setFilters((prev) => {
+      const next = { ...prev };
+      if (withoutImageParam != null) next.withoutImage = withoutImageParam === "1" || withoutImageParam === "true";
+      if (conditionParam) next.condition = conditionParam;
+      if (brandParam) next.brand = brandParam;
+      if (idParam) next.id = idParam;
+      if (queryParam) next.query = queryParam;
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const debouncedQuery = useDebouncedValue(filters.query, 200);
   const queryTokens = useMemo(() => tokenizeQuery(debouncedQuery), [debouncedQuery]);
@@ -253,9 +269,13 @@ export default function VehicleList({ category }: VehicleListProps) {
       const value = String(vehicle.TaxType || "").trim();
       if (value) set.add(value);
     }
-    return Array.from(set)
-      .sort((a, b) => a.localeCompare(b))
-      .map((value) => ({ label: value, value }));
+    // Ensure these helpful search options are always available
+    const extras = ["Tax Paper", "Plate Number"];
+    for (const ex of extras) set.add(ex);
+
+    const others = Array.from(set).filter((v) => !extras.includes(v)).sort((a, b) => a.localeCompare(b));
+    const ordered = extras.concat(others);
+    return ordered.map((value) => ({ label: value, value }));
   }, [vehicles]);
 
   const searchIndex = useMemo(() => {
@@ -369,7 +389,7 @@ export default function VehicleList({ category }: VehicleListProps) {
       const haystack = searchIndex.get(vehicle.VehicleId) ?? "";
       return queryTokens.every((token) => haystack.includes(token));
     });
-  }, [categoryFilteredVehicles, filters, searchIndex, queryTokens, timeIndex]);
+  }, [categoryFilteredVehicles, filters, searchIndex, queryTokens, timeIndex, optimisticUpdates]);
 
   const activeFiltersCount = useMemo(() => {
     const fixedKey = normalizeCategoryKey(fixedCategory);
@@ -722,7 +742,7 @@ export default function VehicleList({ category }: VehicleListProps) {
                       {displayNo}. {vehicle.Brand} {vehicle.Model}
                     </div>
                     <div className="mt-1 text-xs text-gray-600 truncate">
-                      {vehicle.Category} • {vehicle.Year || "-"} • {vehicle.Plate} • Fast: {vehicle.Fast ? "Yes" : "No"}
+                      {vehicle.Category} • {vehicle.Year || "-"} • {vehicle.Plate}
                     </div>
                   </div>
                   <div className="text-right text-xs tabular-nums text-gray-700 whitespace-nowrap">
@@ -797,57 +817,54 @@ export default function VehicleList({ category }: VehicleListProps) {
         {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto print:block">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-green-800/95 via-green-700/95 to-green-600/95">
+            <thead className="ec-glassHeader bg-emerald-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   ID
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   IMAGE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   CATEGORY
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   BRAND
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   MODEL
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   YEAR
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   PLATE
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-extrabold text-white uppercase tracking-wider">
                   MARKET PRICE
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-extrabold text-white uppercase tracking-wider">
                   D.O.C.40%
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-extrabold text-white uppercase tracking-wider">
                   VEHICLES70%
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   TAX TYPE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   CONDITION
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   BODY TYPE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   COLOR
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
-                  FAST
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider">
                   TIME
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-extrabold text-white/90 uppercase tracking-wider print:hidden">
+                <th className="px-6 py-3 text-left text-xs font-extrabold text-white uppercase tracking-wider print:hidden">
                   ACTIONS
                 </th>
               </tr>
