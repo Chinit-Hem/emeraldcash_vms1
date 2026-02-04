@@ -33,11 +33,13 @@
    |------|-------|-------------|
    | `NEXT_PUBLIC_API_URL` | Your Google Apps Script URL | Production, Preview, Development |
    | `SESSION_SECRET` | Your session secret | Production, Preview, Development |
+   | `APPS_SCRIPT_UPLOAD_TOKEN` | Shared token for image uploads | Production, Preview, Development |
    
    **Example:**
    ```
    NEXT_PUBLIC_API_URL=https://script.google.com/macros/s/your-script-id/exec
    SESSION_SECRET=your-long-random-secret-string
+   APPS_SCRIPT_UPLOAD_TOKEN=your-shared-upload-token
    ```
 
 6. **Deploy**
@@ -76,6 +78,7 @@ vercel --prod
 ```bash
 vercel env add NEXT_PUBLIC_API_URL
 vercel env add SESSION_SECRET
+vercel env add APPS_SCRIPT_UPLOAD_TOKEN
 ```
 
 ---
@@ -93,6 +96,11 @@ Make sure to set these in Vercel Dashboard:
    - A long random string for session security
    - Generate one: `openssl rand -base64 32`
    - Prevents users from modifying their role via cookies
+
+3. **`APPS_SCRIPT_UPLOAD_TOKEN`** (Required for image uploads)
+   - Must match the token your Apps Script expects when handling `action=uploadImage`
+   - Required to upload or replace vehicle images in the UI
+   - Use a strong random value and keep it private
 
 ### Optional Environment Variables
 
