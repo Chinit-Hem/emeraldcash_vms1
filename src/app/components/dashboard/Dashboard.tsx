@@ -199,17 +199,18 @@ export default function Dashboard() {
 
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="lg:col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
-          <KpiCard label="Total Vehicles" value={kpis.total.toLocaleString()} accent="green" />
-          <KpiCard label="Cars" value={kpis.cars.toLocaleString()} accent="blue" />
+          <KpiCard label="Total Vehicles" value={kpis.total.toLocaleString()} accent="green" onClick={() => router.push("/vehicles")} />
+          <KpiCard label="Cars" value={kpis.cars.toLocaleString()} accent="blue" onClick={() => router.push("/vehicles?category=Cars")} />
           <KpiCard
             label="Motorcycles"
             value={kpis.motorcycles.toLocaleString()}
             accent="orange"
+            onClick={() => router.push("/vehicles?category=Motorcycles")}
           />
-          <KpiCard label="Tuk Tuk" value={kpis.tukTuk.toLocaleString()} accent="green" />
-          <KpiCard label="New" value={kpis.newCount.toLocaleString()} accent="green" />
-          <KpiCard label="Used" value={kpis.usedCount.toLocaleString()} accent="orange" />
-          <KpiCard label="No Images" value={kpis.noImagesCount.toLocaleString()} accent="red" />
+          <KpiCard label="Tuk Tuk" value={kpis.tukTuk.toLocaleString()} accent="green" onClick={() => router.push("/vehicles?category=Tuk%20Tuk")} />
+          <KpiCard label="New" value={kpis.newCount.toLocaleString()} accent="green" onClick={() => router.push("/vehicles?condition=New")} />
+          <KpiCard label="Used" value={kpis.usedCount.toLocaleString()} accent="orange" onClick={() => router.push("/vehicles?condition=Used")} />
+          <KpiCard label="No Images" value={kpis.noImagesCount.toLocaleString()} accent="red" onClick={() => router.push("/vehicles?withoutImage=true")} />
         </div>
 
         <div className="lg:col-span-6">

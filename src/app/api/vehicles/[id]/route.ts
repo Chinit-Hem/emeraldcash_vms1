@@ -1,4 +1,10 @@
-import { parseSessionCookie, validateSession } from "@/lib/auth";
+
+import {
+  getClientIp,
+  getClientUserAgent,
+  getSessionFromRequest,
+  validateSession,
+} from "@/lib/auth";
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
@@ -16,13 +22,32 @@ import {
 } from "../_shared";
 
 function requireSession(req: NextRequest) {
+  const ip = getClientIp(req.headers);
+  const userAgent = getClientUserAgent(req.headers);
   const sessionCookie = req.cookies.get("session")?.value;
   if (!sessionCookie) return null;
 
-  const session = parseSessionCookie(sessionCookie);
+  const session = getSessionFromRequest(userAgent, ip, sessionCookie);
   if (!session || !validateSession(session)) return null;
 
   return session;
+}
+
+// Input validation helper
+function sanitizeString(value: unknown, maxLength = 1000): string {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, maxLength);
+}
+
+function sanitizeNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value.trim());
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
+  }
+  return null;
 }
 
 function toIntOrNull(value: unknown): number | null {
@@ -106,19 +131,25 @@ export async function GET(
     );
   }
 
+  // Validate ID format
+  const safeId = sanitizeString(id, 100);
+  if (!safeId) {
+    return NextResponse.json({ ok: false, error: "Invalid vehicle ID" }, { status: 400 });
+  }
+
   try {
     // Fast path: try to fetch just one record (if your Apps Script supports getById).
     try {
       const byIdUrl = new URL(baseUrl);
       byIdUrl.searchParams.set("action", "getById");
-      byIdUrl.searchParams.set("id", id);
+      byIdUrl.searchParams.set("id", safeId);
 
       const byIdRes = await fetch(byIdUrl.toString(), { cache: "no-store" });
       const byIdJson = byIdRes.ok ? await byIdRes.json().catch(() => ({})) : null;
 
       if (byIdRes.ok && byIdJson && byIdJson.ok !== false && byIdJson.data && typeof byIdJson.data === "object") {
         const vehicle: Vehicle = toVehicle(byIdJson.data as Record<string, unknown>);
-        if (!vehicle.VehicleId) vehicle.VehicleId = id;
+        if (!vehicle.VehicleId) vehicle.VehicleId = safeId;
         return NextResponse.json({ ok: true, data: vehicle });
       }
 
@@ -134,7 +165,7 @@ export async function GET(
 
     const cachedVehicles = getCachedVehicles();
     if (cachedVehicles) {
-      const cached = cachedVehicles.find((vehicle) => vehicle.VehicleId === id);
+      const cached = cachedVehicles.find((vehicle) => vehicle.VehicleId === safeId);
       if (cached) {
         return NextResponse.json({ ok: true, data: cached });
       }
@@ -142,7 +173,7 @@ export async function GET(
 
     // Fallback: fetch list and search by id (works with older Apps Script versions).
     const rows = await fetchAllVehicleRows(baseUrl, "no-store");
-    const match = rows.find((row) => String(row.VehicleId ?? row.VehicleID ?? row.Id ?? row.id ?? "") === id);
+    const match = rows.find((row) => String(row.VehicleId ?? row.VehicleID ?? row.Id ?? row.id ?? "") === safeId);
 
     if (!match) {
       return NextResponse.json({ ok: false, error: "Vehicle not found" }, { status: 404 });
@@ -181,22 +212,11 @@ export async function PUT(
     );
   }
 
-  const safePart = (value: unknown) =>
-    String(value ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 32);
-
-  const extensionFromMimeType = (mimeType: string) => {
-    const normalized = mimeType.toLowerCase();
-    if (normalized === "image/png") return "png";
-    if (normalized === "image/webp") return "webp";
-    if (normalized === "image/gif") return "gif";
-    if (normalized === "image/svg+xml") return "svg";
-    return "jpg";
-  };
+  // Validate ID format
+  const safeId = sanitizeString(id, 100);
+  if (!safeId) {
+    return NextResponse.json({ ok: false, error: "Invalid vehicle ID" }, { status: 400 });
+  }
 
   try {
     // Handle both FormData (new) and JSON (legacy) requests
@@ -217,7 +237,26 @@ export async function PUT(
     } else {
       body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     }
-    const payload = toAppsScriptPayload(body, { vehicleId: id });
+
+    // Validate numeric fields
+    const year = sanitizeNumber(body.Year);
+    const priceNew = sanitizeNumber(body.PriceNew);
+
+    if (year !== null && (year < 1900 || year > new Date().getFullYear() + 2)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid year" },
+        { status: 400 }
+      );
+    }
+
+    if (priceNew !== null && priceNew < 0) {
+      return NextResponse.json(
+        { ok: false, error: "Price must be positive" },
+        { status: 400 }
+      );
+    }
+
+    const payload = toAppsScriptPayload(body, { vehicleId: safeId });
     const normalizedTime = normalizeCambodiaTimeString(payload.Time);
     if (normalizedTime) payload.Time = normalizedTime;
     else delete payload.Time;
@@ -237,7 +276,7 @@ export async function PUT(
       try {
         const byIdUrl = new URL(baseUrl);
         byIdUrl.searchParams.set("action", "getById");
-        byIdUrl.searchParams.set("id", id);
+        byIdUrl.searchParams.set("id", safeId);
         const byIdRes = await fetchAppsScript(byIdUrl.toString(), { cache: "no-store", timeoutMs: 15000 });
         if (byIdRes.ok) {
           const byIdJson = await byIdRes.json().catch(() => ({}));
@@ -270,9 +309,18 @@ export async function PUT(
       }
 
       // Upload new image with standardized filename
-      const fileName = `vehicle_${id}.webp`;
+      const fileName = `vehicle_${safeId}.webp`;
       const arrayBuffer = await newImageFile.arrayBuffer();
       const base64Data = Buffer.from(arrayBuffer).toString('base64');
+
+      // Validate token
+      const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
+      if (!uploadToken) {
+        return NextResponse.json(
+          { ok: false, error: "Server configuration error" },
+          { status: 500 }
+        );
+      }
 
       const uploadRes = await fetchAppsScript(baseUrl, {
         method: "POST",
@@ -281,7 +329,7 @@ export async function PUT(
           action: "uploadImage",
           folderId,
           category: payload.Category,
-          token: process.env.APPS_SCRIPT_UPLOAD_TOKEN,
+          token: uploadToken,
           mimeType: "image/webp",
           fileName,
           data: base64Data,
@@ -336,7 +384,7 @@ export async function PUT(
     const res = await fetchAppsScript(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update", id, data: payload }),
+      body: JSON.stringify({ action: "update", id: safeId, data: payload }),
       cache: "no-store",
       timeoutMs: 30000,
     });
@@ -379,6 +427,12 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "Missing NEXT_PUBLIC_API_URL" }, { status: 500 });
   }
 
+  // Validate ID format
+  const safeId = sanitizeString(id, 100);
+  if (!safeId) {
+    return NextResponse.json({ ok: false, error: "Invalid vehicle ID" }, { status: 400 });
+  }
+
   try {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const imageFileIdFromBody =
@@ -391,7 +445,7 @@ export async function DELETE(
         // Fast path: use getById if available.
         const byIdUrl = new URL(baseUrl);
         byIdUrl.searchParams.set("action", "getById");
-        byIdUrl.searchParams.set("id", id);
+        byIdUrl.searchParams.set("id", safeId);
         const byIdRes = await fetchAppsScript(byIdUrl.toString(), { cache: "no-store", timeoutMs: 15000 });
         if (byIdRes.ok) {
           const byIdJson = await byIdRes.json().catch(() => ({}));
@@ -408,7 +462,7 @@ export async function DELETE(
       // Fallback: list fetch (older Apps Script versions without getById).
       try {
         const rows = await fetchAllVehicleRows(baseUrl, "no-store");
-        const match = rows.find((row) => String(row.VehicleId ?? row.VehicleID ?? row.Id ?? row.id ?? "") === id);
+        const match = rows.find((row) => String(row.VehicleId ?? row.VehicleID ?? row.Id ?? row.id ?? "") === safeId);
         if (match) {
           const vehicle = toVehicle(match);
           imageFileId = extractDriveFileId(vehicle.Image);
@@ -418,12 +472,21 @@ export async function DELETE(
       }
     }
 
+    // Validate token
+    const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
+    if (!uploadToken) {
+      return NextResponse.json(
+        { ok: false, error: "Server configuration error" },
+        { status: 500 }
+      );
+    }
+
     const deletePayload: Record<string, unknown> = {
       action: "delete",
-      VehicleId: id,
-      id,
-      vehicleId: id,
-      token: process.env.APPS_SCRIPT_UPLOAD_TOKEN,
+      VehicleId: safeId,
+      id: safeId,
+      vehicleId: safeId,
+      token: uploadToken,
     };
     if (imageFileId) deletePayload.imageFileId = imageFileId;
 
@@ -452,3 +515,4 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
+

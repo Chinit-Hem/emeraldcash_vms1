@@ -38,6 +38,15 @@ const HEADERS = [
   "Condition",
   "Body Type",
   "Color",
+  // Market Price columns (added for Cambodia Market Price feature)
+  "MARKET_PRICE_LOW",
+  "MARKET_PRICE_MEDIAN",
+  "MARKET_PRICE_HIGH",
+  "MARKET_PRICE_SOURCE",
+  "MARKET_PRICE_SAMPLES",
+  "MARKET_PRICE_CONFIDENCE",
+  "MARKET_PRICE_UPDATED_AT",
+  // End of market price columns
   "Time",
 ];
 
@@ -117,6 +126,10 @@ function doPost(e) {
       if (!id) return jsonOut_({ ok: false, error: "Missing id" });
       const deleted = deleteRow_(id, payload);
       return jsonOut_({ ok: true, data: deleted });
+    }
+
+    if (action === "updateMarketPrice") {
+      return jsonOut_(updateMarketPrice_(payload));
     }
 
     return jsonOut_({ ok: false, error: "Unknown action: " + action });
@@ -741,6 +754,102 @@ function deleteRow_(id, payload) {
   };
 }
 
+/**
+ * Update market price fields for a vehicle row
+ * Called via action=updateMarketPrice
+ */
+function updateMarketPrice_(payload) {
+  const id = String(payload.id || "").trim();
+  if (!id) return { ok: false, error: "Missing id" };
+
+  const data = payload.data || {};
+  
+  // Map incoming fields to header names
+  const fieldMap = {
+    MARKET_PRICE_LOW: ["MARKET_PRICE_LOW", "MarketPriceLow", "marketPriceLow"],
+    MARKET_PRICE_MEDIAN: ["MARKET_PRICE_MEDIAN", "MarketPriceMedian", "marketPriceMedian"],
+    MARKET_PRICE_HIGH: ["MARKET_PRICE_HIGH", "MarketPriceHigh", "marketPriceHigh"],
+    MARKET_PRICE_SOURCE: ["MARKET_PRICE_SOURCE", "MarketPriceSource", "marketPriceSource"],
+    MARKET_PRICE_SAMPLES: ["MARKET_PRICE_SAMPLES", "MarketPriceSamples", "marketPriceSamples"],
+    MARKET_PRICE_CONFIDENCE: ["MARKET_PRICE_CONFIDENCE", "MarketPriceConfidence", "marketPriceConfidence"],
+    MARKET_PRICE_UPDATED_AT: ["MARKET_PRICE_UPDATED_AT", "MarketPriceUpdatedAt", "marketPriceUpdatedAt"],
+  };
+
+  const sh = getSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return { ok: false, error: "No data found" };
+
+  // Find the row by vehicle ID
+  const ids = sh.getRange(2, 1, lastRow - 1, 1).getValues().flat().map(function (v) {
+    return String(v || "").trim();
+  });
+  const idx = ids.findIndex(function (x) { return x === id; });
+  if (idx === -1) return { ok: false, error: "Vehicle not found: " + id };
+
+  const rowNumber = idx + 2;
+
+  // Build updates object
+  var updates = {};
+  Object.keys(fieldMap).forEach(function (header) {
+    var candidates = fieldMap[header];
+    for (var i = 0; i < candidates.length; i++) {
+      var candidate = candidates[i];
+      if (data[candidate] !== undefined) {
+        updates[header] = data[candidate];
+        break;
+      }
+    }
+  });
+
+  // If no updates provided, return current values
+  if (Object.keys(updates).length === 0) {
+    const existing = sh.getRange(rowNumber, 1, 1, HEADERS.length).getValues()[0];
+    const existingByHeader = rowToHeaderObject_(existing);
+    return {
+      ok: true,
+      data: {
+        vehicleId: id,
+        updated: false,
+        current: {
+          marketPriceLow: toNumber_(existingByHeader["MARKET_PRICE_LOW"]),
+          marketPriceMedian: toNumber_(existingByHeader["MARKET_PRICE_MEDIAN"]),
+          marketPriceHigh: toNumber_(existingByHeader["MARKET_PRICE_HIGH"]),
+          marketPriceSource: String(existingByHeader["MARKET_PRICE_SOURCE"] || ""),
+          marketPriceSamples: toNumber_(existingByHeader["MARKET_PRICE_SAMPLES"]),
+          marketPriceConfidence: String(existingByHeader["MARKET_PRICE_CONFIDENCE"] || ""),
+          marketPriceUpdatedAt: String(existingByHeader["MARKET_PRICE_UPDATED_AT"] || ""),
+        },
+      },
+    };
+  }
+
+  // Apply updates
+  const headerIndices = {};
+  HEADERS.forEach(function (h, i) {
+    headerIndices[h] = i + 1;
+  });
+
+  Object.keys(updates).forEach(function (header) {
+    const colIndex = headerIndices[header];
+    if (colIndex) {
+      sh.getRange(rowNumber, colIndex).setValue(updates[header]);
+    }
+  });
+
+  // Log the update
+  console.log("Updated market price for vehicle " + id + ": " + JSON.stringify(updates));
+
+  return {
+    ok: true,
+    data: {
+      vehicleId: id,
+      updated: true,
+      updatedAt: nowCambodiaString_(),
+      updates: updates,
+    },
+  };
+}
+
 /* ----------------- DRIVE: uploadImage ----------------- */
 
 function uploadImage_(payload) {
@@ -874,6 +983,14 @@ function headerToFriendly_(byHeader) {
     Color: byHeader["Color"],
     Image: byHeader["Image"],
     Time: normalizeCambodiaTime_(byHeader["Time"]),
+    // Market price fields
+    MarketPriceLow: toNumber_(byHeader["MARKET_PRICE_LOW"]),
+    MarketPriceMedian: toNumber_(byHeader["MARKET_PRICE_MEDIAN"]),
+    MarketPriceHigh: toNumber_(byHeader["MARKET_PRICE_HIGH"]),
+    MarketPriceSource: String(byHeader["MARKET_PRICE_SOURCE"] || ""),
+    MarketPriceSamples: toNumber_(byHeader["MARKET_PRICE_SAMPLES"]),
+    MarketPriceConfidence: String(byHeader["MARKET_PRICE_CONFIDENCE"] || ""),
+    MarketPriceUpdatedAt: String(byHeader["MARKET_PRICE_UPDATED_AT"] || ""),
   };
 }
 
@@ -916,8 +1033,21 @@ function normalizeToHeaders_(data) {
         const legacy = pickValue_("Vehicle 70%", "Price70");
         out[h] = legacy !== "" ? legacy : pickValue_("Price 70%", "Price70");
       }
-    }
-    else if (h === "Tax Type") out[h] = pickValue_("Tax Type", "TaxType");
+    } else if (h === "MARKET_PRICE_LOW") {
+      out[h] = pickValue_("MARKET_PRICE_LOW", "MarketPriceLow", "marketPriceLow") || "";
+    } else if (h === "MARKET_PRICE_MEDIAN") {
+      out[h] = pickValue_("MARKET_PRICE_MEDIAN", "MarketPriceMedian", "marketPriceMedian") || "";
+    } else if (h === "MARKET_PRICE_HIGH") {
+      out[h] = pickValue_("MARKET_PRICE_HIGH", "MarketPriceHigh", "marketPriceHigh") || "";
+    } else if (h === "MARKET_PRICE_SOURCE") {
+      out[h] = pickValue_("MARKET_PRICE_SOURCE", "MarketPriceSource", "marketPriceSource") || "";
+    } else if (h === "MARKET_PRICE_SAMPLES") {
+      out[h] = pickValue_("MARKET_PRICE_SAMPLES", "MarketPriceSamples", "marketPriceSamples") || "";
+    } else if (h === "MARKET_PRICE_CONFIDENCE") {
+      out[h] = pickValue_("MARKET_PRICE_CONFIDENCE", "MarketPriceConfidence", "marketPriceConfidence") || "";
+    } else if (h === "MARKET_PRICE_UPDATED_AT") {
+      out[h] = pickValue_("MARKET_PRICE_UPDATED_AT", "MarketPriceUpdatedAt", "marketPriceUpdatedAt") || "";
+    } else if (h === "Tax Type") out[h] = pickValue_("Tax Type", "TaxType");
     else if (h === "Body Type") out[h] = pickValue_("Body Type", "BodyType");
     else out[h] = pickValue_(h, h);
   });

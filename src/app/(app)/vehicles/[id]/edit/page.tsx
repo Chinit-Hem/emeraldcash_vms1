@@ -4,10 +4,12 @@
 /// <reference path="../../../../../types/jsx-global.d.ts" />
 import { useAuthUser } from "@/app/components/AuthContext";
 import ImageZoom from "@/app/components/ImageZoom";
+import { MarketPriceButton } from "@/app/components/MarketPriceButton";
 import { compressImage, formatFileSize } from "@/lib/compressImage";
 import { fileToDataUrl } from "@/lib/fileToDataUrl";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
+import { COLOR_OPTIONS, PLATE_NUMBER_HINTS, PLATE_NUMBER_MAX_LENGTH, TAX_TYPE_METADATA } from "@/lib/types";
 import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
 import { useParams, useRouter } from "next/navigation";
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -34,6 +36,16 @@ function EditVehicleInner() {
   const [imageLoading, setImageLoading] = useState(false);
   const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
+  const [autoUpdateMarketPrice, setAutoUpdateMarketPrice] = useState(false);
+  const [marketPriceData, setMarketPriceData] = useState<{
+    priceLow: number | null;
+    priceMedian: number | null;
+    priceHigh: number | null;
+    source: string;
+    samples: number;
+    confidence: "High" | "Medium" | "Low" | "Unknown";
+    updatedAt: string;
+  } | null>(null);
   const loadedVehicleIdRef = useRef<string | null>(null);
 
   const currentIndex = useMemo(() => vehicles.findIndex((v) => v.VehicleId === id), [id, vehicles]);
@@ -193,6 +205,62 @@ function EditVehicleInner() {
     });
   };
 
+  /**
+   * Handle market price update from MarketPriceButton
+   */
+  const handleMarketPriceUpdate = (marketData: {
+    priceLow: number | null;
+    priceMedian: number | null;
+    priceHigh: number | null;
+    source: string;
+    samples: number;
+    confidence: "High" | "Medium" | "Low" | "Unknown";
+    fetchedAt: string;
+  }) => {
+    setMarketPriceData({
+      priceLow: marketData.priceLow,
+      priceMedian: marketData.priceMedian,
+      priceHigh: marketData.priceHigh,
+      source: marketData.source,
+      samples: marketData.samples,
+      confidence: marketData.confidence,
+      updatedAt: marketData.fetchedAt,
+    });
+  };
+
+  /**
+   * Update market price in Google Sheets
+   */
+  const updateMarketPriceInSheet = async () => {
+    if (!marketPriceData || !currentVehicle) return;
+
+    try {
+      const response = await fetch("/api/market-price/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          vehicleId: currentVehicle.VehicleId,
+          marketData: {
+            priceLow: marketPriceData.priceMedian,
+            priceMedian: marketPriceData.priceMedian,
+            priceHigh: marketPriceData.priceMedian,
+            source: marketPriceData.source,
+            samples: marketPriceData.samples,
+            confidence: marketPriceData.confidence,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn("Failed to update market price in Google Sheets");
+      }
+    } catch (err) {
+      console.warn("Error updating market price in sheet:", err);
+    }
+  };
+
   const handleSave = async () => {
     if (!currentVehicle || !id) return;
 
@@ -248,6 +316,45 @@ function EditVehicleInner() {
         sessionStorage.removeItem(`${EDIT_DRAFT_PREFIX}${id}`);
       } catch {
         // ignore
+      }
+
+      // Auto-update market price if enabled
+      if (autoUpdateMarketPrice && currentVehicle) {
+        try {
+          const params = new URLSearchParams({
+            category: currentVehicle.Category || "",
+            brand: currentVehicle.Brand || "",
+            model: currentVehicle.Model || "",
+          });
+          if (currentVehicle.Year) {
+            params.append("year", currentVehicle.Year.toString());
+          }
+          
+          const priceRes = await fetch(`/api/market-price/fetch?${params.toString()}`);
+          if (priceRes.ok) {
+            const priceData = await priceRes.json();
+            if (priceData.ok && priceData.data) {
+              const result = priceData.data;
+              await fetch("/api/market-price/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  vehicleId: currentVehicle.VehicleId,
+                  marketData: {
+                    priceLow: result.priceLow,
+                    priceMedian: result.priceMedian,
+                    priceHigh: result.priceHigh,
+                    source: result.sources?.[0] || "khmer24.com",
+                    samples: result.sampleCount || 0,
+                    confidence: result.confidence || "Low",
+                  },
+                }),
+              });
+            }
+          }
+        } catch (err) {
+          console.warn("Auto-update market price failed:", err);
+        }
       }
 
       setSuccessMessage("Vehicle saved successfully!");
@@ -403,14 +510,14 @@ function EditVehicleInner() {
             <button
               onClick={handlePrevious}
               disabled={currentIndex <= 0}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium"
+              className="ec-glassBtnSecondary px-6 py-2"
             >
               ← Previous
             </button>
             <button
               onClick={handleNext}
               disabled={currentIndex === -1 || currentIndex >= vehicles.length - 1}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium"
+              className="ec-glassBtnSecondary px-6 py-2"
             >
               Next →
             </button>
@@ -434,7 +541,7 @@ function EditVehicleInner() {
                 }
               }}
               placeholder="Type brand, model, plate, year..."
-              className="w-full pl-4 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900 placeholder:text-gray-400"
+              className="ec-input w-full pl-4 pr-12 placeholder:text-gray-400"
             />
             {jumpQuery ? (
               <button
@@ -559,7 +666,7 @@ function EditVehicleInner() {
               type="text"
               value={formData.Brand || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Brand", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -569,7 +676,7 @@ function EditVehicleInner() {
               type="text"
               value={formData.Model || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Model", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -578,7 +685,7 @@ function EditVehicleInner() {
             <select
               value={categoryValue}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange("Category", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input ec-select w-full"
             >
               <option value="" disabled>
                 Select category
@@ -601,9 +708,14 @@ function EditVehicleInner() {
             <input
               type="text"
               value={formData.Plate || ""}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Plate", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent font-mono text-gray-900"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange("Plate", e.target.value.toUpperCase())
+              }
+              maxLength={PLATE_NUMBER_MAX_LENGTH}
+              placeholder={`e.g. ${PLATE_NUMBER_HINTS[0]}`}
+              className="ec-input w-full font-mono uppercase placeholder:normal-case"
             />
+
           </div>
 
           <div>
@@ -621,7 +733,7 @@ function EditVehicleInner() {
                       : Number.parseInt(e.target.value, 10)
                   )
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -629,10 +741,26 @@ function EditVehicleInner() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
             <input
               type="text"
+              list="colorsList"
               value={formData.Color || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Color", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
+              placeholder="Type color (e.g., White, Black, Red, Custom)"
             />
+            <datalist id="colorsList">
+              {COLOR_OPTIONS.map((color) => (
+                <option key={color.value} value={color.value} />
+              ))}
+            </datalist>
+            {formData.Color && (
+              <div className="mt-2 flex items-center gap-2">
+                <span
+                  className="w-6 h-6 rounded border border-gray-300"
+                  style={{ backgroundColor: COLOR_OPTIONS.find(c => c.value === formData.Color)?.hex || formData.Color }}
+                />
+                <span className="text-sm text-gray-600">{formData.Color}</span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -641,7 +769,7 @@ function EditVehicleInner() {
               type="text"
               value={formData.Condition || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Condition", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -651,7 +779,7 @@ function EditVehicleInner() {
               type="text"
               value={formData.BodyType || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("BodyType", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -659,10 +787,22 @@ function EditVehicleInner() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Tax Type</label>
             <input
               type="text"
+              list="taxTypesList"
               value={formData.TaxType || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("TaxType", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
+              placeholder="Type tax type (or choose)"
             />
+            <datalist id="taxTypesList">
+              {TAX_TYPE_METADATA.map((tt) => (
+                <option key={tt.value} value={tt.label} />
+              ))}
+            </datalist>
+            {formData.TaxType && (
+              <p className="mt-1 text-xs text-gray-600">
+                {TAX_TYPE_METADATA.find((tt) => tt.value === formData.TaxType)?.description || "Custom tax type"}
+              </p>
+            )}
           </div>
 
           <div>
@@ -682,7 +822,7 @@ function EditVehicleInner() {
                       : Number.parseFloat(e.target.value)
                 )
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -693,7 +833,7 @@ function EditVehicleInner() {
               readOnly
               value={formData.Price40 ?? ""}
               placeholder="Auto"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
+              className="ec-input w-full bg-gray-50"
             />
           </div>
 
@@ -704,7 +844,7 @@ function EditVehicleInner() {
               readOnly
               value={formData.Price70 ?? ""}
               placeholder="Auto"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
+              className="ec-input w-full bg-gray-50"
             />
           </div>
 
@@ -753,18 +893,63 @@ function EditVehicleInner() {
           </div>
         </div>
 
+        {/* Cambodia Market Price Section */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5 text-green-600"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 2v20M2 12h20" />
+            </svg>
+            Cambodia Market Price
+          </h2>
+          
+          {/* Market Price Card */}
+          <div className="ec-glassPanel rounded-xl p-6 mb-4">
+            <MarketPriceButton 
+              vehicle={currentVehicle} 
+              onPriceUpdate={handleMarketPriceUpdate}
+              variant="card"
+            />
+          </div>
+
+          {/* Auto-update Toggle */}
+          <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoUpdateMarketPrice}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAutoUpdateMarketPrice(e.target.checked)}
+                className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-600"
+              />
+              <div className="text-sm">
+                <span className="font-medium text-gray-900">Auto-update market price when saving</span>
+                <p className="text-gray-500">Automatically update market price from Cambodia marketplaces when saving vehicle</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
         {/* Actions */}
         <div className="flex gap-4">
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition font-medium"
+            className="flex-1 ec-glassBtnPrimary px-6 py-3"
           >
             {saving ? "Saving..." : "Save Vehicle"}
           </button>
           <button
             onClick={() => router.back()}
-            className="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium"
+            className="flex-1 ec-glassBtnSecondary px-6 py-3"
           >
             Cancel
           </button>

@@ -1,35 +1,24 @@
-import crypto from "node:crypto";
-
-import {
-  getClientIp,
-  getClientUserAgent,
-  getSessionFromRequest,
-  validateSession,
-} from "@/lib/auth";
+<parameter name="content">import { parseSessionCookie, validateSession } from "@/lib/auth";
 import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import type { Vehicle } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
-import { clearCachedVehicles, getCachedVehicles, setCachedVehicles } from "./_cache";
 import {
   appsScriptUrl,
   driveFolderIdForCategory,
   driveThumbnailUrl,
-  fetchAppsScript,
   parseImageDataUrl,
   toAppsScriptPayload,
   toVehicle,
-} from "./_shared";
+} from "../_shared";
 
 const TEN_MINUTES_SECONDS = 60 * 10;
 
 function requireSession(req: NextRequest) {
-  const ip = getClientIp(req.headers);
-  const userAgent = getClientUserAgent(req.headers);
   const sessionCookie = req.cookies.get("session")?.value;
   if (!sessionCookie) return null;
 
-  const session = getSessionFromRequest(userAgent, ip, sessionCookie);
+  const session = parseSessionCookie(sessionCookie);
   if (!session || !validateSession(session)) return null;
 
   return session;
@@ -39,23 +28,6 @@ function cacheHeaders() {
   return {
     "Cache-Control": `public, max-age=0, s-maxage=${TEN_MINUTES_SECONDS}, stale-while-revalidate=${TEN_MINUTES_SECONDS}`,
   };
-}
-
-// Input validation helper
-function sanitizeString(value: unknown, maxLength = 1000): string {
-  if (typeof value !== "string") return "";
-  return value.trim().slice(0, maxLength);
-}
-
-function sanitizeNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.trunc(value);
-  }
-  if (typeof value === "string") {
-    const parsed = Number.parseFloat(value.trim());
-    return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
-  }
-  return null;
 }
 
 export async function GET() {
@@ -174,6 +146,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) {
     return NextResponse.json(
@@ -182,26 +155,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Handle both FormData (new) and JSON (legacy) requests
-  let body: Record<string, unknown>;
-
-  const contentType = req.headers.get("content-type") || "";
-  if (contentType.includes("multipart/form-data")) {
-    const formData = await req.formData();
-    body = {};
-    for (const [key, value] of formData.entries()) {
-      body[key] = value;
-    }
-  } else {
-    body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  }
-
-  // Sanitize string inputs
   const safePart = (value: unknown) =>
-    sanitizeString(value, 32)
+    String(value ?? "")
+      .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 32);
 
   const extensionFromMimeType = (mimeType: string) => {
     const normalized = mimeType.toLowerCase();
@@ -211,36 +171,6 @@ export async function POST(req: NextRequest) {
     if (normalized === "image/svg+xml") return "svg";
     return "jpg";
   };
-
-  // Validate required fields
-  const category = sanitizeString(body.Category, 50);
-  const brand = sanitizeString(body.Brand, 100);
-  const model = sanitizeString(body.Model, 100);
-
-  if (!category || !brand || !model) {
-    return NextResponse.json(
-      { ok: false, error: "Category, Brand, and Model are required" },
-      { status: 400 }
-    );
-  }
-
-  // Validate numeric fields
-  const year = sanitizeNumber(body.Year);
-  const priceNew = sanitizeNumber(body.PriceNew);
-
-  if (year !== null && (year < 1900 || year > new Date().getFullYear() + 2)) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid year" },
-      { status: 400 }
-    );
-  }
-
-  if (priceNew !== null && priceNew < 0) {
-    return NextResponse.json(
-      { ok: false, error: "Price must be positive" },
-      { status: 400 }
-    );
-  }
 
   try {
     const payload = toAppsScriptPayload(body);
@@ -263,38 +193,28 @@ export async function POST(req: NextRequest) {
       );
       const fileName = `${parts.join("-")}.${ext}`;
 
-      // Validate token before sending
-      const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
-      if (!uploadToken) {
-        return NextResponse.json(
-          { ok: false, error: "Server configuration error" },
-          { status: 500 }
-        );
-      }
-
-      const uploadRes = await fetchAppsScript(baseUrl, {
+      const uploadRes = await fetch(baseUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "uploadImage",
           folderId,
           category: payload.Category,
-          token: uploadToken,
+          token: process.env.APPS_SCRIPT_UPLOAD_TOKEN,
           mimeType: imageData.mimeType,
           fileName,
           data: imageData.base64Data,
         }),
         cache: "no-store",
-        timeoutMs: 90000,
       });
 
-      const uploadJson = (await uploadRes.json().catch(() => ({}))) as Record<string, unknown>;
-      const uploadOk = uploadRes.ok && (uploadJson?.ok === true || uploadJson?.ok !== false);
-      const hasError = typeof uploadJson?.error === "string" && String(uploadJson.error).trim();
-      if (!uploadOk || hasError) {
-        const message = hasError
-          ? String(uploadJson.error).trim()
-          : `Image upload failed (${uploadRes.status}).`;
+      const uploadJson = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok || uploadJson.ok === false) {
+        const message =
+          typeof uploadJson?.error === "string" && uploadJson.error.trim()
+            ? uploadJson.error.trim()
+            : `Image upload failed (${uploadRes.status}).`;
+
         return NextResponse.json(
           {
             ok: false,
@@ -306,15 +226,14 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const dataObj = uploadJson?.data && typeof uploadJson.data === "object" ? (uploadJson.data as Record<string, unknown>) : {};
       const uploadedUrlCandidate =
         uploadJson?.url ??
-        dataObj?.url ??
-        dataObj?.thumbnailUrl ??
+        uploadJson?.data?.url ??
+        uploadJson?.data?.thumbnailUrl ??
         uploadJson?.thumbnailUrl ??
-        dataObj?.imageUrl;
+        uploadJson?.data?.imageUrl;
 
-      const uploadedFileIdCandidate = uploadJson?.fileId ?? dataObj?.fileId;
+      const uploadedFileIdCandidate = uploadJson?.fileId ?? uploadJson?.data?.fileId;
 
       if (typeof uploadedUrlCandidate === "string" && uploadedUrlCandidate.trim()) {
         payload.Image = uploadedUrlCandidate.trim();
@@ -331,12 +250,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const res = await fetchAppsScript(baseUrl, {
+    const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "add", data: payload }),
       cache: "no-store",
-      timeoutMs: 30000,
     });
 
     if (!res.ok) {
@@ -354,13 +272,10 @@ export async function POST(req: NextRequest) {
     clearCachedVehicles();
     return NextResponse.json({ ok: true, data: data.data ?? null });
   } catch (e: unknown) {
-    const message =
-      e instanceof Error && e.name === "AbortError"
-        ? "Request to Apps Script timed out. Try again or use a smaller image."
-        : e instanceof Error
-          ? e.message
-          : "Fetch failed";
-    return NextResponse.json({ ok: false, error: message }, { status: 502 });
+    return NextResponse.json(
+      { ok: false, error: e instanceof Error ? e.message : "Fetch failed" },
+      { status: 500 }
+    );
   }
 }
-
+</parameter>

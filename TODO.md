@@ -1,18 +1,26 @@
-# TODO: Add button to find data without image and upload image in edit
+# Task Tracking
 
-## Task 1: Add "Find without image" filter in VehicleList
-- ✅ Add a `withoutImage` boolean state to filters
-- ✅ Add filter button next to existing filter controls
-- ✅ Add filter logic to exclude vehicles that have images
+## Completed Tasks
 
-## Task 2: Improve image upload UI in edit page for vehicles without images
-- ✅ Status: Complete
-- Show prominent upload section when vehicle doesn't have an image
-- Location: `src/app/(app)/vehicles/[id]/edit/page.tsx`
-- Implementation:
-  - When no image exists, show a more visible upload area with clear call-to-action
-  - Uses amber background with dashed border to draw attention
-  - Includes upload icon and instructional text
+### 2024-01-XX: Tax Type and Plate Number Enhancements
+- ✅ Add TaxTypeMetadata interface with descriptions
+- ✅ Add TAX_TYPE_METADATA constant with static data
+- ✅ Add plate number validation helper
+- ✅ Add "Plate Number" to Tax Type options
+- ✅ Add Plate Number auto-uppercase formatting
+- ✅ Add Plate Number placeholder examples
+- ✅ Enhance Tax Type dropdown with descriptions
+- ✅ Add Tax Type input with datalist (allow manual typing)
 
-## Status: All Tasks Complete ✅
+---
+
+## In Progress
+
+---
+
+## Backlog
+
+---
+
+## Notes
 

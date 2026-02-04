@@ -5,7 +5,14 @@ import ImageZoom from "@/app/components/ImageZoom";
 import { getCambodiaNowString } from "@/lib/cambodiaTime";
 import { compressImage, formatFileSize } from "@/lib/compressImage";
 import { derivePrices } from "@/lib/pricing";
-import type { Vehicle } from "@/lib/types";
+import {
+  COLOR_OPTIONS,
+  PLATE_NUMBER_HINTS,
+  PLATE_NUMBER_MAX_LENGTH,
+  TAX_TYPE_METADATA,
+  TAX_TYPE_OPTIONS,
+  type Vehicle
+} from "@/lib/types";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState, type FormEvent } from "react";
 
@@ -19,7 +26,6 @@ function AddVehicleInner() {
   const router = useRouter();
   const user = useAuthUser();
   const isAdmin = user.role === "Admin";
-  const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -202,7 +208,7 @@ function AddVehicleInner() {
   const categories = ["Cars", "Motorcycles", "Tuk Tuk"];
   const conditions = ["New", "Used", "Damaged"];
   const bodyTypes = ["Sedan", "SUV", "Truck", "Van", "Bike", "Other"];
-  const taxTypes = ["Standard", "Luxury", "Commercial"];
+  const taxTypes = [...TAX_TYPE_OPTIONS];
 
   if (!isAdmin) {
     return (
@@ -289,7 +295,7 @@ function AddVehicleInner() {
               autoFocus
               value={formData.Category || ""}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange("Category", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input ec-select w-full"
             >
               <option value="" disabled>
                 Select category
@@ -310,7 +316,7 @@ function AddVehicleInner() {
               maxLength={100}
               value={formData.Brand || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Brand", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -322,7 +328,7 @@ function AddVehicleInner() {
               maxLength={100}
               value={formData.Model || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Model", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -331,11 +337,15 @@ function AddVehicleInner() {
             <input
               type="text"
               required
-              maxLength={20}
+              maxLength={PLATE_NUMBER_MAX_LENGTH}
               value={formData.Plate || ""}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Plate", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent font-mono text-gray-900"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange("Plate", e.target.value.toUpperCase())
+              }
+              placeholder={`e.g. ${PLATE_NUMBER_HINTS[0]}`}
+              className="ec-input w-full font-mono uppercase placeholder:normal-case"
             />
+
           </div>
 
           <div>
@@ -353,7 +363,7 @@ function AddVehicleInner() {
                       : Number.parseInt(e.target.value, 10)
                 )
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -361,10 +371,26 @@ function AddVehicleInner() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
             <input
               type="text"
+              list="colorsList"
               value={formData.Color || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Color", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
+              placeholder="Type color (e.g., White, Black, Red, Custom)"
             />
+            <datalist id="colorsList">
+              {COLOR_OPTIONS.map((color) => (
+                <option key={color.value} value={color.value} />
+              ))}
+            </datalist>
+            {formData.Color && (
+              <div className="mt-2 flex items-center gap-2">
+                <span
+                  className="w-6 h-6 rounded border border-gray-300"
+                  style={{ backgroundColor: COLOR_OPTIONS.find(c => c.value === formData.Color)?.hex || formData.Color }}
+                />
+                <span className="text-sm text-gray-600">{formData.Color}</span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -372,7 +398,7 @@ function AddVehicleInner() {
             <select
               value={formData.Condition || "New"}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange("Condition", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input ec-select w-full"
             >
               {conditions.map((cond) => (
                 <option key={cond} value={cond}>
@@ -389,7 +415,7 @@ function AddVehicleInner() {
               list="bodyTypesList"
               value={formData.BodyType || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("BodyType", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
               placeholder="Type body type (or choose)"
             />
             <datalist id="bodyTypesList">
@@ -406,14 +432,19 @@ function AddVehicleInner() {
               list="taxTypesList"
               value={formData.TaxType || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("TaxType", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
               placeholder="Type tax type (or choose)"
             />
             <datalist id="taxTypesList">
-              {taxTypes.map((tt) => (
-                <option key={tt} value={tt} />
+              {TAX_TYPE_METADATA.map((tt) => (
+                <option key={tt.value} value={tt.label} />
               ))}
             </datalist>
+            {formData.TaxType && (
+              <p className="mt-1 text-xs text-gray-600">
+                {TAX_TYPE_METADATA.find((tt) => tt.value === formData.TaxType)?.description || "Custom tax type"}
+              </p>
+            )}
           </div>
 
           <div>
@@ -433,7 +464,7 @@ function AddVehicleInner() {
                       : Number.parseFloat(e.target.value)
                 )
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900"
+              className="ec-input w-full"
             />
           </div>
 
@@ -444,7 +475,7 @@ function AddVehicleInner() {
               readOnly
               value={formData.Price40 ?? ""}
               placeholder="Auto"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
+              className="ec-input w-full bg-gray-50"
             />
           </div>
 
@@ -455,7 +486,7 @@ function AddVehicleInner() {
               readOnly
               value={formData.Price70 ?? ""}
               placeholder="Auto"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
+              className="ec-input w-full bg-gray-50"
             />
           </div>
 
@@ -484,7 +515,7 @@ function AddVehicleInner() {
                   value={formData.Image || ""}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("Image", e.target.value)}
                   placeholder="https://..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-900 placeholder:text-gray-400"
+                  className="ec-input w-full placeholder:text-gray-400"
                 />
                 {formData.Image ? (
                   <button
@@ -511,14 +542,14 @@ function AddVehicleInner() {
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition font-medium"
+              className="flex-1 ec-glassBtnPrimary px-6 py-3"
             >
               {submitting ? "Adding..." : "Add Vehicle"}
             </button>
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium"
+              className="flex-1 ec-glassBtnSecondary px-6 py-3"
             >
               Cancel
             </button>

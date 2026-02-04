@@ -1,11 +1,12 @@
+
 "use client";
 
 import { useAuthUser } from "@/app/components/AuthContext";
+import BrandLogo from "@/app/components/BrandLogo";
 import ImageZoom from "@/app/components/ImageZoom";
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
-import { TAX_TYPE_METADATA } from "@/lib/types";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -181,22 +182,27 @@ function ViewVehicleInner() {
       <div className="max-w-4xl mx-auto ec-glassPanel rounded-2xl shadow-xl ring-1 ring-black/5 p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start mb-8">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">
-              {vehicle.Brand} {vehicle.Model}
-            </h1>
-            <p className="text-gray-600 mt-2">Vehicle ID: {vehicle.VehicleId}</p>
+          <div className="flex items-start gap-4">
+            {vehicle.Brand && (
+              <BrandLogo brand={vehicle.Brand} size="lg" />
+            )}
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">
+                {vehicle.Brand} {vehicle.Model}
+              </h1>
+              <p className="text-gray-600 mt-2">Vehicle ID: {vehicle.VehicleId}</p>
+            </div>
           </div>
           <div className="space-y-2">
             <button
               onClick={handlePrint}
-              className="w-full ec-glassBtnBlue px-4 py-2 print:hidden"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium print:hidden"
             >
               Print
             </button>
             <button
               onClick={() => router.back()}
-              className="w-full ec-glassBtnSecondary px-4 py-2 print:hidden"
+              className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium print:hidden"
             >
               Back
             </button>
@@ -213,68 +219,63 @@ function ViewVehicleInner() {
 
         {/* Details Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-blue-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Category</p>
             <p className="text-lg font-semibold text-gray-800">{vehicle.Category}</p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-green-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Plate Number</p>
-            <p className="text-lg font-semibold text-gray-800 font-mono uppercase">{vehicle.Plate}</p>
+            <p className="text-lg font-semibold text-gray-800 font-mono">{vehicle.Plate}</p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-purple-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Year</p>
             <p className="text-lg font-semibold text-gray-800">{vehicle.Year || "N/A"}</p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-orange-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Color</p>
             <p className="text-lg font-semibold text-gray-800">{vehicle.Color}</p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-red-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Condition</p>
             <p className="text-lg font-semibold text-gray-800">{vehicle.Condition}</p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-cyan-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Body Type</p>
             <p className="text-lg font-semibold text-gray-800">{vehicle.BodyType}</p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-pink-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Tax Type</p>
             <p className="text-lg font-semibold text-gray-800">{vehicle.TaxType}</p>
-            {vehicle.TaxType && (
-              <p className="text-xs text-gray-500 mt-1">
-                {TAX_TYPE_METADATA.find((tt) => tt.value === vehicle.TaxType)?.description}
-              </p>
-            )}
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-indigo-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Market Price</p>
             <p className="text-lg font-semibold text-gray-800">
               ${vehicle.PriceNew?.toLocaleString() || "N/A"}
             </p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-lime-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">D.O.C.40%</p>
             <p className="text-lg font-semibold text-gray-800">
               ${vehicle.Price40?.toLocaleString() || "N/A"}
             </p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4">
+          <div className="border-l-4 border-emerald-600 pl-4">
             <p className="text-gray-600 text-sm font-medium">Vehicles70%</p>
             <p className="text-lg font-semibold text-gray-800">
               ${vehicle.Price70?.toLocaleString() || "N/A"}
             </p>
           </div>
 
-          <div className="ec-glassBadge rounded-lg p-4 md:col-span-2">
+          <div className="border-l-4 border-gray-600 pl-4 md:col-span-2">
             <p className="text-gray-600 text-sm font-medium">Added Time</p>
             <p className="text-lg font-semibold text-gray-800 font-mono">
               {normalizeCambodiaTimeString(vehicle.Time)}
@@ -366,14 +367,14 @@ function ViewVehicleInner() {
             <>
               <button
                 onClick={() => router.push(`/vehicles/${vehicle.VehicleId}/edit`)}
-                className="flex-1 ec-glassBtnPrimary px-6 py-3"
+                className="flex-1 px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-medium"
               >
                 Edit Vehicle
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-1 ec-glassBtnRed px-6 py-3"
+                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed transition font-medium"
               >
                 {deleting ? "Deleting..." : "Delete"}
               </button>
@@ -381,7 +382,7 @@ function ViewVehicleInner() {
           ) : null}
           <button
             onClick={() => router.back()}
-            className="flex-1 ec-glassBtnSecondary px-6 py-3"
+            className="flex-1 px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition font-medium"
           >
             Back
           </button>
@@ -390,3 +391,4 @@ function ViewVehicleInner() {
     </div>
   );
 }
+

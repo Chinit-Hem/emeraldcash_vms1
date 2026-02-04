@@ -1,23 +1,33 @@
+import {
+  getClientIp,
+  getClientUserAgent,
+  getSessionFromRequest,
+  validateSession,
+} from "@/lib/auth";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-import { parseSessionCookie, validateSession } from "@/lib/auth";
 import { fetchAppsScript } from "../../_shared";
 
+// Input validation helper
+function sanitizeString(value: unknown, maxLength = 1000): string {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, maxLength);
+}
+
 function requireSession(req: NextRequest) {
+  const ip = getClientIp(req.headers);
+  const userAgent = getClientUserAgent(req.headers);
   const sessionCookie = req.cookies.get("session")?.value;
   if (!sessionCookie) return null;
 
-  const session = parseSessionCookie(sessionCookie);
+  const session = getSessionFromRequest(userAgent, ip, sessionCookie);
   if (!session || !validateSession(session)) return null;
 
   return session;
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest, _props: { params: Promise<{ id: string }> }) {
   const session = requireSession(req);
   if (!session) {
     return NextResponse.json({ ok: false, error: "Invalid or expired session" }, { status: 401 });
@@ -27,7 +37,6 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
-  const { id } = await params;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL;
   if (!baseUrl) {
     return NextResponse.json(
@@ -38,9 +47,19 @@ export async function POST(
 
   try {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const imageFileId = String(body.imageFileId || "").trim();
+    const imageFileId = sanitizeString(body.imageFileId, 500);
+
     if (!imageFileId) {
-      return NextResponse.json({ ok: false, error: "Missing imageFileId" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Missing or invalid imageFileId" }, { status: 400 });
+    }
+
+    // Validate token
+    const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
+    if (!uploadToken) {
+      return NextResponse.json(
+        { ok: false, error: "Server configuration error" },
+        { status: 500 }
+      );
     }
 
     const res = await fetchAppsScript(baseUrl, {
@@ -49,7 +68,7 @@ export async function POST(
       body: JSON.stringify({
         action: "deleteImage",
         fileId: imageFileId,
-        token: process.env.APPS_SCRIPT_UPLOAD_TOKEN,
+        token: uploadToken,
       }),
       cache: "no-store",
       timeoutMs: 30000,
@@ -71,3 +90,4 @@ export async function POST(
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
+

@@ -161,7 +161,15 @@ export function toVehicle(row: Record<string, unknown>): Vehicle {
   const color = toStringValue(pick(row, ["Color"]));
   const image = toStringValue(pick(row, ["Image", "ImageURL", "Image URL"]));
   const time = toStringValue(pick(row, ["Time", "Added Time"]));
-  const fast = pick(row, ["Fast"]) === "true" || pick(row, ["Fast"]) === true;
+
+  // Market price fields
+  const marketPriceLow = toNumberOrNull(pick(row, ["MARKET_PRICE_LOW", "MarketPriceLow", "marketPriceLow"]));
+  const marketPriceMedian = toNumberOrNull(pick(row, ["MARKET_PRICE_MEDIAN", "MarketPriceMedian", "marketPriceMedian"]));
+  const marketPriceHigh = toNumberOrNull(pick(row, ["MARKET_PRICE_HIGH", "MarketPriceHigh", "marketPriceHigh"]));
+  const marketPriceSource = toStringValue(pick(row, ["MARKET_PRICE_SOURCE", "MarketPriceSource", "marketPriceSource"]));
+  const marketPriceSamples = toNumberOrNull(pick(row, ["MARKET_PRICE_SAMPLES", "MarketPriceSamples", "marketPriceSamples"]));
+  const marketPriceConfidence = toStringValue(pick(row, ["MARKET_PRICE_CONFIDENCE", "MarketPriceConfidence", "marketPriceConfidence"]));
+  const marketPriceUpdatedAt = toStringValue(pick(row, ["MARKET_PRICE_UPDATED_AT", "MarketPriceUpdatedAt", "marketPriceUpdatedAt"]));
 
   return {
     VehicleId: vehicleId,
@@ -179,7 +187,14 @@ export function toVehicle(row: Record<string, unknown>): Vehicle {
     Color: color,
     Image: image,
     Time: time,
-    Fast: fast,
+    // Market price fields
+    MarketPriceLow: marketPriceLow,
+    MarketPriceMedian: marketPriceMedian,
+    MarketPriceHigh: marketPriceHigh,
+    MarketPriceSource: marketPriceSource || null,
+    MarketPriceSamples: marketPriceSamples,
+    MarketPriceConfidence: (marketPriceConfidence as "High" | "Medium" | "Low") || null,
+    MarketPriceUpdatedAt: marketPriceUpdatedAt || null,
   };
 }
 
@@ -204,7 +219,6 @@ export function toAppsScriptPayload(
 
   const taxType = toStringValue(pick(input, ["TaxType", "Tax Type"]));
   const bodyType = toStringValue(pick(input, ["BodyType", "Body Type"]));
-  const fast = pick(input, ["Fast"]) === "true" || pick(input, ["Fast"]) === true;
 
   const payload: Record<string, unknown> = {
     VehicleId: vehicleId,
@@ -219,7 +233,6 @@ export function toAppsScriptPayload(
     Color: toStringValue(pick(input, ["Color"])),
     Image: toStringValue(pick(input, ["Image", "ImageURL", "Image URL"])),
     Time: toStringValue(pick(input, ["Time"])),
-    Fast: fast,
 
     // Compatibility keys (camelCase)
     PriceNew: priceNew ?? "",
