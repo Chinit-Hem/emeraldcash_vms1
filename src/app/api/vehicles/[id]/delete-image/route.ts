@@ -27,7 +27,7 @@ function requireSession(req: NextRequest) {
   return session;
 }
 
-export async function POST(req: NextRequest, _props: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest) {
   const session = requireSession(req);
   if (!session) {
     return NextResponse.json({ ok: false, error: "Invalid or expired session" }, { status: 401 });

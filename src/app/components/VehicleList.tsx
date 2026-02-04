@@ -246,7 +246,6 @@ export default function VehicleList({ category }: VehicleListProps) {
       if (queryParam) next.query = queryParam;
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const debouncedQuery = useDebouncedValue(filters.query, 200);

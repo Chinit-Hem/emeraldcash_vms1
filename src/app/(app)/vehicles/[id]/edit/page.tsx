@@ -37,15 +37,6 @@ function EditVehicleInner() {
   const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [autoUpdateMarketPrice, setAutoUpdateMarketPrice] = useState(false);
-  const [marketPriceData, setMarketPriceData] = useState<{
-    priceLow: number | null;
-    priceMedian: number | null;
-    priceHigh: number | null;
-    source: string;
-    samples: number;
-    confidence: "High" | "Medium" | "Low" | "Unknown";
-    updatedAt: string;
-  } | null>(null);
   const loadedVehicleIdRef = useRef<string | null>(null);
 
   const currentIndex = useMemo(() => vehicles.findIndex((v) => v.VehicleId === id), [id, vehicles]);
@@ -208,58 +199,17 @@ function EditVehicleInner() {
   /**
    * Handle market price update from MarketPriceButton
    */
-  const handleMarketPriceUpdate = (marketData: {
-    priceLow: number | null;
-    priceMedian: number | null;
-    priceHigh: number | null;
-    source: string;
-    samples: number;
-    confidence: "High" | "Medium" | "Low" | "Unknown";
-    fetchedAt: string;
-  }) => {
-    setMarketPriceData({
-      priceLow: marketData.priceLow,
-      priceMedian: marketData.priceMedian,
-      priceHigh: marketData.priceHigh,
-      source: marketData.source,
-      samples: marketData.samples,
-      confidence: marketData.confidence,
-      updatedAt: marketData.fetchedAt,
-    });
+  const handleMarketPriceUpdate = () => {
+    // Intentionally ignore; MarketPriceButton already updates the sheet
+    // and we perform auto-update on save. Kept for future extension.
   };
 
   /**
    * Update market price in Google Sheets
    */
-  const updateMarketPriceInSheet = async () => {
-    if (!marketPriceData || !currentVehicle) return;
-
-    try {
-      const response = await fetch("/api/market-price/update", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          vehicleId: currentVehicle.VehicleId,
-          marketData: {
-            priceLow: marketPriceData.priceMedian,
-            priceMedian: marketPriceData.priceMedian,
-            priceHigh: marketPriceData.priceMedian,
-            source: marketPriceData.source,
-            samples: marketPriceData.samples,
-            confidence: marketPriceData.confidence,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        console.warn("Failed to update market price in Google Sheets");
-      }
-    } catch (err) {
-      console.warn("Error updating market price in sheet:", err);
-    }
-  };
+  // Note: market price updates are handled by `MarketPriceButton` which
+  // performs the Apps Script update. The local helper was unused and
+  // removed to satisfy lint rules.
 
   const handleSave = async () => {
     if (!currentVehicle || !id) return;

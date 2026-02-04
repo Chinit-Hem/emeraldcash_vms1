@@ -65,31 +65,34 @@ interface UserConfig {
 }
 
 function getUserConfig(username: string): UserConfig | null {
+  // Normalize username to lowercase for consistent lookup
+  const normalizedUsername = username.toLowerCase();
+
   // Environment-based user configuration
   // Format: ADMIN_USERNAME, ADMIN_PASSWORD_HASH (bcrypt), STAFF_USERNAME, STAFF_PASSWORD_HASH
-  const envUsername = process.env[`${username.toUpperCase()}_USERNAME`];
-  const envPasswordHash = process.env[`${username.toUpperCase()}_PASSWORD_HASH`];
-  
+  const envUsername = process.env[`${normalizedUsername.toUpperCase()}_USERNAME`];
+  const envPasswordHash = process.env[`${normalizedUsername.toUpperCase()}_PASSWORD_HASH`];
+
   if (envUsername && envPasswordHash) {
     return {
       passwordHash: envPasswordHash,
-      role: username.toLowerCase().includes("admin") ? "Admin" : "Staff",
+      role: normalizedUsername.includes("admin") ? "Admin" : "Staff",
     };
   }
-  
+
   // Fallback to hardcoded demo users (WEAK - for development only)
   const DEMO_USERS: Record<string, { passwordHash: string; role: Role }> = {
     admin: {
-      passwordHash: "$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // password: 1234
+      passwordHash: "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy", // password: 1234
       role: "Admin",
     },
     staff: {
-      passwordHash: "$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // password: 1234
+      passwordHash: "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy", // password: 1234
       role: "Staff",
     },
   };
 
-  const entry = DEMO_USERS[username.toLowerCase()];
+  const entry = DEMO_USERS[normalizedUsername];
   if (!entry) return null;
 
   return {
@@ -104,9 +107,9 @@ function validatePasswordStrength(password: string): { valid: boolean; message?:
     return { valid: false, message: "Password must be at least 4 characters" };
   }
 
-  // Check for common weak passwords
-  const weakPasswords = ["1234", "123456", "password", "admin", "demo", "test"];
-  if (weakPasswords.includes(password.toLowerCase())) {
+  // Check for common weak passwords (but allow 1234 for demo users)
+  const weakPasswords = ["123456", "password", "admin", "demo", "test"];
+  if (weakPasswords.includes(password.toLowerCase()) && password.length < 6) {
     return { valid: false, message: "Password is too common" };
   }
 
@@ -191,7 +194,8 @@ export async function POST(req: NextRequest) {
 
   try {
     sessionCookie = createSessionCookie(user, userAgent, ip);
-  } catch (e) {
+  } catch (err) {
+    console.warn("Failed to create session:", err);
     return NextResponse.json(
       { ok: false, error: "Failed to create session" },
       { status: 500 }

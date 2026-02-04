@@ -10,7 +10,6 @@ import {
   PLATE_NUMBER_HINTS,
   PLATE_NUMBER_MAX_LENGTH,
   TAX_TYPE_METADATA,
-  TAX_TYPE_OPTIONS,
   type Vehicle
 } from "@/lib/types";
 import { useRouter } from "next/navigation";
@@ -208,7 +207,7 @@ function AddVehicleInner() {
   const categories = ["Cars", "Motorcycles", "Tuk Tuk"];
   const conditions = ["New", "Used", "Damaged"];
   const bodyTypes = ["Sedan", "SUV", "Truck", "Van", "Bike", "Other"];
-  const taxTypes = [...TAX_TYPE_OPTIONS];
+  // tax types are available via `TAX_TYPE_OPTIONS`; no local copy needed
 
   if (!isAdmin) {
     return (
