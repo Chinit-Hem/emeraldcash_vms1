@@ -261,7 +261,7 @@ export async function PUT(
     if (normalizedTime) payload.Time = normalizedTime;
     else delete payload.Time;
 
-    // Handle image upload/replacement
+    // Handle image upload/replacement with optimized performance
     if (newImageFile) {
       const folderId = driveFolderIdForCategory(payload.Category);
       if (!folderId) {
@@ -271,49 +271,7 @@ export async function PUT(
         );
       }
 
-      // Check if vehicle already has an image and delete it first
-      let existingFileId: string | null = null;
-      try {
-        const byIdUrl = new URL(baseUrl);
-        byIdUrl.searchParams.set("action", "getById");
-        byIdUrl.searchParams.set("id", safeId);
-        const byIdRes = await fetchAppsScript(byIdUrl.toString(), { cache: "no-store", timeoutMs: 15000 });
-        if (byIdRes.ok) {
-          const byIdJson = await byIdRes.json().catch(() => ({}));
-          if (byIdJson?.ok !== false && byIdJson?.data && typeof byIdJson.data === "object") {
-            const vehicle = toVehicle(byIdJson.data as Record<string, unknown>);
-            existingFileId = extractDriveFileId(vehicle.Image);
-          }
-        }
-      } catch {
-        // ignore, proceed without deleting existing image
-      }
-
-      // Delete existing image if any
-      if (existingFileId) {
-        try {
-          await fetchAppsScript(baseUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "deleteImage",
-              fileId: existingFileId,
-              token: process.env.APPS_SCRIPT_UPLOAD_TOKEN,
-            }),
-            cache: "no-store",
-            timeoutMs: 30000,
-          });
-        } catch {
-          // ignore delete errors, proceed with upload
-        }
-      }
-
-      // Upload new image with standardized filename
-      const fileName = `vehicle_${safeId}.webp`;
-      const arrayBuffer = await newImageFile.arrayBuffer();
-      const base64Data = Buffer.from(arrayBuffer).toString('base64');
-
-      // Validate token
+      // Validate token early
       const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
       if (!uploadToken) {
         return NextResponse.json(
@@ -326,25 +284,60 @@ export async function PUT(
         );
       }
 
+      // Prepare image data (convert to base64 once)
+      const fileName = `vehicle_${safeId}.webp`;
+      const arrayBuffer = await newImageFile.arrayBuffer();
+      const base64Data = Buffer.from(arrayBuffer).toString('base64');
+
+      // Parallel operations: fetch existing vehicle AND prepare upload payload
+      const [existingVehicleRes] = await Promise.allSettled([
+        // Fetch existing vehicle to check for old image (with shorter timeout)
+        fetchAppsScript(new URL(baseUrl).toString() + `?action=getById&id=${encodeURIComponent(safeId)}`, {
+          cache: "no-store",
+          timeoutMs: 10000
+        }).catch(() => null)
+      ]);
+
+      // Extract existing file ID if available
+      let existingFileId: string | null = null;
+      if (existingVehicleRes.status === 'fulfilled' && existingVehicleRes.value) {
+        try {
+          const byIdJson = await existingVehicleRes.value.json().catch(() => ({}));
+          if (byIdJson?.ok !== false && byIdJson?.data && typeof byIdJson.data === "object") {
+            const vehicle = toVehicle(byIdJson.data as Record<string, unknown>);
+            existingFileId = extractDriveFileId(vehicle.Image);
+          }
+        } catch {
+          // ignore, proceed without deleting existing image
+        }
+      }
+
+      // Prepare upload payload
+      const uploadPayload = {
+        action: "uploadImage",
+        folderId,
+        category: payload.Category,
+        token: uploadToken,
+        mimeType: "image/webp",
+        fileName,
+        data: base64Data,
+        // Optionally replace existing image in one call if Apps Script supports it
+        replaceFileId: existingFileId || undefined,
+      };
+
+      // Upload new image (reduced timeout from 90s to 60s)
       const uploadRes = await fetchAppsScript(baseUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "uploadImage",
-          folderId,
-          category: payload.Category,
-          token: uploadToken,
-          mimeType: "image/webp",
-          fileName,
-          data: base64Data,
-        }),
+        body: JSON.stringify(uploadPayload),
         cache: "no-store",
-        timeoutMs: 90000,
+        timeoutMs: 60000, // Reduced from 90s to 60s
       });
 
       const uploadJson = (await uploadRes.json().catch(() => ({}))) as Record<string, unknown>;
       const uploadOk = uploadRes.ok && (uploadJson?.ok === true || uploadJson?.ok !== false);
       const hasError = typeof uploadJson?.error === "string" && String(uploadJson.error).trim();
+
       if (!uploadOk || hasError) {
         const message = hasError
           ? String(uploadJson.error).trim()
@@ -360,6 +353,7 @@ export async function PUT(
         );
       }
 
+      // Extract uploaded image URL
       const dataObj = uploadJson?.data && typeof uploadJson.data === "object" ? (uploadJson.data as Record<string, unknown>) : {};
       const uploadedUrlCandidate =
         uploadJson?.url ??

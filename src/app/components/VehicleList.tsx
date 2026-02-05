@@ -538,6 +538,31 @@ export default function VehicleList({ category }: VehicleListProps) {
                   <span>{filters.withoutImage ? "Show all images" : "Find no image"}</span>
                 </span>
               </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="ec-btn w-full sm:w-auto text-sm"
+                title="Print all vehicle data"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6,9 6,2 18,2 18,9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect width="12" height="8" x="6" y="14" />
+                  </svg>
+                  <span>Print</span>
+                </span>
+              </button>
             </div>
 
             <div className="text-sm text-gray-600 whitespace-nowrap text-right sm:text-left">
