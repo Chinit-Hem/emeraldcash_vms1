@@ -659,13 +659,11 @@ function getVehicles_() {
     const byHeader = rowToHeaderObject_(row);
     return headerToFriendly_(byHeader);
   }).filter(function (vehicle) {
-    // Filter out vehicles without a valid ID
-    const hasId = vehicle.VehicleId !== null && vehicle.VehicleId !== undefined && String(vehicle.VehicleId).trim() !== "";
-    // Also check if vehicle has at least some meaningful data (Category, Brand, or Model)
-    const hasData = (vehicle.Category && String(vehicle.Category).trim() !== "") ||
-                    (vehicle.Brand && String(vehicle.Brand).trim() !== "") ||
-                    (vehicle.Model && String(vehicle.Model).trim() !== "");
-    return hasId && hasData;
+    // Only filter out vehicles with completely empty/missing IDs
+    // Convert to string and check if it's empty after trimming
+    const idStr = String(vehicle.VehicleId || "").trim();
+    const hasId = idStr !== "" && idStr !== "null" && idStr !== "undefined";
+    return hasId;
   });
 
   console.log("Processed vehicles length (after filtering): " + vehicles.length);
