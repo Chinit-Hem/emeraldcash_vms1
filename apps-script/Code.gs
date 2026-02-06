@@ -649,13 +649,34 @@ function fixVehiclesSheetToSchemaInPlace() {
 function getVehicles_() {
   const sh = getSheet_();
   const lastRow = sh.getLastRow();
+  console.log("Sheet lastRow: " + lastRow);
   if (lastRow < 2) return [];
 
   const values = sh.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
-  return values.map(function (row) {
+  console.log("Raw values length: " + values.length);
+
+  const vehicles = values.map(function (row) {
     const byHeader = rowToHeaderObject_(row);
     return headerToFriendly_(byHeader);
+  }).filter(function (vehicle) {
+    // Filter out vehicles without a valid ID
+    const hasId = vehicle.VehicleId !== null && vehicle.VehicleId !== undefined && String(vehicle.VehicleId).trim() !== "";
+    // Also check if vehicle has at least some meaningful data (Category, Brand, or Model)
+    const hasData = (vehicle.Category && String(vehicle.Category).trim() !== "") ||
+                    (vehicle.Brand && String(vehicle.Brand).trim() !== "") ||
+                    (vehicle.Model && String(vehicle.Model).trim() !== "");
+    return hasId && hasData;
   });
+
+  console.log("Processed vehicles length (after filtering): " + vehicles.length);
+
+  // Log first and last few vehicles to check for empty rows
+  if (vehicles.length > 0) {
+    console.log("First vehicle:", JSON.stringify(vehicles[0]));
+    console.log("Last vehicle:", JSON.stringify(vehicles[vehicles.length - 1]));
+  }
+
+  return vehicles;
 }
 
 function getById_(id) {

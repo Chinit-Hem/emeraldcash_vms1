@@ -149,6 +149,25 @@ function IconTukTuk({ active }: { active: boolean }) {
   );
 }
 
+function IconSettings({ active }: { active: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={iconClassName(active)}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
 interface SidebarProps {
   user: User;
   onNavigate?: () => void;
@@ -159,6 +178,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [vehiclesMenuOpen, setVehiclesMenuOpen] = useState(() => pathname.startsWith("/vehicles"));
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -183,11 +203,11 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
 
   const navButtonClasses = useMemo(() => {
     const base =
-      "group relative w-full text-left px-4 py-2 rounded-lg transition-all duration-200 font-semibold flex items-center justify-between";
+      "group relative w-full text-left px-4 py-3 lg:py-2 rounded-lg transition-all duration-200 font-semibold flex items-center justify-between min-h-[44px] lg:min-h-[auto]";
     return {
       base,
       active: `${base} bg-green-700 text-white shadow-sm`,
-      inactive: `${base} text-gray-800 hover:bg-gray-100 hover:translate-x-[1px]`,
+      inactive: `${base} text-gray-800 hover:bg-gray-100 hover:translate-x-[1px] active:scale-[0.98] lg:active:scale-100`,
       label: "relative z-10",
       activePill:
         "absolute inset-0 rounded-lg bg-gradient-to-r from-green-800 to-green-600 opacity-0 scale-[0.98] transition-all duration-200",
@@ -359,32 +379,54 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
         {/* Divider */}
         <div className="border-t border-gray-200 mb-6"></div>
 
-        {/* User Info & Logout */}
-        <div className="space-y-4">
-          <div className="px-4 py-3 ec-glassPanelSoft rounded-lg">
-            <p className="text-xs text-gray-600 mb-1">Role:</p>
-            <p className="font-semibold text-gray-800">{user.role}</p>
-            <p className="text-xs text-gray-600 mt-2">User: {user.username}</p>
-          </div>
-
-          <div className="flex items-center justify-between px-1">
-            <div className="text-xs text-gray-600 font-semibold">Appearance</div>
-            <ThemeToggle />
-          </div>
-
+        {/* Settings */}
+        <div>
           <button
-            onClick={() => setChangePasswordOpen(true)}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+            type="button"
+            onClick={() => setSettingsMenuOpen((prev) => !prev)}
+            className={navButtonClasses.inactive}
           >
-            Change Password
+            <span className={`${navButtonClasses.label} flex items-center justify-between w-full`}>
+              <span className="flex items-center gap-3">
+                <IconSettings active={false} />
+                <span>Settings</span>
+              </span>
+              <span
+                className={`text-xs font-extrabold tracking-wide text-gray-500`}
+              >
+                {settingsMenuOpen ? "Hide ▾" : "Show ▸"}
+              </span>
+            </span>
           </button>
 
-          <button
-            onClick={handleLogout}
-            className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
-          >
-            Logout
-          </button>
+          {settingsMenuOpen ? (
+            <div className="mt-2 space-y-3 lg:space-y-4">
+              <div className="px-4 py-3 ec-glassPanelSoft rounded-lg">
+                <p className="text-xs text-gray-600 mb-1">Role:</p>
+                <p className="font-semibold text-gray-800">{user.role}</p>
+                <p className="text-xs text-gray-600 mt-2">User: {user.username}</p>
+              </div>
+
+              <div className="flex items-center justify-between px-1">
+                <div className="text-xs text-gray-600 font-semibold">Appearance</div>
+                <ThemeToggle />
+              </div>
+
+              <button
+                onClick={() => setChangePasswordOpen(true)}
+                className="w-full px-4 py-3 lg:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition font-medium min-h-[44px] lg:min-h-[auto] active:scale-[0.98] lg:active:scale-100"
+              >
+                Change Password
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="w-full px-4 py-3 lg:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 transition font-medium min-h-[44px] lg:min-h-[auto] active:scale-[0.98] lg:active:scale-100"
+              >
+                Logout
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 

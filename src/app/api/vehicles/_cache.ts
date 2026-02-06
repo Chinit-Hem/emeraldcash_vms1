@@ -9,11 +9,11 @@ let cache: VehiclesCache | null = null;
 
 function cacheTtlMs(): number {
   const raw = process.env.VEHICLES_CACHE_TTL_MS;
-  // Default 10 minutes.
-  if (!raw) return 10 * 60 * 1000;
+  // Default 0 to disable caching for real-time updates.
+  if (!raw) return 0;
 
   const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) return 10 * 60 * 1000;
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return parsed;
 }
 

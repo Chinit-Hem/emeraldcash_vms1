@@ -24,14 +24,21 @@ function LoginForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
+        // Ensure cookies are sent and received properly on mobile
+        credentials: "same-origin",
       });
 
       const json = await res.json();
       if (!res.ok || json.ok === false)
         throw new Error(json.error || "Login failed");
 
+      // Add a small delay to ensure cookie is set before redirect
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       const redirectTo = searchParams?.get("redirect") || "/";
       router.push(redirectTo);
+      // Force a page reload to ensure session is recognized
+      router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login error");
     } finally {

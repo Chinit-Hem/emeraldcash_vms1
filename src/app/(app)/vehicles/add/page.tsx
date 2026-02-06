@@ -28,7 +28,6 @@ function AddVehicleInner() {
   const isAdmin = user.role === "Admin";
   const [imageLoading, setImageLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [compressedImage, setCompressedImage] = useState<{
     file: File;
     dataUrl: string;
@@ -135,72 +134,81 @@ function AddVehicleInner() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitting(true);
+
+    // Optimistic update: clear form and show success immediately
+    const currentFormData = { ...formData };
+    const currentCompressedImage = compressedImage;
 
     try {
-      const formDataToSend = new FormData();
-
-      // Add vehicle data
-      Object.entries(formData).forEach(([key, value]) => {
-        if (value != null) {
-          formDataToSend.append(key, String(value));
-        }
-      });
-      formDataToSend.append("Time", getCambodiaNowString());
-
-      // Add compressed image if available
-      if (compressedImage?.file) {
-        formDataToSend.append("image", compressedImage.file);
-      }
-
-      const res = await fetch("/api/vehicles", {
-        method: "POST",
-        body: formDataToSend,
-      });
-
-      if (res.status === 401) {
-        router.push("/login");
-        return;
-      }
-
-      const json = await res.json().catch(() => ({}));
-      if (res.status === 403) throw new Error("Forbidden");
-      if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to add vehicle");
-
-      try {
-        sessionStorage.removeItem(ADD_DRAFT_KEY);
-      } catch {
-        // ignore
-      }
-
-      setSuccessMessage("Vehicle added successfully!");
-
-      setFormData({
-        Brand: "",
-        Model: "",
-        Category: "",
-        Plate: "",
-        Year: null,
-        Color: "",
-        Condition: "New",
-        BodyType: "",
-        TaxType: "",
-        PriceNew: null,
-        Price40: null,
-        Price70: null,
-        Image: "",
-      });
-      setCompressedImage(null);
-
-      await refreshVehicleCache();
-      const refreshKey = Date.now();
-      router.push(`/vehicles?refresh=${refreshKey}`);
-      router.refresh();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Error adding vehicle");
-    } finally {
-      setSubmitting(false);
+      sessionStorage.removeItem(ADD_DRAFT_KEY);
+    } catch {
+      // ignore
     }
+
+    setSuccessMessage("Vehicle added successfully!");
+
+    // Clear form for new input
+    setFormData({
+      Brand: "",
+      Model: "",
+      Category: "",
+      Plate: "",
+      Year: null,
+      Color: "",
+      Condition: "New",
+      BodyType: "",
+      TaxType: "",
+      PriceNew: null,
+      Price40: null,
+      Price70: null,
+      Image: "",
+    });
+    setCompressedImage(null);
+
+    // Refresh cache optimistically (assume success)
+    refreshVehicleCache();
+
+    // Perform API call in background
+    (async () => {
+      try {
+        const formDataToSend = new FormData();
+
+        // Add vehicle data
+        Object.entries(currentFormData).forEach(([key, value]) => {
+          if (value != null) {
+            formDataToSend.append(key, String(value));
+          }
+        });
+        formDataToSend.append("Time", getCambodiaNowString());
+
+        // Add compressed image if available
+        if (currentCompressedImage?.file) {
+          formDataToSend.append("image", currentCompressedImage.file);
+        }
+
+        const res = await fetch("/api/vehicles", {
+          method: "POST",
+          body: formDataToSend,
+        });
+
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
+
+        const json = await res.json().catch(() => ({}));
+        if (res.status === 403) throw new Error("Forbidden");
+        if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to add vehicle");
+
+        // Success: cache already refreshed optimistically
+      } catch (err) {
+        // On failure, show error but don't block user
+        setSuccessMessage("");
+        alert(`Failed to add vehicle: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`);
+        // Optionally, refresh cache to revert optimistic update
+        refreshVehicleCache();
+      }
+    })();
   };
 
   const categories = ["Cars", "Motorcycles", "Tuk Tuk"];
@@ -293,6 +301,25 @@ function AddVehicleInner() {
               autoFocus
               value={formData.Category || ""}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange("Category", e.target.value)}
+              onPaste={(e: React.ClipboardEvent<HTMLSelectElement>) => {
+                const pasted = e.clipboardData.getData('text');
+                if (pasted.includes('\t')) {
+                  e.preventDefault();
+                  const parts = pasted.split('\t').map(s => s.trim());
+                  // Assuming tab-separated: ID, Category, Brand, Model, Year, Plate, PriceNew, ?, Condition, BodyType, Image, Color, ?, Time
+                  handleChange('Category', parts[1] || '');
+                  handleChange('Brand', parts[2] || '');
+                  handleChange('Model', parts[3] || '');
+                  handleChange('Year', parts[4] ? parseInt(parts[4], 10) : null);
+                  handleChange('Plate', parts[5] || '');
+                  handleChange('PriceNew', parts[6] ? parseFloat(parts[6]) : null);
+                  handleChange('Condition', parts[8] || 'New');
+                  handleChange('BodyType', parts[9] || '');
+                  handleChange('Image', parts[10] || '');
+                  handleChange('Color', parts[11] || '');
+                  // TaxType not in pasted data, leave unchanged
+                }
+              }}
               className="ec-input ec-select w-full"
             >
               <option value="" disabled>
@@ -331,10 +358,9 @@ function AddVehicleInner() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Plate *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Plate</label>
             <input
               type="text"
-              required
               maxLength={PLATE_NUMBER_MAX_LENGTH}
               value={formData.Plate || ""}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -539,10 +565,9 @@ function AddVehicleInner() {
           <div className="col-span-2 flex gap-4">
             <button
               type="submit"
-              disabled={submitting}
               className="flex-1 ec-glassBtnPrimary px-6 py-3"
             >
-              {submitting ? "Adding..." : "Add Vehicle"}
+              Add Vehicle
             </button>
             <button
               type="button"

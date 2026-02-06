@@ -125,8 +125,6 @@ type VehicleFilters = {
   taxType: string;
   dateFrom: string;
   dateTo: string;
-  timeFrom: string;
-  timeTo: string;
   withoutImage: boolean;
 };
 
@@ -158,11 +156,9 @@ export default function VehicleList({ category }: VehicleListProps) {
     taxType: "",
     dateFrom: "",
     dateTo: "",
-    timeFrom: "",
-    timeTo: "",
     withoutImage: false,
   }));
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+
 
   // Load from cache immediately on mount + subscribe to cache updates
   useEffect(() => {
@@ -365,20 +361,14 @@ export default function VehicleList({ category }: VehicleListProps) {
 
     const dateFrom = filters.dateFrom.trim();
     const dateTo = filters.dateTo.trim();
-    const timeFromMinutes = parseTimeToMinutes(filters.timeFrom);
-    const timeToMinutes = parseTimeToMinutes(filters.timeTo);
 
-    if (dateFrom || dateTo || timeFromMinutes != null || timeToMinutes != null) {
+    if (dateFrom || dateTo) {
       current = current.filter((vehicle) => {
         const meta = timeIndex.get(vehicle.VehicleId) ?? { dateKey: "", timeMinutes: null };
         const dateKey = meta.dateKey;
-        const timeMinutes = meta.timeMinutes;
 
         if (dateFrom && (!dateKey || dateKey < dateFrom)) return false;
         if (dateTo && (!dateKey || dateKey > dateTo)) return false;
-
-        if (timeFromMinutes != null && (timeMinutes == null || timeMinutes < timeFromMinutes)) return false;
-        if (timeToMinutes != null && (timeMinutes == null || timeMinutes > timeToMinutes)) return false;
 
         return true;
       });
@@ -430,8 +420,6 @@ export default function VehicleList({ category }: VehicleListProps) {
       taxType: "",
       dateFrom: "",
       dateTo: "",
-      timeFrom: "",
-      timeTo: "",
       withoutImage: false,
     });
     setFiltersOpen(false);
@@ -443,32 +431,52 @@ export default function VehicleList({ category }: VehicleListProps) {
     const ok = confirm("Delete this vehicle?");
     if (!ok) return;
 
-    setDeletingId(vehicleId);
-    try {
-      const imageFileId = extractDriveFileId(vehicle.Image);
-      const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageFileId, imageUrl: vehicle.Image }),
-      });
-      if (res.status === 401) {
-        router.push("/login");
-        return;
+    // Optimistic update: mark as deleted immediately
+    setOptimisticUpdates((prev) => {
+      const next = new Map(prev);
+      next.set(vehicleId, { ...vehicle, _deleted: true });
+      return next;
+    });
+
+    // Perform API call in background
+    (async () => {
+      try {
+        const imageFileId = extractDriveFileId(vehicle.Image);
+        const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageFileId, imageUrl: vehicle.Image }),
+        });
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
+
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to delete vehicle");
+
+        // Success: remove from vehicles list
+        setVehicles((prev) => {
+          const nextVehicles = prev.filter((v) => v.VehicleId !== vehicleId);
+          writeVehicleCache(nextVehicles);
+          return nextVehicles;
+        });
+        // Remove from optimistic updates since it's permanently deleted
+        setOptimisticUpdates((prev) => {
+          const next = new Map(prev);
+          next.delete(vehicleId);
+          return next;
+        });
+      } catch (err) {
+        // On failure, revert optimistic delete
+        setOptimisticUpdates((prev) => {
+          const next = new Map(prev);
+          next.delete(vehicleId);
+          return next;
+        });
+        alert(`Failed to delete vehicle: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`);
       }
-
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to delete vehicle");
-
-      setVehicles((prev) => {
-        const nextVehicles = prev.filter((v) => v.VehicleId !== vehicleId);
-        writeVehicleCache(nextVehicles);
-        return nextVehicles;
-      });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Delete failed");
-    } finally {
-      setDeletingId(null);
-    }
+    })();
   };
 
   if (error) return <div className="text-red-600 py-8">{error}</div>;
@@ -495,74 +503,78 @@ export default function VehicleList({ category }: VehicleListProps) {
                   ) : null}
                 </span>
               </button>
-              {hasFilters ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="ec-btn w-full sm:w-auto text-sm"
-                >
-                  Clear
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="ec-btn w-full sm:w-auto text-sm"
-              >
-                {isRefreshing ? "Refreshing..." : "Refresh"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFilters((prev) => ({ ...prev, withoutImage: !prev.withoutImage }));
-                  setFiltersOpen(true);
-                }}
-                className={`ec-btn w-full sm:w-auto text-sm ${filters.withoutImage ? "ec-btnPrimary" : ""}`}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
-                    aria-hidden="true"
+              {filtersOpen && (
+                <>
+                  {hasFilters ? (
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="ec-btn w-full sm:w-auto text-sm"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="ec-btn w-full sm:w-auto text-sm"
                   >
-                    <rect width="18" height="18" x="3" y="3" rx="1" />
-                    <path d="M9 9h6v6H9z" />
-                  </svg>
-                  <span>{filters.withoutImage ? "Show all images" : "Find no image"}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="ec-btn w-full sm:w-auto text-sm"
-                title="Print all vehicle data"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
-                    aria-hidden="true"
+                    {isRefreshing ? "Refreshing..." : "Refresh"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((prev) => ({ ...prev, withoutImage: !prev.withoutImage }));
+                      setFiltersOpen(true);
+                    }}
+                    className={`ec-btn w-full sm:w-auto text-sm ${filters.withoutImage ? "ec-btnPrimary" : ""}`}
                   >
-                    <polyline points="6,9 6,2 18,2 18,9" />
-                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                    <rect width="12" height="8" x="6" y="14" />
-                  </svg>
-                  <span>Print</span>
-                </span>
-              </button>
+                    <span className="inline-flex items-center gap-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      >
+                        <rect width="18" height="18" x="3" y="3" rx="1" />
+                        <path d="M9 9h6v6H9z" />
+                      </svg>
+                      <span>{filters.withoutImage ? "Show all images" : "Find no image"}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="ec-btn w-full sm:w-auto text-sm"
+                    title="Print all vehicle data"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      >
+                        <polyline points="6,9 6,2 18,2 18,9" />
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                        <rect width="12" height="8" x="6" y="14" />
+                      </svg>
+                      <span>Print</span>
+                    </span>
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="text-sm text-gray-600 whitespace-nowrap text-right sm:text-left">
@@ -571,21 +583,25 @@ export default function VehicleList({ category }: VehicleListProps) {
           </div>
         </div>
 
+        <div className="ec-glassPanelSoft px-4 pb-4 border-b border-black/5 print:hidden">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="md:col-span-12">
+              <FilterField id="vms-filter-query" label="Quick Search">
+                <FilterInput
+                  id="vms-filter-query"
+                  value={filters.query}
+                  onChange={(value) => setFilters((prev) => ({ ...prev, query: value }))}
+                  placeholder="Search across all fields..."
+                  inputMode="search"
+                />
+              </FilterField>
+            </div>
+          </div>
+        </div>
+
         {filtersOpen ? (
           <div className="ec-glassPanelSoft px-4 pb-4 border-b border-black/5 print:hidden">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-              <div className="md:col-span-12">
-                <FilterField id="vms-filter-query" label="Quick Search">
-                  <FilterInput
-                    id="vms-filter-query"
-                    value={filters.query}
-                    onChange={(value) => setFilters((prev) => ({ ...prev, query: value }))}
-                    placeholder="Search across all fields..."
-                    inputMode="search"
-                  />
-                </FilterField>
-              </div>
-
               <div className="md:col-span-3">
                 <FilterField id="vms-filter-id" label="Id">
                   <FilterInput
@@ -725,27 +741,7 @@ export default function VehicleList({ category }: VehicleListProps) {
                 </FilterField>
               </div>
 
-              <div className="md:col-span-3">
-                <FilterField id="vms-filter-timeFrom" label="Added Time From">
-                  <FilterInput
-                    id="vms-filter-timeFrom"
-                    value={filters.timeFrom}
-                    onChange={(value) => setFilters((prev) => ({ ...prev, timeFrom: value }))}
-                    type="time"
-                  />
-                </FilterField>
-              </div>
 
-              <div className="md:col-span-3">
-                <FilterField id="vms-filter-timeTo" label="Added Time To">
-                  <FilterInput
-                    id="vms-filter-timeTo"
-                    value={filters.timeTo}
-                    onChange={(value) => setFilters((prev) => ({ ...prev, timeTo: value }))}
-                    type="time"
-                  />
-                </FilterField>
-              </div>
             </div>
           </div>
         ) : null}
@@ -850,10 +846,10 @@ export default function VehicleList({ category }: VehicleListProps) {
                       <button
                         type="button"
                         onClick={() => handleDelete(vehicle)}
-                        disabled={!vehicleId || deletingId === vehicle.VehicleId}
+                        disabled={!vehicleId}
                         className="ec-btn ec-btnRed px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {deletingId === vehicle.VehicleId ? "Deleting..." : "Delete"}
+                        Delete
                       </button>
                     </>
                   ) : null}
@@ -1026,10 +1022,10 @@ export default function VehicleList({ category }: VehicleListProps) {
                             <button
                               type="button"
                               onClick={() => handleDelete(vehicle)}
-                              disabled={!vehicleId || deletingId === vehicleId}
+                              disabled={!vehicleId}
                               className="ec-btn ec-btnRed px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              {deletingId === vehicleId ? "Deleting..." : "Delete"}
+                              Delete
                             </button>
                           </>
                         ) : null}

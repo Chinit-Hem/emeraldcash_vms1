@@ -159,13 +159,30 @@ export async function GET(req: NextRequest) {
     let total: number | null = null;
     let lastMetaOffset: number | null = null;
     const allRows: Record<string, unknown>[] = [];
+    let pageCount = 0;
+    let totalRawRows = 0;
+    let totalValidRows = 0;
 
     for (let page = 0; page < maxPages; page++) {
       const { rows, meta } = await fetchVehiclesPage(offset, requestedLimit);
-      allRows.push(...rows);
+      pageCount++;
+      totalRawRows += rows.length;
+      
+      // Filter out empty rows (rows with no VehicleId or meaningful data)
+      const validRows = rows.filter((row) => {
+        const vehicleId = row["VehicleId"] || row["VehicleID"] || row["Id"] || row["id"] || row["#"];
+        const hasId = vehicleId !== undefined && vehicleId !== null && String(vehicleId).trim() !== "";
+        // Also check if row has at least some meaningful data beyond just an ID
+        const hasData = Object.values(row).some(v => v !== undefined && v !== null && v !== "");
+        return hasId && hasData;
+      });
+      
+      totalValidRows += validRows.length;
+      allRows.push(...validRows);
 
       if (!meta) {
         // No pagination metadata => assume this is the full list.
+        console.log(`[DEBUG] No meta data, breaking after page ${pageCount}. Raw rows: ${totalRawRows}, Valid rows: ${totalValidRows}`);
         break;
       }
 
@@ -175,18 +192,42 @@ export async function GET(req: NextRequest) {
       const effectiveOffset = meta.offset != null && meta.offset >= 0 ? meta.offset : offset;
 
       // Guard: if offset doesn't move, stop to avoid infinite loops.
-      if (lastMetaOffset != null && effectiveOffset === lastMetaOffset) break;
+      if (lastMetaOffset != null && effectiveOffset === lastMetaOffset) {
+        console.log(`[DEBUG] Offset didn't move, breaking. Page: ${pageCount}, Raw: ${totalRawRows}, Valid: ${totalValidRows}`);
+        break;
+      }
       lastMetaOffset = effectiveOffset;
 
-      if (rows.length === 0) break;
-      if (rows.length < effectiveLimit) break;
-      if (total != null && allRows.length >= total) break;
+      if (rows.length === 0) {
+        console.log(`[DEBUG] No rows returned, breaking. Page: ${pageCount}`);
+        break;
+      }
+      // Don't break on rows.length < effectiveLimit if we got valid data
+      // The backend might return fewer rows than limit but still have more data
+      if (rows.length < effectiveLimit && validRows.length === 0) {
+        console.log(`[DEBUG] Rows < limit and no valid rows, breaking. Page: ${pageCount}`);
+        break;
+      }
+      if (total != null && allRows.length >= total) {
+        console.log(`[DEBUG] Reached total count (${total}), breaking.`);
+        break;
+      }
 
       offset = effectiveOffset + effectiveLimit;
-      if (total != null && offset >= total) break;
+      if (total != null && offset >= total) {
+        console.log(`[DEBUG] Offset >= total, breaking.`);
+        break;
+      }
     }
 
-    const vehicles = allRows.map((row) => toVehicle(row)) as Vehicle[];
+    console.log(`[DEBUG] Fetch complete. Pages: ${pageCount}, Raw rows: ${totalRawRows}, Valid rows: ${totalValidRows}, AllRows: ${allRows.length}`);
+
+    // Additional filtering to ensure no empty/invalid vehicles
+    const vehicles = allRows
+      .map((row) => toVehicle(row))
+      .filter((v) => v.VehicleId && String(v.VehicleId).trim() !== "") as Vehicle[];
+    
+    console.log(`[DEBUG] Final vehicles count: ${vehicles.length}`);
 
     setCachedVehicles(vehicles);
     const headers = bypassCache ? { "Cache-Control": "no-store" } : cacheHeaders();
@@ -398,4 +439,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
-

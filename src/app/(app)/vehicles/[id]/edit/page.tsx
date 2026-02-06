@@ -33,7 +33,7 @@ function EditVehicleInner() {
   const [error, setError] = useState("");
   const [jumpQuery, setJumpQuery] = useState("");
   const [formData, setFormData] = useState<Partial<Vehicle>>({});
-  const [saving, setSaving] = useState(false);
+
   const [imageLoading, setImageLoading] = useState(false);
   const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
@@ -215,122 +215,137 @@ function EditVehicleInner() {
   const handleSave = async () => {
     if (!currentVehicle || !id) return;
 
-    setSaving(true);
+    // Optimistic update: update cache and show success immediately
+    const updatedVehicle: Vehicle = {
+      ...currentVehicle,
+      ...(formData as Vehicle),
+      VehicleId: currentVehicle.VehicleId,
+    };
+    setVehicles((prev) => {
+      const nextVehicles = prev.map((vehicle) =>
+        vehicle.VehicleId === updatedVehicle.VehicleId ? updatedVehicle : vehicle
+      );
+      writeVehicleCache(nextVehicles);
+      return nextVehicles;
+    });
+
     try {
-      let body: string | FormData;
-      const headers: Record<string, string> = {};
-
-      if (uploadedImageFile) {
-        // Use FormData for image uploads
-        const formDataToSend = new FormData();
-
-        // Add vehicle data
-        Object.entries(formData).forEach(([key, value]) => {
-          if (value != null && key !== 'Image') { // Don't include the data URL in FormData
-            formDataToSend.append(key, String(value));
-          }
-        });
-        formDataToSend.append("VehicleId", id);
-
-        // Compress and add the image
-        const compressedResult = await compressImage(uploadedImageFile, {
-          maxWidth: 1280,
-          quality: 0.75,
-          targetMinSizeKB: 250,
-          targetMaxSizeKB: 800,
-        });
-        formDataToSend.append("image", compressedResult.file);
-
-        body = formDataToSend;
-      } else {
-        // Use JSON for non-image updates
-        headers["Content-Type"] = "application/json";
-        body = JSON.stringify({ ...formData, VehicleId: id });
-      }
-
-      const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
-        method: "PUT",
-        headers,
-        body,
-      });
-
-      if (res.status === 401) {
-        router.push("/login");
-        return;
-      }
-
-      const json = await res.json().catch(() => ({}));
-      if (res.status === 403) throw new Error("Forbidden");
-      if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to save vehicle");
-
-      if (currentVehicle) {
-        const updatedVehicle: Vehicle = {
-          ...currentVehicle,
-          ...(formData as Vehicle),
-          VehicleId: currentVehicle.VehicleId,
-        };
-        setVehicles((prev) => {
-          const nextVehicles = prev.map((vehicle) =>
-            vehicle.VehicleId === updatedVehicle.VehicleId ? updatedVehicle : vehicle
-          );
-          writeVehicleCache(nextVehicles);
-          return nextVehicles;
-        });
-      }
-
-      try {
-        sessionStorage.removeItem(`${EDIT_DRAFT_PREFIX}${id}`);
-      } catch {
-        // ignore
-      }
-
-      await refreshVehicleCache();
-
-      // Auto-update market price if enabled
-      if (autoUpdateMarketPrice && currentVehicle) {
-        try {
-          const params = new URLSearchParams({
-            category: currentVehicle.Category || "",
-            brand: currentVehicle.Brand || "",
-            model: currentVehicle.Model || "",
-          });
-          if (currentVehicle.Year) {
-            params.append("year", currentVehicle.Year.toString());
-          }
-          
-          const priceRes = await fetch(`/api/market-price/fetch?${params.toString()}`);
-          if (priceRes.ok) {
-            const priceData = await priceRes.json();
-            if (priceData.ok && priceData.data) {
-              const result = priceData.data;
-              await fetch("/api/market-price/update", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  vehicleId: currentVehicle.VehicleId,
-                  marketData: {
-                    priceLow: result.priceLow,
-                    priceMedian: result.priceMedian,
-                    priceHigh: result.priceHigh,
-                    source: result.sources?.[0] || "khmer24.com",
-                    samples: result.sampleCount || 0,
-                    confidence: result.confidence || "Low",
-                  },
-                }),
-              });
-            }
-          }
-        } catch (err) {
-          console.warn("Auto-update market price failed:", err);
-        }
-      }
-
-      setSuccessMessage("Vehicle saved successfully!");
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Error saving vehicle");
-    } finally {
-      setSaving(false);
+      sessionStorage.removeItem(`${EDIT_DRAFT_PREFIX}${id}`);
+    } catch {
+      // ignore
     }
+
+    setSuccessMessage("Vehicle saved successfully!");
+
+    // Clear uploaded image file after optimistic save
+    setUploadedImageFile(null);
+
+    // Perform API call in background
+    (async () => {
+      try {
+        let body: string | FormData;
+        const headers: Record<string, string> = {};
+
+        if (uploadedImageFile) {
+          // Use FormData for image uploads
+          const formDataToSend = new FormData();
+
+          // Add vehicle data
+          Object.entries(formData).forEach(([key, value]) => {
+            if (value != null && key !== 'Image') { // Don't include the data URL in FormData
+              formDataToSend.append(key, String(value));
+            }
+          });
+          formDataToSend.append("VehicleId", id);
+
+          // Compress and add the image
+          const compressedResult = await compressImage(uploadedImageFile, {
+            maxWidth: 1280,
+            quality: 0.75,
+            targetMinSizeKB: 250,
+            targetMaxSizeKB: 800,
+          });
+          formDataToSend.append("image", compressedResult.file);
+
+          body = formDataToSend;
+        } else {
+          // Use JSON for non-image updates
+          headers["Content-Type"] = "application/json";
+          body = JSON.stringify({ ...formData, VehicleId: id });
+        }
+
+        const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
+          method: "PUT",
+          headers,
+          body,
+        });
+
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
+
+        const json = await res.json().catch(() => ({}));
+        if (res.status === 403) throw new Error("Forbidden");
+        if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to save vehicle");
+
+        await refreshVehicleCache();
+
+        // Auto-update market price if enabled
+        if (autoUpdateMarketPrice && currentVehicle) {
+          try {
+            const params = new URLSearchParams({
+              category: currentVehicle.Category || "",
+              brand: currentVehicle.Brand || "",
+              model: currentVehicle.Model || "",
+            });
+            if (currentVehicle.Year) {
+              params.append("year", currentVehicle.Year.toString());
+            }
+
+            const priceRes = await fetch(`/api/market-price/fetch?${params.toString()}`);
+            if (priceRes.ok) {
+              const priceData = await priceRes.json();
+              if (priceData.ok && priceData.data) {
+                const result = priceData.data;
+                await fetch("/api/market-price/update", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    vehicleId: currentVehicle.VehicleId,
+                    marketData: {
+                      priceLow: result.priceLow,
+                      priceMedian: result.priceMedian,
+                      priceHigh: result.priceHigh,
+                      source: result.sources?.[0] || "khmer24.com",
+                      samples: result.sampleCount || 0,
+                      confidence: result.confidence || "Low",
+                    },
+                  }),
+                });
+              }
+            }
+          } catch (err) {
+            console.warn("Auto-update market price failed:", err);
+          }
+        }
+
+        // Success: cache already refreshed optimistically
+      } catch (err) {
+        // On failure, show error but don't block user
+        setSuccessMessage("");
+        alert(`Failed to save vehicle: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`);
+        // Optionally, revert optimistic update
+        setVehicles((prev) => {
+          const revertedVehicles = prev.map((vehicle) =>
+            vehicle.VehicleId === currentVehicle.VehicleId ? currentVehicle : vehicle
+          );
+          writeVehicleCache(revertedVehicles);
+          return revertedVehicles;
+        });
+        refreshVehicleCache();
+      }
+    })();
   };
 
   if (error && vehicles.length === 0) {
@@ -910,10 +925,9 @@ function EditVehicleInner() {
         <div className="flex gap-4">
           <button
             onClick={handleSave}
-            disabled={saving}
             className="flex-1 ec-glassBtnPrimary px-6 py-3"
           >
-            {saving ? "Saving..." : "Save Vehicle"}
+            Save Vehicle
           </button>
           <button
             onClick={() => router.back()}

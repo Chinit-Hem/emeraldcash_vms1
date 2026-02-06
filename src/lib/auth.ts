@@ -17,13 +17,27 @@ let ephemeralSessionSecret: string | null = null;
 
 /**
  * Generate a secure session fingerprint from request headers
+ * For mobile devices, use a more stable fingerprint to avoid session invalidation
+ * due to changing user agents or IPs
  */
 function getRequestFingerprint(
   userAgent: string,
   ip: string
 ): string {
-  const data = `${userAgent}|${ip}`;
-  return crypto.createHash("sha256").update(data).digest("hex");
+  // Check if this is likely a mobile device
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+  if (isMobile) {
+    // For mobile, use a simplified fingerprint that's more stable
+    // Extract key parts of user agent that are less likely to change
+    const mobileAgent = userAgent.replace(/\/[\d.]+/, '').replace(/\s+/g, ' ').trim();
+    const data = `mobile|${mobileAgent}`;
+    return crypto.createHash("sha256").update(data).digest("hex");
+  } else {
+    // For desktop, use the full fingerprint
+    const data = `${userAgent}|${ip}`;
+    return crypto.createHash("sha256").update(data).digest("hex");
+  }
 }
 
 /**

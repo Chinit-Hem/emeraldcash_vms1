@@ -951,6 +951,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .ec-appShell {
@@ -960,6 +961,7 @@ body {
 
 .ec-card {
   width: min(980px, 100%);
+  max-width: 100%;
   background-color: rgba(var(--ec-surface-rgb), 0.82);
   background: color-mix(in srgb, var(--ec-surface) 82%, transparent);
   border: 1px solid var(--ec-border);
@@ -968,6 +970,7 @@ body {
   box-shadow: var(--ec-shadow);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  box-sizing: border-box;
 }
 
 .ec-authCard {
@@ -1148,6 +1151,50 @@ body {
 .ec-table {
   width: 100%;
   border-collapse: collapse;
+  overflow-x: auto;
+  display: block;
+  white-space: nowrap;
+}
+
+.ec-table thead,
+.ec-table tbody,
+.ec-table tr,
+.ec-table th,
+.ec-table td {
+  display: block;
+}
+
+.ec-table thead tr {
+  position: absolute;
+  top: -9999px;
+  left: -9999px;
+}
+
+.ec-table tr {
+  border: 1px solid var(--ec-border);
+  margin-bottom: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ec-table td {
+  border: none;
+  border-bottom: 1px solid var(--ec-border);
+  position: relative;
+  padding-left: 50%;
+  text-align: left;
+  white-space: normal;
+}
+
+.ec-table td:before {
+  content: attr(data-label);
+  position: absolute;
+  left: 6px;
+  width: 45%;
+  padding-right: 10px;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: bold;
 }
 
 .ec-table th {
