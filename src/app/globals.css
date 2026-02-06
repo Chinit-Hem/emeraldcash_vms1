@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* Critical mobile fixes - MUST be at the top */
+html {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent zoom on input focus for iOS */
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 :root {
   /* Emerald Cash (red + green) theme */
   color-scheme: light;
@@ -1229,4 +1244,705 @@ body {
 
 .ec-table a:hover {
   text-decoration: underline;
+}
+
+/* Mobile-first responsive utilities */
+@supports (height: 100dvh) {
+  .min-h-screen-safe {
+    min-height: 100dvh;
+  }
+}
+
+@supports not (height: 100dvh) {
+  .min-h-screen-safe {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
+
+@supports (padding: max(0px)) {
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  
+  .pt-safe {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+  
+  .px-safe {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+}
+
+/* Touch targets for mobile */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Active scale feedback */
+.active-scale {
+  transition: transform 0.15s ease;
+}
+
+.active-scale:active {
+  transform: scale(0.96);
+}
+
+/* Skeleton loading animations */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(156, 163, 175, 0.3) 25%,
+    rgba(156, 163, 175, 0.5) 50%,
+    rgba(156, 163, 175, 0.3) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.375rem;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Shake animation for errors */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Error banner styles */
+.ec-errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background-color: var(--ec-red-50);
+  border: 1px solid color-mix(in srgb, var(--ec-red-600) 20%, transparent);
+}
+
+.ec-errorBanner-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--ec-red-600);
+}
+
+.ec-errorBanner-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ec-errorBanner-title {
+  font-weight: 600;
+  color: var(--ec-red-700);
+  font-size: 0.875rem;
+}
+
+.ec-errorBanner-message {
+  color: var(--ec-red-600);
+  font-size: 0.8125rem;
+  margin-top: 0.125rem;
+}
+
+.ec-errorBanner-action {
+  flex-shrink: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: white;
+  background: var(--ec-red-600);
+  transition: all 0.2s;
+}
+
+.ec-errorBanner-action:hover {
+  background: var(--ec-red-700);
+}
+
+/* Empty state styles */
+.ec-emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.ec-emptyState-icon {
+  width: 4rem;
+  height: 4rem;
+  color: var(--ec-muted);
+  opacity: 0.5;
+  margin-bottom: 1rem;
+}
+
+.ec-emptyState-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--ec-text);
+  margin-bottom: 0.5rem;
+}
+
+.ec-emptyState-description {
+  font-size: 0.875rem;
+  color: var(--ec-muted);
+  max-width: 20rem;
+}
+
+/* Mobile bottom nav glass effect */
+.ec-mobileNav {
+  background: color-mix(in srgb, var(--ec-surface) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--ec-border);
+}
+
+/* Responsive typography */
+@media (max-width: 640px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+/* Prevent horizontal scroll */
+body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Image loading placeholder */
+.img-placeholder {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--ec-green-600);
+  outline-offset: 2px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .pulse,
+  .animate-shake {
+    animation: none;
+  }
+  
+  .active-scale:active {
+    transform: none;
+  }
+}
+
+/* ==================== MOBILE RESPONSIVE UPGRADES ==================== */
+
+/* Safe height handling - 100dvh for mobile, 100vh fallback */
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.h-screen-safe {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Safe area insets for notched devices */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-inset-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Mobile bottom nav safe area */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 80px);
+}
+
+/* ==================== LOADING SKELETONS ==================== */
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(var(--ec-surface-rgb), 0.6) 25%,
+    rgba(var(--ec-surface-rgb), 0.8) 50%,
+    rgba(var(--ec-surface-rgb), 0.6) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.skeleton-pulse {
+  background-color: rgba(var(--ec-surface-rgb), 0.6);
+  animation: skeleton-pulse 2s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.skeleton-text {
+  height: 1em;
+  margin-bottom: 0.5em;
+}
+
+.skeleton-text-sm {
+  height: 0.875em;
+  width: 60%;
+}
+
+.skeleton-text-lg {
+  height: 1.25em;
+  width: 80%;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-card {
+  height: 120px;
+  width: 100%;
+}
+
+/* Light mode skeletons */
+:root[data-theme="light"] .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.8) 25%,
+    rgba(241, 245, 249, 0.95) 50%,
+    rgba(226, 232, 240, 0.8) 75%
+  );
+  background-size: 200% 100%;
+}
+
+:root[data-theme="light"] .skeleton-pulse {
+  background-color: rgba(226, 232, 240, 0.8);
+}
+
+/* ==================== MOBILE GLASS EFFECTS ==================== */
+
+/* Mobile-optimized glass with less blur for performance */
+.ec-glassMobile {
+  background-color: rgba(var(--ec-surface-rgb), 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--ec-border) 50%, transparent);
+}
+
+/* Sticky mobile header */
+.ec-mobileHeader {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: rgba(var(--ec-surface-rgb), 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--ec-border);
+}
+
+/* Mobile bottom sheet */
+.ec-bottomSheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background-color: rgba(var(--ec-surface-rgb), 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--ec-border);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ==================== MOBILE TYPOGRAPHY ==================== */
+
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Prevent text size adjustment on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Touch action optimizations */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Remove tap highlight on mobile */
+.no-tap-highlight {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ==================== MOBILE SCROLLING ==================== */
+
+/* Smooth scrolling */
+.scroll-smooth {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Horizontal scroll snap */
+.scroll-snap-x {
+  scroll-snap-type: x mandatory;
+  overflow-x: auto;
+}
+
+.scroll-snap-start {
+  scroll-snap-align: start;
+}
+
+/* ==================== MOBILE BUTTONS ==================== */
+
+/* Larger touch targets for mobile */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Active state for touch */
+.active-scale {
+  transition: transform 0.1s ease;
+}
+
+.active-scale:active {
+  transform: scale(0.96);
+}
+
+/* ==================== EMPTY STATES ==================== */
+
+.ec-emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.ec-emptyState-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1rem;
+  color: var(--ec-muted);
+  opacity: 0.5;
+}
+
+.ec-emptyState-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--ec-text);
+  margin-bottom: 0.5rem;
+}
+
+.ec-emptyState-description {
+  font-size: 0.875rem;
+  color: var(--ec-muted);
+  max-width: 300px;
+}
+
+/* ==================== ERROR BANNERS ==================== */
+
+.ec-errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin: 1rem;
+  border-radius: 12px;
+  background-color: var(--ec-red-50);
+  border: 1px solid color-mix(in srgb, var(--ec-red-600) 30%, transparent);
+  color: var(--ec-red-700);
+}
+
+.ec-errorBanner-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.ec-errorBanner-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ec-errorBanner-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.ec-errorBanner-message {
+  font-size: 0.8125rem;
+  opacity: 0.9;
+  margin-top: 0.25rem;
+}
+
+.ec-errorBanner-action {
+  flex-shrink: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background-color: var(--ec-red-600);
+  color: white;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.ec-errorBanner-action:hover {
+  opacity: 0.9;
+}
+
+/* ==================== MOBILE IMAGE OPTIMIZATION ==================== */
+
+/* Lazy load placeholder */
+.img-placeholder {
+  background: linear-gradient(
+    135deg,
+    rgba(var(--ec-surface-rgb), 0.6) 0%,
+    rgba(var(--ec-surface-rgb), 0.4) 100%
+  );
+  animation: skeleton-pulse 2s ease-in-out infinite;
+}
+
+/* Image container with aspect ratio */
+.img-container {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(var(--ec-surface-rgb), 0.5);
+}
+
+.img-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.3s ease;
+}
+
+.img-container img[loading="lazy"] {
+  opacity: 0;
+}
+
+.img-container img.loaded {
+  opacity: 1;
+}
+
+/* ==================== PAGINATION ==================== */
+
+.ec-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 1rem;
+  flex-wrap: wrap;
+}
+
+.ec-pagination-btn {
+  min-width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--ec-border);
+  background-color: rgba(var(--ec-surface-rgb), 0.8);
+  color: var(--ec-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ec-pagination-btn:hover:not(:disabled) {
+  background-color: rgba(var(--ec-surface-rgb), 0.95);
+  border-color: var(--ec-green-600);
+}
+
+.ec-pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ec-pagination-btn.active {
+  background-color: var(--ec-green-600);
+  border-color: var(--ec-green-600);
+  color: white;
+}
+
+.ec-pagination-btn.prev,
+.ec-pagination-btn.next {
+  padding: 0 1rem;
+}
+
+/* ==================== MOBILE FILTER BAR ==================== */
+
+.ec-filterBar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background-color: rgba(var(--ec-surface-rgb), 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--ec-border);
+  padding: 0.75rem 1rem;
+}
+
+.ec-filterBar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .ec-filterBar-content {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+}
+
+/* Filter chips */
+.ec-filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  background-color: rgba(var(--ec-green-600), 0.1);
+  border: 1px solid rgba(var(--ec-green-600), 0.2);
+  color: var(--ec-green-700);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ec-filterChip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: rgba(var(--ec-green-600), 0.2);
+  color: var(--ec-green-700);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.ec-filterChip-remove:hover {
+  background-color: rgba(var(--ec-green-600), 0.3);
+}
+
+/* ==================== RESPONSIVE UTILITIES ==================== */
+
+/* Hide on mobile */
+@media (max-width: 639px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Hide on desktop */
+@media (min-width: 1024px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Show only on tablet */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .show-tablet {
+    display: block !important;
+  }
+}
+
+/* Container padding for mobile */
+.container-mobile {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-mobile {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-mobile {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
 }

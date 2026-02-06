@@ -12,21 +12,43 @@ export async function GET(req: NextRequest) {
     const userAgent = getClientUserAgent(req.headers);
     const sessionCookie = req.cookies.get("session")?.value;
     
+    // Debug logging for mobile
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    if (isMobile) {
+      console.log(`[API_ME] Request from mobile: ${userAgent.substring(0, 50)}...`);
+      console.log(`[API_ME] Session cookie exists: ${!!sessionCookie}`);
+    }
+
     if (!sessionCookie) {
-      return NextResponse.json({ ok: false });
+      const res = NextResponse.json({ ok: false, error: "No session cookie" });
+      // Add debug header for mobile troubleshooting
+      res.headers.set("X-Auth-Debug", "no-cookie");
+      return res;
     }
 
     const session = getSessionFromRequest(userAgent, ip, sessionCookie);
     if (!session || !validateSession(session)) {
-      return NextResponse.json({ ok: false });
+      const res = NextResponse.json({ ok: false, error: "Invalid or expired session" });
+      res.headers.set("X-Auth-Debug", "invalid-session");
+      return res;
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       ok: true,
       user: { username: session.username, role: session.role },
     });
-  } catch {
-    return NextResponse.json({ ok: false });
+    
+    // Add debug headers for mobile
+    if (isMobile) {
+      res.headers.set("X-Auth-Debug", "success");
+      res.headers.set("X-User-Role", session.role);
+    }
+    
+    return res;
+  } catch (err) {
+    console.error("[API_ME] Error:", err);
+    const res = NextResponse.json({ ok: false, error: "Internal error" });
+    res.headers.set("X-Auth-Debug", "error");
+    return res;
   }
 }
-

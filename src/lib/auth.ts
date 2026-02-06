@@ -208,3 +208,49 @@ export function getClientUserAgent(headers: Headers): string {
   return headers.get("user-agent") || "unknown";
 }
 
+// ============ Role-Based Permissions ============
+
+export type Permission = "read" | "create" | "update" | "delete" | "admin";
+
+const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  Admin: ["read", "create", "update", "delete", "admin"],
+  Staff: ["read", "create", "update"],
+};
+
+/**
+ * Check if a role has a specific permission
+ */
+export function hasPermission(role: Role, permission: Permission): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+}
+
+/**
+ * Check if user can delete (Admin only)
+ */
+export function canDelete(role: Role): boolean {
+  return hasPermission(role, "delete");
+}
+
+/**
+ * Check if user can update/create (Admin or Staff)
+ */
+export function canModify(role: Role): boolean {
+  return hasPermission(role, "update");
+}
+
+/**
+ * Check if user is Admin
+ */
+export function isAdmin(role: Role): boolean {
+  return role === "Admin";
+}
+
+/**
+ * Require Admin role or throw
+ */
+export function requireAdmin(session: SessionPayload | null): boolean {
+  if (!session || session.role !== "Admin") {
+    return false;
+  }
+  return true;
+}

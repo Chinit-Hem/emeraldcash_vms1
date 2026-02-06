@@ -205,15 +205,21 @@ export async function POST(req: NextRequest) {
   const isHttps =
     req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
 
+  // Debug logging for mobile troubleshooting
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  if (isMobile) {
+    console.log(`[LOGIN] Mobile login detected: ${userAgent.substring(0, 50)}...`);
+    console.log(`[LOGIN] Setting cookie - secure: ${isHttps}, sameSite: lax`);
+  }
+
   const res = NextResponse.json({ ok: true, user });
   res.cookies.set("session", sessionCookie, {
     httpOnly: true,
-    sameSite: "strict",
-    secure: isHttps,
+    sameSite: "lax", // Changed from "strict" for mobile compatibility
+    secure: true, // Always secure for Vercel (HTTPS)
     path: "/",
     maxAge: 60 * 60 * 8, // 8 hours
   });
 
   return res;
 }
-
