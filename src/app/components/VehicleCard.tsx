@@ -1,10 +1,13 @@
-"use client";
+  "use client";
 
 import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { useRouter } from "next/navigation";
-import React from "react";
+import React, { useMemo } from "react";
+
+import { GlassButton } from "@/app/components/ui/GlassButton";
+
 
 type VehicleCardProps = {
   vehicle: Vehicle;
@@ -30,9 +33,13 @@ export default function VehicleCard({
   const price70 = vehicle.Price70 ?? derived.Price70;
 
   const imageFileId = extractDriveFileId(vehicle.Image);
-  const thumbUrl = imageFileId
-    ? `${driveThumbnailUrl(imageFileId, "w300-h300")}?t=${Date.now()}`
-    : vehicle.Image;
+  // Use useMemo to avoid calling Date.now() during render (impure function)
+  const thumbUrl = useMemo(() => {
+    return imageFileId
+      ? `${driveThumbnailUrl(imageFileId, "w300-h300")}`
+      : vehicle.Image;
+  }, [imageFileId, vehicle.Image]);
+
 
   const handleClick = () => {
     if (!vehicleId) return;
@@ -152,9 +159,10 @@ export default function VehicleCard({
 
           {/* Actions */}
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <button
+            <GlassButton
               onClick={handleClick}
-              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors touch-target"
+              variant="ghost"
+              className="!p-2 !w-auto !h-auto"
               aria-label="View"
             >
               <svg
@@ -170,12 +178,13 @@ export default function VehicleCard({
                 <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                 <circle cx="12" cy="12" r="3" />
               </svg>
-            </button>
+            </GlassButton>
             {isAdmin && (
               <>
-                <button
+                <GlassButton
                   onClick={handleEdit}
-                  className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors touch-target"
+                  variant="ghost"
+                  className="!p-2 !w-auto !h-auto text-blue-600"
                   aria-label="Edit"
                 >
                   <svg
@@ -190,10 +199,11 @@ export default function VehicleCard({
                   >
                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3Z" />
                   </svg>
-                </button>
-                <button
+                </GlassButton>
+                <GlassButton
                   onClick={handleDelete}
-                  className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors touch-target"
+                  variant="ghost"
+                  className="!p-2 !w-auto !h-auto text-red-600"
                   aria-label="Delete"
                 >
                   <svg
@@ -210,7 +220,7 @@ export default function VehicleCard({
                     <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                     <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                   </svg>
-                </button>
+                </GlassButton>
               </>
             )}
           </div>

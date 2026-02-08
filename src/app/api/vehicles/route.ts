@@ -7,7 +7,7 @@ import {
   validateSession,
 } from "@/lib/auth";
 import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
-import type { Vehicle } from "@/lib/types";
+import type { Vehicle, VehicleMeta } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
 import { clearCachedVehicles, getCachedVehicles, setCachedVehicles } from "./_cache";
@@ -15,6 +15,7 @@ import {
   appsScriptUrl,
   driveFolderIdForCategory,
   driveThumbnailUrl,
+  extractDriveFileId,
   fetchAppsScript,
   parseImageDataUrl,
   toAppsScriptPayload,
@@ -89,6 +90,16 @@ function sanitizeNumber(value: unknown): number | null {
   return null;
 }
 
+// Safe error response helper to prevent circular references
+function createErrorResponse(message: string, status: number): NextResponse {
+  // Ensure message is a simple string, never an object or circular reference
+  const safeMessage = typeof message === "string" ? message : String(message);
+  return NextResponse.json(
+    { ok: false, error: safeMessage },
+    { status, headers: { "Content-Type": "application/json" } }
+  );
+}
+
 export async function GET(req: NextRequest) {
   const bypassCache = req.nextUrl.searchParams.get("noCache") === "1";
   if (!bypassCache) {
@@ -100,9 +111,9 @@ export async function GET(req: NextRequest) {
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) {
-    return NextResponse.json(
-      { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars" },
-      { status: 500 }
+    return createErrorResponse(
+      "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars",
+      500
     );
   }
 
@@ -229,32 +240,59 @@ export async function GET(req: NextRequest) {
     
     console.log(`[DEBUG] Final vehicles count: ${vehicles.length}`);
 
-    setCachedVehicles(vehicles);
-    const headers = bypassCache ? { "Cache-Control": "no-store" } : cacheHeaders();
-    return NextResponse.json({ ok: true, data: vehicles }, { headers });
+    // Compute meta from FULL dataset (all vehicles, not just current page)
+    // IMPORTANT: total = actual record count, NOT max(ID) or lastRowIndex
+    // This ensures KPI "Total Vehicles" matches the actual data count
+    const meta: VehicleMeta = {
+      total: vehicles.length,
+      countsByCategory: {
+        Cars: vehicles.filter(v => v.Category === "Cars").length,
+        Motorcycles: vehicles.filter(v => v.Category === "Motorcycles").length,
+        TukTuks: vehicles.filter(v => v.Category === "Tuk Tuk").length,
+      },
+      avgPrice: vehicles.length > 0
+        ? vehicles.reduce((sum, v) => sum + (v.PriceNew || 0), 0) / vehicles.length
+        : 0,
+      noImageCount: vehicles.filter(v => !v.Image || !extractDriveFileId(v.Image)).length,
+      countsByCondition: {
+        New: vehicles.filter(v => v.Condition === "New").length,
+        Used: vehicles.filter(v => v.Condition === "Used").length,
+      },
+    };
+
+    // Only update server cache if not bypassing (i.e., normal fetch)
+    if (!bypassCache) {
+      setCachedVehicles(vehicles);
+    }
+    const headers = bypassCache 
+      ? { 
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        } 
+      : cacheHeaders();
+    return NextResponse.json({ ok: true, data: vehicles, meta }, { headers });
   } catch (e: unknown) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : "Fetch failed" },
-      { status: 500 }
-    );
+    const message = e instanceof Error ? e.message : "Fetch failed";
+    return createErrorResponse(message, 500);
   }
 }
 
 export async function POST(req: NextRequest) {
   const session = requireSession(req);
   if (!session) {
-    return NextResponse.json({ ok: false, error: "Invalid or expired session" }, { status: 401 });
+    return createErrorResponse("Invalid or expired session", 401);
   }
 
   if (session.role !== "Admin") {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    return createErrorResponse("Forbidden", 403);
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) {
-    return NextResponse.json(
-      { ok: false, error: "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars" },
-      { status: 500 }
+    return createErrorResponse(
+      "Missing NEXT_PUBLIC_API_URL in .env.local / Vercel env vars",
+      500
     );
   }
 
@@ -294,10 +332,7 @@ export async function POST(req: NextRequest) {
   const model = sanitizeString(body.Model, 100);
 
   if (!category || !brand || !model) {
-    return NextResponse.json(
-      { ok: false, error: "Category, Brand, and Model are required" },
-      { status: 400 }
-    );
+    return createErrorResponse("Category, Brand, and Model are required", 400);
   }
 
   // Validate numeric fields
@@ -305,17 +340,11 @@ export async function POST(req: NextRequest) {
   const priceNew = sanitizeNumber(body.PriceNew);
 
   if (year !== null && (year < 1900 || year > new Date().getFullYear() + 2)) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid year" },
-      { status: 400 }
-    );
+    return createErrorResponse("Invalid year", 400);
   }
 
   if (priceNew !== null && priceNew < 0) {
-    return NextResponse.json(
-      { ok: false, error: "Price must be positive" },
-      { status: 400 }
-    );
+    return createErrorResponse("Price must be positive", 400);
   }
 
   try {
@@ -326,9 +355,9 @@ export async function POST(req: NextRequest) {
     if (imageData) {
       const folderId = driveFolderIdForCategory(payload.Category);
       if (!folderId) {
-        return NextResponse.json(
-          { ok: false, error: "Unknown category. Please select Cars, Motorcycles, or Tuk Tuk." },
-          { status: 400 }
+        return createErrorResponse(
+          "Unknown category. Please select Cars, Motorcycles, or Tuk Tuk.",
+          400
         );
       }
 
@@ -342,10 +371,7 @@ export async function POST(req: NextRequest) {
       // Validate token before sending
       const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
       if (!uploadToken) {
-        return NextResponse.json(
-          { ok: false, error: "Server configuration error" },
-          { status: 500 }
-        );
+        return createErrorResponse("Server configuration error", 500);
       }
 
       const uploadRes = await fetchAppsScript(baseUrl, {
@@ -371,14 +397,9 @@ export async function POST(req: NextRequest) {
         const message = hasError
           ? String(uploadJson.error).trim()
           : `Image upload failed (${uploadRes.status}).`;
-        return NextResponse.json(
-          {
-            ok: false,
-            error:
-              `${message} ` +
-              `Your Apps Script must support action=uploadImage to save images into Drive folders.`,
-          },
-          { status: 502 }
+        return createErrorResponse(
+          `${message} Your Apps Script must support action=uploadImage to save images into Drive folders.`,
+          502
         );
       }
 
@@ -397,12 +418,9 @@ export async function POST(req: NextRequest) {
       } else if (typeof uploadedFileIdCandidate === "string" && uploadedFileIdCandidate.trim()) {
         payload.Image = driveThumbnailUrl(uploadedFileIdCandidate.trim());
       } else {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Image upload succeeded but no image URL was returned by Apps Script.",
-          },
-          { status: 502 }
+        return createErrorResponse(
+          "Image upload succeeded but no image URL was returned by Apps Script.",
+          502
         );
       }
     }
@@ -416,15 +434,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      return NextResponse.json(
-        { ok: false, error: `Apps Script error: ${res.status}` },
-        { status: 502 }
-      );
+      return createErrorResponse(`Apps Script error: ${res.status}`, 502);
     }
 
     const data = await res.json().catch(() => ({}));
     if (data.ok === false) {
-      return NextResponse.json({ ok: false, error: data.error || "Apps Script returned ok=false" }, { status: 500 });
+      const errorMsg = typeof data.error === "string" ? data.error : "Apps Script returned ok=false";
+      return createErrorResponse(errorMsg, 500);
     }
 
     clearCachedVehicles();
@@ -436,6 +452,6 @@ export async function POST(req: NextRequest) {
         : e instanceof Error
           ? e.message
           : "Fetch failed";
-    return NextResponse.json({ ok: false, error: message }, { status: 502 });
+    return createErrorResponse(message, 502);
   }
 }

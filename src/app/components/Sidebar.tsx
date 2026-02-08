@@ -3,22 +3,16 @@
 import type { User } from "@/lib/types";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { clearCachedUser } from "@/app/components/authCache";
 import ChangePasswordModal from "@/app/components/ChangePasswordModal";
-import ThemeToggle from "@/app/components/ThemeToggle";
 
 function normalizeCategory(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function iconClassName(active: boolean) {
-  return active
-    ? "h-4 w-4 text-white/90"
-    : "h-4 w-4 text-gray-500 group-hover:text-gray-700 transition-colors";
-}
-
+// Icon Components with consistent styling
 function IconDashboard({ active }: { active: boolean }) {
   return (
     <svg
@@ -26,15 +20,16 @@ function IconDashboard({ active }: { active: boolean }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={iconClassName(active)}
+      className="ec-sidebar-icon"
       aria-hidden="true"
     >
-      <path d="M3 10.5 12 3l9 7.5" />
-      <path d="M5 10v10h14V10" />
-      <path d="M9 20v-6h6v6" />
+      <rect width="7" height="9" x="3" y="3" rx="1" />
+      <rect width="7" height="5" x="14" y="3" rx="1" />
+      <rect width="7" height="9" x="14" y="12" rx="1" />
+      <rect width="7" height="5" x="3" y="16" rx="1" />
     </svg>
   );
 }
@@ -46,37 +41,16 @@ function IconVehicles({ active }: { active: boolean }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={iconClassName(active)}
+      className="ec-sidebar-icon"
       aria-hidden="true"
     >
-      <path d="M8 6h13" />
-      <path d="M8 12h13" />
-      <path d="M8 18h13" />
-      <path d="M3 6h.01" />
-      <path d="M3 12h.01" />
-      <path d="M3 18h.01" />
-    </svg>
-  );
-}
-
-function IconAdd({ active }: { active: boolean }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={iconClassName(active)}
-      aria-hidden="true"
-    >
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
+      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+      <circle cx="7" cy="17" r="2" />
+      <path d="M9 17h6" />
+      <circle cx="17" cy="17" r="2" />
     </svg>
   );
 }
@@ -88,19 +62,16 @@ function IconCar({ active }: { active: boolean }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={iconClassName(active)}
+      className="ec-sidebar-icon"
       aria-hidden="true"
     >
-      <path d="M7 16h10" />
-      <path d="M4 12l2-5h12l2 5" />
-      <path d="M6 12h12" />
-      <path d="M5 16v2" />
-      <path d="M19 16v2" />
-      <circle cx="7.5" cy="18" r="1" />
-      <circle cx="16.5" cy="18" r="1" />
+      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+      <circle cx="7" cy="17" r="2" />
+      <path d="M9 17h6" />
+      <circle cx="17" cy="17" r="2" />
     </svg>
   );
 }
@@ -112,16 +83,16 @@ function IconMotorcycle({ active }: { active: boolean }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={iconClassName(active)}
+      className="ec-sidebar-icon"
       aria-hidden="true"
     >
-      <circle cx="6" cy="17" r="2" />
-      <circle cx="18" cy="17" r="2" />
-      <path d="M6 17h5l3-6h3" />
-      <path d="M13 11l2 6" />
+      <circle cx="5.5" cy="17.5" r="2.5" />
+      <circle cx="17.5" cy="17.5" r="2.5" />
+      <path d="M7 17h7l3-6H8.5" />
+      <path d="M14 11l2 6" />
       <path d="M10 11l2-3h3" />
     </svg>
   );
@@ -134,17 +105,36 @@ function IconTukTuk({ active }: { active: boolean }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={iconClassName(active)}
+      className="ec-sidebar-icon"
       aria-hidden="true"
     >
-      <path d="M5 13V9h9l3 4v4H7" />
-      <path d="M14 9V6h3v7" />
-      <circle cx="7" cy="17" r="1.5" />
-      <circle cx="17" cy="17" r="1.5" />
-      <path d="M7 9h3v4H7z" />
+      <path d="M4 16v-3a2 2 0 0 1 2-2h8l3 3v3" />
+      <path d="M14 13V9a2 2 0 0 1 2-2h2" />
+      <circle cx="7" cy="17" r="2" />
+      <circle cx="17" cy="17" r="2" />
+    </svg>
+  );
+}
+
+function IconAdd({ active }: { active: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="ec-sidebar-icon"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 12h8" />
+      <path d="M12 8v8" />
     </svg>
   );
 }
@@ -156,14 +146,72 @@ function IconSettings({ active }: { active: boolean }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={iconClassName(active)}
+      className="ec-sidebar-icon"
       aria-hidden="true"
     >
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
       <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+function IconLock({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className || "w-4 h-4"}
+      aria-hidden="true"
+    >
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+function IconLogout({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className || "w-4 h-4"}
+      aria-hidden="true"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" x2="9" y1="12" y2="12" />
+    </svg>
+  );
+}
+
+function IconChevron({ open }: { open: boolean }) {
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`ec-sidebar-chevron ${open ? "ec-sidebar-chevron-open" : ""}`}
+      aria-hidden="true"
+    >
+      <path d="m6 9 6 6 6-6" />
     </svg>
   );
 }
@@ -173,12 +221,97 @@ interface SidebarProps {
   onNavigate?: () => void;
 }
 
+// Navigation Item Component - Premium glass pill
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  active,
+  onClick,
+  subItem = false,
+  count,
+}: {
+  href: string;
+  icon: ({ active }: { active: boolean }) => React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  subItem?: boolean;
+  count?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`ec-sidebar-item ${active ? "ec-sidebar-item-active" : ""} ${
+        subItem ? "ec-sidebar-sub-item" : ""
+      }`}
+      aria-current={active ? "page" : undefined}
+      aria-label={label}
+    >
+      <Icon active={active} />
+      <span className="truncate flex-1 text-left">{label}</span>
+      {count !== undefined && count > 0 && (
+        <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// Section Header Component - Clean uppercase labels
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <div className="ec-sidebar-section">
+      <span>{title}</span>
+    </div>
+  );
+}
+
+// Collapsible Section Component - Smooth accordion
+function CollapsibleSection({
+  title,
+  icon: Icon,
+  children,
+  defaultOpen = false,
+  active = false,
+}: {
+  title: string;
+  icon: ({ active }: { active: boolean }) => React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  active?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`ec-sidebar-item ${active ? "ec-sidebar-item-active" : ""}`}
+        aria-expanded={isOpen}
+        aria-controls={`section-${title.toLowerCase().replace(/\s+/g, "-")}`}
+      >
+        <Icon active={active} />
+        <span className="truncate flex-1 text-left">{title}</span>
+        <IconChevron open={isOpen} />
+      </button>
+      <div
+        id={`section-${title.toLowerCase().replace(/\s+/g, "-")}`}
+        className={`mt-1 space-y-1 overflow-hidden transition-all duration-300 ease-in-out ${
+          isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [vehiclesMenuOpen, setVehiclesMenuOpen] = useState(() => pathname.startsWith("/vehicles"));
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -196,240 +329,177 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
 
   const activeCategory = pathname === "/vehicles" ? searchParams?.get("category") || "" : "";
 
+  // Route active states
   const isDashboardActive = pathname === "/";
   const isVehiclesSectionActive = pathname.startsWith("/vehicles");
   const isAllVehiclesActive = pathname === "/vehicles" && !activeCategory;
+  const isCarsActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "cars";
+  const isMotorcyclesActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "motorcycles";
+  const isTukTuksActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "tuk tuk";
   const isAddActive = pathname === "/vehicles/add";
+  const isSettingsActive = pathname === "/settings";
 
-  const navButtonClasses = useMemo(() => {
-    const base =
-      "group relative w-full text-left px-4 py-3 lg:py-2 rounded-lg transition-all duration-200 font-semibold flex items-center justify-between min-h-[44px] lg:min-h-[auto]";
-    return {
-      base,
-      active: `${base} bg-green-700 text-white shadow-sm`,
-      inactive: `${base} text-gray-800 hover:bg-gray-100 hover:translate-x-[1px] active:scale-[0.98] lg:active:scale-100`,
-      label: "relative z-10",
-      activePill:
-        "absolute inset-0 rounded-lg bg-gradient-to-r from-green-800 to-green-600 opacity-0 scale-[0.98] transition-all duration-200",
-      activePillOn: "opacity-100 scale-100",
-    };
-  }, []);
+  const handleNavigate = (href: string) => {
+    router.push(href);
+    onNavigate?.();
+  };
 
   return (
-    <aside className="w-64 ec-glassPanel shadow-lg ring-1 ring-black/5 print:hidden">
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Image
-            src="/logo.png"
-            alt="Emerald Cash"
-            width={40}
-            height={40}
-            className="h-10 w-10 object-contain"
-            priority
-          />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 leading-tight">Emerald Cash</h1>
-            <p className="text-sm text-gray-600">VMS</p>
+    <aside className="ec-sidebar w-[280px] h-screen overflow-y-auto flex flex-col print:hidden">
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true" />
+
+      {/* Header - Premium brand lockup */}
+      <div className="relative p-6 border-b border-black/5 dark:border-white/10">
+        <div className="flex items-center gap-4">
+          <div className="relative w-12 h-12 rounded-xl bg-white shadow-lg flex items-center justify-center flex-shrink-0 overflow-hidden ring-2 ring-emerald-100">
+            <Image
+              src="/logo.png"
+              alt="Emerald Cash"
+              width={44}
+              height={44}
+              className="w-11 h-11 object-contain"
+              priority
+            />
           </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="space-y-2 mb-8">
-          <div>
-            <button
-              onClick={() => {
-                router.push("/");
-                onNavigate?.();
-              }}
-              className={isDashboardActive ? navButtonClasses.active : navButtonClasses.inactive}
-            >
-              <span
-                className={`${navButtonClasses.activePill} ${isDashboardActive ? navButtonClasses.activePillOn : ""}`}
-                aria-hidden="true"
-              />
-                <span className={`${navButtonClasses.label} flex items-center justify-between w-full`}>
-                  <span className="flex items-center gap-3">
-                    <IconDashboard active={isDashboardActive} />
-                    <span>Dashboard</span>
-                  </span>
-                </span>
-            </button>
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!vehiclesMenuOpen && !pathname.startsWith("/vehicles")) {
-                  router.push("/vehicles");
-                  onNavigate?.();
-                }
-                setVehiclesMenuOpen((prev) => !prev);
-              }}
-              className={isVehiclesSectionActive ? navButtonClasses.active : navButtonClasses.inactive}
-            >
-              <span
-                className={`${navButtonClasses.activePill} ${
-                  isVehiclesSectionActive ? navButtonClasses.activePillOn : ""
-                }`}
-                aria-hidden="true"
-              />
-              <span className={`${navButtonClasses.label} flex items-center justify-between w-full`}>
-                <span className="flex items-center gap-3">
-                  <IconVehicles active={isVehiclesSectionActive} />
-                  <span>All Vehicles</span>
-                </span>
-                <span
-                  className={`text-xs font-extrabold tracking-wide ${
-                    isVehiclesSectionActive ? "text-white/90" : "text-gray-500"
-                  }`}
-                >
-                  {vehiclesMenuOpen ? "Hide ▾" : "Show ▸"}
-                </span>
-              </span>
-            </button>
-
-            {vehiclesMenuOpen ? (
-              <div className="mt-2 space-y-2">
-                <button
-                  onClick={() => {
-                    router.push("/vehicles");
-                    onNavigate?.();
-                  }}
-                  className={isAllVehiclesActive ? navButtonClasses.active : navButtonClasses.inactive}
-                >
-                  <span
-                    className={`${navButtonClasses.activePill} ${
-                      isAllVehiclesActive ? navButtonClasses.activePillOn : ""
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className={`${navButtonClasses.label} flex items-center gap-3`}>
-                    <IconVehicles active={isAllVehiclesActive} />
-                    <span>All Vehicles</span>
-                  </span>
-                </button>
-
-                {isAdmin ? (
-                  <button
-                    onClick={() => {
-                      router.push("/vehicles/add");
-                      onNavigate?.();
-                    }}
-                    className={isAddActive ? navButtonClasses.active : navButtonClasses.inactive}
-                  >
-                    <span
-                      className={`${navButtonClasses.activePill} ${
-                        isAddActive ? navButtonClasses.activePillOn : ""
-                      }`}
-                      aria-hidden="true"
-                    />
-                    <span className={`${navButtonClasses.label} flex items-center gap-3`}>
-                      <IconAdd active={isAddActive} />
-                      <span>Add Vehicle</span>
-                    </span>
-                  </button>
-                ) : null}
-
-                {(() => {
-                  const categories = ["Cars", "Motorcycles", "Tuk Tuk"];
-                  return categories.map((cat) => {
-                    const isActive =
-                      pathname === "/vehicles" && normalizeCategory(activeCategory) === normalizeCategory(cat);
-
-                    const categoryNormalized = normalizeCategory(cat);
-                    const icon =
-                      categoryNormalized === "cars" ? (
-                        <IconCar active={isActive} />
-                      ) : categoryNormalized === "motorcycles" ? (
-                        <IconMotorcycle active={isActive} />
-                      ) : (
-                        <IconTukTuk active={isActive} />
-                      );
-
-                    return (
-                      <button
-                        key={cat}
-                        onClick={() => {
-                          router.push(`/vehicles?category=${encodeURIComponent(cat)}`);
-                          onNavigate?.();
-                        }}
-                        className={isActive ? navButtonClasses.active : navButtonClasses.inactive}
-                      >
-                        <span
-                          className={`${navButtonClasses.activePill} ${
-                            isActive ? navButtonClasses.activePillOn : ""
-                          }`}
-                          aria-hidden="true"
-                        />
-                        <span className={`${navButtonClasses.label} flex items-center gap-3`}>
-                          {icon}
-                          <span>{cat === "Tuk Tuk" ? "TukTuks" : cat}</span>
-                        </span>
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            ) : null}
-          </div>
-        </nav>
-
-        {/* Divider */}
-        <div className="border-t border-gray-200 mb-6"></div>
-
-        {/* Settings */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setSettingsMenuOpen((prev) => !prev)}
-            className={navButtonClasses.inactive}
-          >
-            <span className={`${navButtonClasses.label} flex items-center justify-between w-full`}>
-              <span className="flex items-center gap-3">
-                <IconSettings active={false} />
-                <span>Settings</span>
-              </span>
-              <span
-                className={`text-xs font-extrabold tracking-wide text-gray-500`}
-              >
-                {settingsMenuOpen ? "Hide ▾" : "Show ▸"}
-              </span>
-            </span>
-          </button>
-
-          {settingsMenuOpen ? (
-            <div className="mt-2 space-y-3 lg:space-y-4">
-              <div className="px-4 py-3 ec-glassPanelSoft rounded-lg">
-                <p className="text-xs text-gray-600 mb-1">Role:</p>
-                <p className="font-semibold text-gray-800">{user.role}</p>
-                <p className="text-xs text-gray-600 mt-2">User: {user.username}</p>
-              </div>
-
-              <div className="flex items-center justify-between px-1">
-                <div className="text-xs text-gray-600 font-semibold">Appearance</div>
-                <ThemeToggle />
-              </div>
-
-              <button
-                onClick={() => setChangePasswordOpen(true)}
-                className="w-full px-4 py-3 lg:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition font-medium min-h-[44px] lg:min-h-[auto] active:scale-[0.98] lg:active:scale-100"
-              >
-                Change Password
-              </button>
-
-              <button
-                onClick={handleLogout}
-                className="w-full px-4 py-3 lg:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 transition font-medium min-h-[44px] lg:min-h-[auto] active:scale-[0.98] lg:active:scale-100"
-              >
-                Logout
-              </button>
+          <div className="min-w-0 flex flex-col">
+            <h1 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight leading-tight">
+              Emerald Cash
+            </h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="ec-sidebar-badge">VMS PRO</span>
             </div>
-          ) : null}
+          </div>
         </div>
       </div>
 
+      {/* Navigation */}
+      <nav className="relative flex-1 p-4 space-y-1" aria-label="Main navigation">
+        {/* Overview Section */}
+        <SectionHeader title="Overview" />
+        <NavItem
+          href="/"
+          icon={IconDashboard}
+          label="Dashboard"
+          active={isDashboardActive}
+          onClick={() => handleNavigate("/")}
+        />
+
+        {/* Vehicles Section */}
+        <SectionHeader title="Vehicles" />
+        <CollapsibleSection
+          title="All Vehicles"
+          icon={IconVehicles}
+          defaultOpen={isVehiclesSectionActive}
+          active={isAllVehiclesActive}
+        >
+          <NavItem
+            href="/vehicles"
+            icon={IconVehicles}
+            label="All Vehicles"
+            active={isAllVehiclesActive}
+            onClick={() => handleNavigate("/vehicles")}
+            subItem
+          />
+          <NavItem
+            href="/vehicles?category=Cars"
+            icon={IconCar}
+            label="Cars"
+            active={isCarsActive}
+            onClick={() => handleNavigate("/vehicles?category=Cars")}
+            subItem
+          />
+          <NavItem
+            href="/vehicles?category=Motorcycles"
+            icon={IconMotorcycle}
+            label="Motorcycles"
+            active={isMotorcyclesActive}
+            onClick={() => handleNavigate("/vehicles?category=Motorcycles")}
+            subItem
+          />
+          <NavItem
+            href="/vehicles?category=Tuk+Tuk"
+            icon={IconTukTuk}
+            label="TukTuks"
+            active={isTukTuksActive}
+            onClick={() => handleNavigate("/vehicles?category=Tuk+Tuk")}
+            subItem
+          />
+          {isAdmin && (
+            <NavItem
+              href="/vehicles/add"
+              icon={IconAdd}
+              label="Add Vehicle"
+              active={isAddActive}
+              onClick={() => handleNavigate("/vehicles/add")}
+              subItem
+            />
+          )}
+        </CollapsibleSection>
+
+        {/* Admin Section */}
+        <SectionHeader title="Admin" />
+        <CollapsibleSection
+          title="Settings"
+          icon={IconSettings}
+          defaultOpen={isSettingsActive}
+          active={isSettingsActive}
+        >
+          <div className="ec-sidebar-sub-item space-y-3 py-2">
+            {/* User Card - Premium glass with status */}
+            <div className="ec-sidebar-user-card">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="ec-status-dot absolute -bottom-0.5 -right-0.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
+                    {user.username}
+                  </p>
+                  <span
+                    className={`ec-sidebar-role-badge ${
+                      isAdmin ? "ec-sidebar-role-badge-admin" : "ec-sidebar-role-badge-user"
+                    }`}
+                  >
+                    {user.role}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions - Premium glass buttons */}
+            <button
+              onClick={() => setChangePasswordOpen(true)}
+              className="ec-sidebar-action-secondary touch-target"
+              aria-label="Change password"
+            >
+              <IconLock className="w-4 h-4" />
+              <span>Change Password</span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="ec-sidebar-action-danger touch-target"
+              aria-label="Logout"
+            >
+              <IconLogout className="w-4 h-4" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </CollapsibleSection>
+      </nav>
+
+      {/* Footer - Subtle copyright */}
+      <div className="relative p-4 border-t border-black/5 dark:border-white/10">
+        <p className="text-xs text-slate-400 dark:text-slate-500 text-center font-medium">
+          © 2025 Emerald Cash
+        </p>
+      </div>
+
+      {/* Change Password Modal */}
       <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
     </aside>
   );

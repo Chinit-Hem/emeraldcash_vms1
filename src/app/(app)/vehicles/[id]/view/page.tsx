@@ -1,14 +1,17 @@
 "use client";
 
-import { useAuthUser } from "@/app/components/AuthContext";
-import ImageZoom from "@/app/components/ImageZoom";
-import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
-import { extractDriveFileId } from "@/lib/drive";
-import type { Vehicle } from "@/lib/types";
-import { TAX_TYPE_METADATA } from "@/lib/types";
-import { refreshVehicleCache } from "@/lib/vehicleCache";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useAuthUser } from "@/app/components/AuthContext";
+import { VehicleDetailsCard } from "@/app/components/vehicles/VehicleDetailsCard";
+import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal";
+import { GlassCard } from "@/app/components/ui/GlassCard";
+import { GlassButton } from "@/app/components/ui/GlassButton";
+import { useToast } from "@/app/components/ui/GlassToast";
+import { CardSkeleton } from "@/app/components/LoadingSkeleton";
+import { extractDriveFileId } from "@/lib/drive";
+import { refreshVehicleCache } from "@/lib/vehicleCache";
+import type { Vehicle } from "@/lib/types";
 
 export default function ViewVehiclePage() {
   return <ViewVehicleInner />;
@@ -17,22 +20,29 @@ export default function ViewVehiclePage() {
 function ViewVehicleInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const user = useAuthUser();
-  const isAdmin = user.role === "Admin";
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
+  const user = useAuthUser();
+  
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [deleting, setDeleting] = useState(false);
-  const autoPrintDoneRef = useRef(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
+  // Determine user role
+  const userRole = user?.role || "Viewer";
+  
+  // Toast
+  const { success: showSuccess, error: showError } = useToast();
+
+  // Check for auto-print
   const shouldAutoPrint = (() => {
     const value = searchParams?.get("print") ?? "";
     return value === "1" || value.toLowerCase() === "true";
   })();
 
-  // Load from cache immediately
+  // Load vehicle data
   useEffect(() => {
     if (!id) return;
 
@@ -52,19 +62,28 @@ function ViewVehicleInner() {
     } catch {
       // Ignore cache errors
     }
-  }, [id]);
 
-  // Fetch fresh data in background
-  useEffect(() => {
-    if (!id) return;
+    // Fetch fresh data in background
     let alive = true;
+    let authFailed = false; // Prevent infinite loops on 401
     setError("");
 
     async function fetchVehicle() {
       try {
-        const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, { cache: "no-store" });
+        console.log(`[VIEW_VEHICLE] Fetching vehicle ${id} with credentials`);
+        const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
+          cache: "no-store",
+          credentials: "include", // CRITICAL: Required for session cookie
+        });
+        
+        console.log(`[VIEW_VEHICLE] Response status: ${res.status}`);
+        
         if (res.status === 401) {
-          router.push("/login");
+          if (!authFailed) {
+            authFailed = true;
+            console.log("[VIEW_VEHICLE] 401 received, redirecting to login");
+            router.push("/login?redirect=" + encodeURIComponent(window.location.pathname));
+          }
           return;
         }
         if (!res.ok) throw new Error("Failed to fetch vehicle");
@@ -72,6 +91,7 @@ function ViewVehicleInner() {
         if (!alive) return;
         const fetchedVehicle = data.data || data.vehicle;
         setVehicle(fetchedVehicle);
+        
         // Update cache
         try {
           const cached = localStorage.getItem("vms-vehicles");
@@ -90,7 +110,6 @@ function ViewVehicleInner() {
         }
       } catch (err) {
         if (!alive) return;
-        // Only set error if we didn't have cached data
         if (!vehicle) {
           setError(err instanceof Error ? err.message : "Error loading vehicle");
         }
@@ -103,292 +122,177 @@ function ViewVehicleInner() {
     return () => {
       alive = false;
     };
-  }, [id, router, vehicle]);
+  }, [id, router]);
 
+  // Auto-print effect
   useEffect(() => {
-    if (!shouldAutoPrint) return;
-    if (!vehicle) return;
-    if (autoPrintDoneRef.current) return;
-    autoPrintDoneRef.current = true;
-
+    if (!shouldAutoPrint || !vehicle) return;
     const timeout = window.setTimeout(() => window.print(), 150);
     return () => window.clearTimeout(timeout);
   }, [shouldAutoPrint, vehicle]);
 
-  if (loading) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="flex items-center justify-center h-[60vh] text-gray-700">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="max-w-3xl mx-auto ec-glassPanel rounded-2xl shadow-xl ring-1 ring-black/5 p-6 text-red-700">
-          {error}
-        </div>
-      </div>
-    );
-  }
-
-  if (!vehicle) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="max-w-3xl mx-auto ec-glassPanel rounded-2xl shadow-xl ring-1 ring-black/5 p-6 text-center text-gray-700">
-          Vehicle not found
-        </div>
-      </div>
-    );
-  }
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDelete = async () => {
-    if (!isAdmin) return;
-    const ok = confirm("Delete this vehicle?");
-    if (!ok) return;
-
-    setDeleting(true);
+  // Handle delete
+  const handleDelete = useCallback(async () => {
+    if (!vehicle) return;
+    
+    setIsDeleting(true);
     try {
       const imageFileId = extractDriveFileId(vehicle.Image);
       const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicle.VehicleId)}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // CRITICAL: Required for session cookie
         body: JSON.stringify({ imageFileId, imageUrl: vehicle.Image }),
       });
 
       if (res.status === 401) {
-        router.push("/login");
+        router.push("/login?redirect=" + encodeURIComponent(window.location.pathname));
         return;
       }
 
+      if (res.status === 403) {
+        throw new Error("You don't have permission to delete this vehicle");
+      }
+
       const json = await res.json().catch(() => ({}));
-      if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to delete vehicle");
+      if (!res.ok || json.ok === false) {
+        throw new Error(json.error || "Failed to delete vehicle");
+      }
 
       await refreshVehicleCache();
+      showSuccess("Vehicle deleted successfully");
+      setIsDeleteModalOpen(false);
       router.push("/vehicles");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Delete failed");
+      const message = err instanceof Error ? err.message : "Delete failed";
+      showError(message);
     } finally {
-      setDeleting(false);
+      setIsDeleting(false);
     }
-  };
+  }, [vehicle, router, showSuccess, showError]);
 
-  return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto ec-glassPanel rounded-2xl shadow-xl ring-1 ring-black/5 p-4 sm:p-6 lg:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start mb-8">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">
-              {vehicle.Brand} {vehicle.Model}
-            </h1>
-            <p className="text-gray-600 mt-2">Vehicle ID: {vehicle.VehicleId}</p>
-          </div>
-          <div className="space-y-2">
-            <button
-              onClick={handlePrint}
-              className="w-full ec-glassBtnBlue px-4 py-2 print:hidden"
-            >
-              Print
-            </button>
-            <button
-              onClick={() => router.back()}
-              className="w-full ec-glassBtnSecondary px-4 py-2 print:hidden"
-            >
-              Back
-            </button>
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <CardSkeleton className="h-96" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardSkeleton className="h-64" />
+            <CardSkeleton className="h-64" />
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Image Section */}
-        {vehicle.Image && (
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Vehicle Image</h2>
-            <ImageZoom src={vehicle.Image} alt={`${vehicle.Brand} ${vehicle.Model}`} />
-          </div>
-        )}
-
-        {/* Details Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Category</p>
-            <p className="text-lg font-semibold text-gray-800">{vehicle.Category}</p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Plate Number</p>
-            <p className="text-lg font-semibold text-gray-800 font-mono uppercase">{vehicle.Plate}</p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Year</p>
-            <p className="text-lg font-semibold text-gray-800">{vehicle.Year || "N/A"}</p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Color</p>
-            <p className="text-lg font-semibold text-gray-800">{vehicle.Color}</p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Condition</p>
-            <p className="text-lg font-semibold text-gray-800">{vehicle.Condition}</p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Body Type</p>
-            <p className="text-lg font-semibold text-gray-800">{vehicle.BodyType}</p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Tax Type</p>
-            <p className="text-lg font-semibold text-gray-800">{vehicle.TaxType}</p>
-            {vehicle.TaxType && (
-              <p className="text-xs text-gray-500 mt-1">
-                {TAX_TYPE_METADATA.find((tt) => tt.value === vehicle.TaxType)?.description}
-              </p>
-            )}
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Market Price</p>
-            <p className="text-lg font-semibold text-gray-800">
-              ${vehicle.PriceNew?.toLocaleString() || "N/A"}
-            </p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">D.O.C.40%</p>
-            <p className="text-lg font-semibold text-gray-800">
-              ${vehicle.Price40?.toLocaleString() || "N/A"}
-            </p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4">
-            <p className="text-gray-600 text-sm font-medium">Vehicles70%</p>
-            <p className="text-lg font-semibold text-gray-800">
-              ${vehicle.Price70?.toLocaleString() || "N/A"}
-            </p>
-          </div>
-
-          <div className="ec-glassBadge rounded-lg p-4 md:col-span-2">
-            <p className="text-gray-600 text-sm font-medium">Added Time</p>
-            <p className="text-lg font-semibold text-gray-800 font-mono">
-              {normalizeCambodiaTimeString(vehicle.Time)}
-            </p>
-          </div>
-        </div>
-
-        {/* Cambodia Market Price Section */}
-        {(vehicle.MarketPriceMedian || vehicle.MarketPriceLow || vehicle.MarketPriceHigh) && (
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+  // Error state
+  if (error) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="max-w-3xl mx-auto">
+          <GlassCard variant="elevated" className="p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="h-5 w-5 text-green-600"
+                className="h-8 w-8 text-red-600"
               >
                 <circle cx="12" cy="12" r="10" />
-                <path d="M12 2v20M2 12h20" />
+                <path d="m15 9-6 6" />
+                <path d="m9 9 6 6" />
               </svg>
-              Cambodia Market Price
-            </h2>
-            <div className="ec-glassPanel rounded-xl p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-1">Low (25th %)</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    ${vehicle.MarketPriceLow?.toLocaleString() || "-"}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-1">Median</p>
-                  <p className="text-3xl font-bold text-green-600">
-                    ${vehicle.MarketPriceMedian?.toLocaleString() || "-"}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-1">High (75th %)</p>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    ${vehicle.MarketPriceHigh?.toLocaleString() || "-"}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-4 text-sm">
-                <div className="flex items-center gap-4">
-                  <span className="text-gray-600">
-                    Source: <span className="font-medium">{vehicle.MarketPriceSource || "N/A"}</span>
-                  </span>
-                  <span className="text-gray-600">
-                    Samples: <span className="font-medium">{vehicle.MarketPriceSamples || 0}</span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600">Confidence:</span>
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded-full ${
-                      vehicle.MarketPriceConfidence === "High"
-                        ? "bg-green-100 text-green-700"
-                        : vehicle.MarketPriceConfidence === "Medium"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : vehicle.MarketPriceConfidence === "Low"
-                        ? "bg-orange-100 text-orange-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {vehicle.MarketPriceConfidence || "Unknown"}
-                  </span>
-                </div>
-              </div>
-              {vehicle.MarketPriceUpdatedAt && (
-                <p className="mt-2 text-xs text-gray-500 text-right">
-                  Updated: {new Date(vehicle.MarketPriceUpdatedAt).toLocaleString()}
-                </p>
-              )}
             </div>
-            <p className="mt-2 text-xs text-gray-400 text-center">
-              Prices are estimates based on available Cambodia marketplace listings.
-            </p>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-4 print:hidden">
-          {isAdmin ? (
-            <>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Error Loading Vehicle
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
+            <div className="flex gap-3 justify-center">
               <button
-                onClick={() => router.push(`/vehicles/${vehicle.VehicleId}/edit`)}
-                className="flex-1 ec-glassBtnPrimary px-6 py-3"
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
               >
-                Edit Vehicle
+                Retry
               </button>
               <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 ec-glassBtnRed px-6 py-3"
+                onClick={() => router.push("/vehicles")}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
-                {deleting ? "Deleting..." : "Delete"}
+                Back to List
               </button>
-            </>
-          ) : null}
-          <button
-            onClick={() => router.back()}
-            className="flex-1 ec-glassBtnSecondary px-6 py-3"
-          >
-            Back
-          </button>
+            </div>
+          </GlassCard>
         </div>
       </div>
+    );
+  }
+
+  // Not found state
+  if (!vehicle) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="max-w-3xl mx-auto">
+          <GlassCard variant="elevated" className="p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-8 w-8 text-gray-400"
+              >
+                <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+                <circle cx="7" cy="17" r="2" />
+                <path d="M9 17h6" />
+                <circle cx="17" cy="17" r="2" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Vehicle Not Found
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              The vehicle you&apos;re looking for doesn&apos;t exist or has been removed.
+            </p>
+            <button
+              onClick={() => router.push("/vehicles")}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            >
+              Back to Vehicles
+            </button>
+          </GlassCard>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-6xl mx-auto">
+        <VehicleDetailsCard
+          vehicle={vehicle}
+          userRole={userRole}
+          onDelete={() => setIsDeleteModalOpen(true)}
+          isDeleting={isDeleting}
+        />
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        vehicle={vehicle}
+        isOpen={isDeleteModalOpen}
+        isDeleting={isDeleting}
+        userRole={userRole}
+        onConfirm={handleDelete}
+        onCancel={() => setIsDeleteModalOpen(false)}
+      />
     </div>
   );
 }

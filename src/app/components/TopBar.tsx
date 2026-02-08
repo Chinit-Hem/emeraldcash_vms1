@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import React from "react";
 
 import ThemeToggle from "@/app/components/ThemeToggle";
+import { GlassButton } from "@/app/components/ui/GlassButton";
 
 type TopBarProps = {
   user: User;
@@ -37,10 +38,11 @@ export default function TopBar({
       <div className="h-14 px-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {showBack ? (
-            <button
+            <GlassButton
               type="button"
               onClick={handleBack}
-              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-target"
+              variant="ghost"
+              className="!p-2 !w-auto !h-auto"
               aria-label="Go back"
             >
               <svg
@@ -55,12 +57,13 @@ export default function TopBar({
               >
                 <path d="m15 18-6-6 6-6" />
               </svg>
-            </button>
+            </GlassButton>
           ) : (
-            <button
+            <GlassButton
               type="button"
               onClick={onMenuClick}
-              className="lg:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-target"
+              variant="ghost"
+              className="lg:hidden !p-2 !w-auto !h-auto"
               aria-label="Open menu"
             >
               <svg
@@ -77,7 +80,7 @@ export default function TopBar({
                 <path d="M4 12h16" />
                 <path d="M4 18h16" />
               </svg>
-            </button>
+            </GlassButton>
           )}
 
           {title && (

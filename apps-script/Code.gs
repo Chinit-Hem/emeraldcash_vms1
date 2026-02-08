@@ -1102,6 +1102,202 @@ function roundTo_(value, decimals) {
   return Math.round((value + Number.EPSILON) * factor) / factor;
 }
 
+/* ----------------- DIAGNOSTIC & CLEANUP FUNCTIONS ----------------- */
+
+/**
+ * Diagnostic function to identify why row count differs from actual data count
+ * Run this in the Apps Script editor to see which rows are problematic
+ */
+function diagnoseDataDiscrepancy() {
+  const sh = getSheet_();
+  const lastRow = sh.getLastRow();
+  
+  console.log("=== DATA DISCREPANCY DIAGNOSTIC ===");
+  console.log("Sheet lastRow (includes header): " + lastRow);
+  console.log("Expected data rows: " + (lastRow - 1));
+  
+  if (lastRow < 2) {
+    console.log("No data rows found");
+    return { totalRows: 0, validRows: 0, emptyRows: 0, missingIdRows: [] };
+  }
+  
+  const values = sh.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
+  
+  let validCount = 0;
+  let emptyRowCount = 0;
+  let missingIdRows = [];
+  
+  for (let i = 0; i < values.length; i++) {
+    const row = values[i];
+    const rowNumber = i + 2; // Actual sheet row number (1-indexed, +1 for header)
+    
+    // Check if row is completely empty
+    const isEmpty = row.every(function(v) { 
+      return String(v || "").trim() === ""; 
+    });
+    
+    if (isEmpty) {
+      emptyRowCount++;
+      missingIdRows.push({
+        rowNumber: rowNumber,
+        reason: "Completely empty row",
+        idValue: null
+      });
+      continue;
+    }
+    
+    // Check ID column (first column)
+    const idValue = String(row[0] || "").trim();
+    const hasValidId = idValue !== "" && idValue !== "null" && idValue !== "undefined";
+    
+    if (!hasValidId) {
+      missingIdRows.push({
+        rowNumber: rowNumber,
+        reason: "Missing or invalid ID",
+        idValue: row[0]
+      });
+    } else {
+      validCount++;
+    }
+  }
+  
+  console.log("Valid rows with IDs: " + validCount);
+  console.log("Completely empty rows: " + emptyRowCount);
+  console.log("Rows with missing/invalid IDs: " + (missingIdRows.length - emptyRowCount));
+  console.log("Total discrepancy: " + (lastRow - 1 - validCount) + " rows");
+  
+  if (missingIdRows.length > 0) {
+    console.log("\n=== PROBLEMATIC ROWS ===");
+    missingIdRows.forEach(function(info) {
+      console.log("Row " + info.rowNumber + ": " + info.reason + " (ID value: '" + info.idValue + "')");
+    });
+  }
+  
+  return {
+    totalRows: lastRow - 1,
+    validRows: validCount,
+    emptyRows: emptyRowCount,
+    missingIdRows: missingIdRows,
+    discrepancy: (lastRow - 1) - validCount
+  };
+}
+
+/**
+ * Cleanup function to remove empty rows and fix data gaps
+ * Creates a backup first, then consolidates data
+ */
+function cleanupEmptyRows() {
+  const sh = getSheet_();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Create backup
+  const ts = Utilities.formatDate(new Date(), CAMBODIA_TIMEZONE, "yyyyMMdd-HHmmss");
+  const backupName = "Vehicles-backup-cleanup-" + ts;
+  sh.copyTo(ss).setName(backupName);
+  console.log("Created backup: " + backupName);
+  
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) {
+    console.log("No data to cleanup");
+    return { ok: true, message: "No data rows" };
+  }
+  
+  const values = sh.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
+  
+  // Filter out completely empty rows
+  const validRows = values.filter(function(row) {
+    const isEmpty = row.every(function(v) { 
+      return String(v || "").trim() === ""; 
+    });
+    return !isEmpty;
+  });
+  
+  console.log("Found " + values.length + " total rows");
+  console.log("Found " + validRows.length + " valid rows");
+  console.log("Removing " + (values.length - validRows.length) + " empty rows");
+  
+  // Clear all data rows
+  if (lastRow > 1) {
+    sh.getRange(2, 1, lastRow - 1, HEADERS.length).clear();
+  }
+  
+  // Write back valid rows
+  if (validRows.length > 0) {
+    sh.getRange(2, 1, validRows.length, HEADERS.length).setValues(validRows);
+  }
+  
+  // Remove excess rows if any
+  const newLastRow = sh.getLastRow();
+  const maxRows = sh.getMaxRows();
+  if (maxRows > newLastRow + 10) {
+    // Keep some buffer rows but remove excessive empty rows
+    sh.deleteRows(newLastRow + 10, maxRows - newLastRow - 10);
+  }
+  
+  console.log("Cleanup complete. Sheet now has " + validRows.length + " data rows.");
+  
+  return {
+    ok: true,
+    backup: backupName,
+    originalCount: values.length,
+    newCount: validRows.length,
+    removedCount: values.length - validRows.length
+  };
+}
+
+/**
+ * Quick fix: Fill missing IDs for rows that have data but no ID
+ */
+function fillMissingIds() {
+  const sh = getSheet_();
+  const lastRow = sh.getLastRow();
+  
+  if (lastRow < 2) return { ok: true, filled: 0 };
+  
+  const idCol = 1; // First column
+  const idRange = sh.getRange(2, idCol, lastRow - 1, 1);
+  const idValues = idRange.getValues();
+  
+  let maxId = 0;
+  let emptyIdRows = [];
+  
+  // Find max ID and identify empty IDs
+  for (let i = 0; i < idValues.length; i++) {
+    const val = idValues[i][0];
+    const idStr = String(val || "").trim();
+    
+    if (idStr === "" || idStr === "null" || idStr === "undefined") {
+      emptyIdRows.push(i);
+    } else {
+      const num = parseInt(idStr, 10);
+      if (!isNaN(num) && num > maxId) {
+        maxId = num;
+      }
+    }
+  }
+  
+  console.log("Max existing ID: " + maxId);
+  console.log("Rows with missing IDs: " + emptyIdRows.length);
+  
+  // Fill missing IDs
+  let nextId = maxId + 1;
+  for (let i = 0; i < emptyIdRows.length; i++) {
+    const rowIndex = emptyIdRows[i];
+    idValues[rowIndex][0] = String(nextId++);
+  }
+  
+  if (emptyIdRows.length > 0) {
+    idRange.setValues(idValues);
+    console.log("Filled " + emptyIdRows.length + " missing IDs");
+  }
+  
+  return {
+    ok: true,
+    filled: emptyIdRows.length,
+    nextId: nextId
+  };
+}
+
 function extractDriveFileId_(value) {
   if (value == null) return "";
   const raw = String(value).trim();

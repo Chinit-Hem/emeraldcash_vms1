@@ -3,11 +3,13 @@
 import { useAuthUser } from "@/app/components/AuthContext";
 import ChartCard from "@/app/components/dashboard/ChartCard";
 import KpiCard from "@/app/components/dashboard/KpiCard";
+import SkeletonDashboard from "@/app/components/dashboard/SkeletonDashboard";
 import MonthlyAddedChart from "@/app/components/dashboard/charts/MonthlyAddedChart";
 import NewVsUsedChart from "@/app/components/dashboard/charts/NewVsUsedChart";
 import PriceDistributionChart from "@/app/components/dashboard/charts/PriceDistributionChart";
 import VehiclesByBrandChart from "@/app/components/dashboard/charts/VehiclesByBrandChart";
 import VehiclesByCategoryChart from "@/app/components/dashboard/charts/VehiclesByCategoryChart";
+import VehicleModal from "@/app/components/dashboard/VehicleModal";
 import {
   buildMonthlyAdded,
   buildNewVsUsed,
@@ -18,7 +20,29 @@ import {
   normalizeCategoryLabel,
   normalizeConditionLabel,
 } from "@/lib/analytics";
+
+function normalizeCategoryParam(value: string): string {
+  return normalizeCategoryLabel(value).toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normalizeConditionParam(value: string): string {
+  return normalizeConditionLabel(value).toLowerCase();
+}
+
+function applyFilter(router: ReturnType<typeof useRouter>, filter: { type: "category" | "condition" | "noImage"; value: string | boolean }) {
+  const params = new URLSearchParams();
+  if (filter.type === "category") {
+    params.set("category", normalizeCategoryParam(filter.value as string));
+  } else if (filter.type === "condition") {
+    params.set("condition", normalizeConditionParam(filter.value as string));
+  } else if (filter.type === "noImage") {
+    params.set("noImage", "1");
+  }
+  router.push(`/vehicles?${params.toString()}`);
+}
+
 import { getCambodiaNowString } from "@/lib/cambodiaTime";
+import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -28,15 +52,59 @@ function formatMoney(value: number | null): string {
   return `$${Math.round(value).toLocaleString()}`;
 }
 
+// Icons
+function IconRefresh({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 21h5v-5" />
+    </svg>
+  );
+}
+
+function IconPlus({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function IconClock({ className = "h-3 w-3" }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function IconAlert({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
 export default function Dashboard() {
   const user = useAuthUser();
   const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false); // Background refresh only
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [vehiclesError, setVehiclesError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [cambodiaNow, setCambodiaNow] = useState(() => getCambodiaNowString());
+  const [isLoading, setIsLoading] = useState(true);
   const fetchAbortRef = useRef<AbortController | null>(null);
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
   useEffect(() => {
     const interval = window.setInterval(() => setCambodiaNow(getCambodiaNowString()), 1000);
@@ -76,6 +144,7 @@ export default function Dashboard() {
       const newVehicles = (data.data || []) as Vehicle[];
       setVehicles(newVehicles);
       setLastUpdated(getCambodiaNowString());
+      setIsLoading(false);
       // Save to localStorage
       try {
         localStorage.setItem("vms-vehicles", JSON.stringify(newVehicles));
@@ -85,6 +154,7 @@ export default function Dashboard() {
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setVehiclesError(err instanceof Error ? err.message : "Error loading vehicles");
+      setIsLoading(false);
     } finally {
       setIsRefreshing(false);
     }
@@ -100,6 +170,83 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  // Safe error message extraction to prevent circular reference issues
+  const getSafeErrorMessage = (errorData: unknown): string => {
+    if (errorData === null || errorData === undefined) {
+      return "Failed to save vehicle";
+    }
+    if (typeof errorData === "string") {
+      return errorData || "Failed to save vehicle";
+    }
+    if (typeof errorData === "object") {
+      // Handle { error: "message" } format
+      if (errorData && "error" in errorData) {
+        const err = (errorData as { error: unknown }).error;
+        if (typeof err === "string") return err;
+        if (err === null || err === undefined) return "Failed to save vehicle";
+        try {
+          return String(err);
+        } catch {
+          return "Failed to save vehicle";
+        }
+      }
+      // Handle { message: "message" } format
+      if ("message" in errorData) {
+        const msg = (errorData as { message: unknown }).message;
+        if (typeof msg === "string") return msg;
+        try {
+          return String(msg);
+        } catch {
+          return "Failed to save vehicle";
+        }
+      }
+      // Try to stringify safely
+      try {
+        const str = JSON.stringify(errorData);
+        return str || "Failed to save vehicle";
+      } catch {
+        return "Failed to save vehicle";
+      }
+    }
+    try {
+      return String(errorData);
+    } catch {
+      return "Failed to save vehicle";
+    }
+  };
+
+  const handleSaveVehicle = async (vehicleData: Partial<Vehicle>) => {
+    try {
+      const res = await fetch("/api/vehicles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vehicleData),
+      });
+
+      if (!res.ok) {
+        let errorData: unknown;
+        try {
+          errorData = await res.json();
+        } catch {
+          errorData = null;
+        }
+        const errorMessage = getSafeErrorMessage(errorData);
+        throw new Error(errorMessage);
+      }
+
+      // Refresh vehicles list after successful save
+      await fetchVehicles();
+    } catch (error) {
+      console.error("Failed to save vehicle:", error);
+      throw error;
+    }
+  };
+
+  const handleOpenAddModal = () => {
+    setSelectedVehicle(null);
+    setIsModalOpen(true);
+  };
+
   const kpis = useMemo(() => {
     const countsByCategory: Record<string, number> = { Cars: 0, Motorcycles: 0, "Tuk Tuk": 0, Other: 0 };
     const countsByCondition: Record<string, number> = { New: 0, Used: 0, Other: 0 };
@@ -108,7 +255,7 @@ export default function Dashboard() {
     for (const v of vehicles) {
       countsByCategory[normalizeCategoryLabel(v.Category)] += 1;
       countsByCondition[normalizeConditionLabel(v.Condition)] += 1;
-      if (!v.Image || v.Image.trim() === "") {
+      if (!v.Image || v.Image.trim() === "" || !extractDriveFileId(v.Image)) {
         noImagesCount += 1;
       }
     }
@@ -135,129 +282,197 @@ export default function Dashboard() {
   const newVsUsed = useMemo(() => buildNewVsUsed(vehicles), [vehicles]);
   const monthlyAdded = useMemo(() => buildMonthlyAdded(vehicles), [vehicles]);
 
+  if (isLoading && vehicles.length === 0) {
+    return <SkeletonDashboard />;
+  }
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6 rounded-2xl overflow-hidden shadow-xl ring-1 ring-black/5 ec-glassPanel">
-        <div className="bg-gradient-to-r from-green-800/95 via-green-700/95 to-green-600/95 px-4 py-5 sm:px-6 sm:py-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-              <p className="text-green-50/90 mt-1 text-sm">
-                Welcome, <span className="font-semibold text-white">{user.username}</span> • Role:{" "}
-                <span className="font-semibold text-white">{user.role}</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => fetchVehicles()} className="ec-btn ec-btnBlue text-sm flex items-center gap-2">
-                {isRefreshing ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen">
+      {/* Glass Hero Header */}
+      <div className="ec-dashboard-hero rounded-2xl p-5 sm:p-6 mb-6">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Left: Title + Welcome */}
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white tracking-tight">
+              Dashboard
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Welcome, <span className="font-semibold text-slate-800 dark:text-white">{user.username}</span>
+              <span className="mx-2 text-slate-400">•</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                {user.role}
+              </span>
+            </p>
+            {lastUpdated && (
+              <p className="text-xs text-slate-500 dark:text-slate-500 flex items-center gap-1.5">
+                <span>Last updated:</span>
+                <span className="font-mono text-slate-600 dark:text-slate-400">{lastUpdated}</span>
+                {isRefreshing && (
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    <span>Refreshing...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                      <path d="M3 3v5h5" />
-                      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                      <path d="M16 21h5v-5" />
-                    </svg>
-                    <span>Refresh</span>
-                  </>
+                    Syncing...
+                  </span>
                 )}
-              </button>
-              <div className="text-xs text-white/90 font-semibold">
-                Cambodia time: <span className="font-mono text-white">{cambodiaNow}</span>
-              </div>
+              </p>
+            )}
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* Refresh Button */}
+            <button
+              type="button"
+              onClick={() => fetchVehicles()}
+              disabled={isRefreshing}
+              className="ec-dashboard-btn-icon touch-target"
+              aria-label="Refresh data"
+            >
+              <IconRefresh className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+            </button>
+
+            {/* Add Vehicle Button */}
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="ec-dashboard-btn-primary touch-target"
+            >
+              <IconPlus className="h-4 w-4" />
+              <span>Add Vehicle</span>
+            </button>
+
+            {/* Cambodia Time Pill */}
+            <div className="ec-time-pill">
+              <IconClock />
+              <span>{cambodiaNow}</span>
             </div>
           </div>
-          {lastUpdated ? (
-            <div className="mt-2 text-xs text-white/80 flex items-center gap-2">
-              <span>Last updated: <span className="font-mono">{lastUpdated}</span></span>
-              {isRefreshing && (
-                <span className="flex items-center gap-1">
-                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Syncing...
-                </span>
-              )}
-            </div>
-          ) : null}
         </div>
       </div>
 
+      {/* Error Alert */}
       {vehiclesError ? (
-        <div className="mb-4 ec-glassPanel rounded-2xl shadow-xl ring-1 ring-black/5 p-4 text-red-700">
-          {vehiclesError}
+        <div className="ec-alert-glass mb-6">
+          <div className="flex items-start gap-3">
+            <IconAlert className="h-5 w-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="ec-alert-glass-title">Failed to load vehicles</div>
+              <div className="ec-alert-glass-message">{vehiclesError}</div>
+            </div>
+          </div>
+          <button
+            onClick={() => fetchVehicles()}
+            className="ec-alert-glass-action mt-3"
+          >
+            <IconRefresh className="h-3.5 w-3.5" />
+            <span>Retry</span>
+          </button>
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
-          <KpiCard label="Total Vehicles" value={kpis.total.toLocaleString()} accent="green" onClick={() => router.push("/vehicles")} />
-          <KpiCard label="Cars" value={kpis.cars.toLocaleString()} accent="blue" onClick={() => router.push("/vehicles?category=Cars")} />
-          <KpiCard
-            label="Motorcycles"
-            value={kpis.motorcycles.toLocaleString()}
-            accent="orange"
-            onClick={() => router.push("/vehicles?category=Motorcycles")}
-          />
-          <KpiCard label="Tuk Tuk" value={kpis.tukTuk.toLocaleString()} accent="green" onClick={() => router.push("/vehicles?category=Tuk%20Tuk")} />
-          <KpiCard label="New" value={kpis.newCount.toLocaleString()} accent="green" onClick={() => router.push("/vehicles?condition=New")} />
-          <KpiCard label="Used" value={kpis.usedCount.toLocaleString()} accent="orange" onClick={() => router.push("/vehicles?condition=Used")} />
-          <KpiCard label="No Images" value={kpis.noImagesCount.toLocaleString()} accent="red" onClick={() => router.push("/vehicles?withoutImage=true")} />
-        </div>
-
-        <div className="lg:col-span-6">
-          <ChartCard title="Vehicles by Category" subtitle="Distribution across categories">
-            <VehiclesByCategoryChart data={byCategory} />
-          </ChartCard>
-        </div>
-
-        <div className="lg:col-span-6">
-          <ChartCard title="New vs Used" subtitle="Condition ratio">
-            <NewVsUsedChart data={newVsUsed} />
-          </ChartCard>
-        </div>
-
-        <div className="lg:col-span-12">
-          <ChartCard title="Vehicles by Brand" subtitle="Top brands (others grouped)">
-            <VehiclesByBrandChart data={byBrand} />
-          </ChartCard>
-        </div>
-
-        <div className="lg:col-span-12">
-          <ChartCard title="Monthly Added Vehicles" subtitle="Based on Time column">
-            <MonthlyAddedChart data={monthlyAdded} />
-          </ChartCard>
-        </div>
-
-        <div className="lg:col-span-12">
-          <ChartCard
-            title="Market Price Distribution"
-            subtitle={`Histogram of MARKET PRICE (priced vehicles: ${kpis.pricedCount.toLocaleString()})`}
-            right={
-              <div className="text-xs text-gray-600 font-semibold text-right">
-                <div>
-                  Total: <span className="font-mono text-gray-900">{formatMoney(kpis.totalMarketValue)}</span>
-                </div>
-                <div>
-                  Avg: <span className="font-mono text-gray-900">{formatMoney(kpis.avgPrice)}</span> • Median:{" "}
-                  <span className="font-mono text-gray-900">{formatMoney(kpis.medianPrice)}</span>
-                </div>
-              </div>
-            }
-          >
-            <PriceDistributionChart data={priceDistribution} />
-          </ChartCard>
-        </div>
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
+        <KpiCard 
+          label="Total" 
+          value={kpis.total.toLocaleString()} 
+          sublabel="vehicles"
+          accent="green" 
+          onClick={() => router.push("/vehicles")} 
+        />
+        <KpiCard 
+          label="Cars" 
+          value={kpis.cars.toLocaleString()} 
+          sublabel="vehicles"
+          accent="blue" 
+          onClick={() => applyFilter(router, { type: "category", value: "Car" })} 
+        />
+        <KpiCard
+          label="Motorcycles"
+          value={kpis.motorcycles.toLocaleString()}
+          sublabel="vehicles"
+          accent="orange"
+          onClick={() => applyFilter(router, { type: "category", value: "Motorcycle" })}
+        />
+        <KpiCard 
+          label="Tuk Tuk" 
+          value={kpis.tukTuk.toLocaleString()} 
+          sublabel="vehicles"
+          accent="green" 
+          onClick={() => applyFilter(router, { type: "category", value: "Tuk Tuk" })} 
+        />
+        <KpiCard 
+          label="New" 
+          value={kpis.newCount.toLocaleString()} 
+          sublabel="condition"
+          accent="green" 
+          onClick={() => applyFilter(router, { type: "condition", value: "New" })} 
+        />
+        <KpiCard 
+          label="Used" 
+          value={kpis.usedCount.toLocaleString()} 
+          sublabel="condition"
+          accent="orange" 
+          onClick={() => applyFilter(router, { type: "condition", value: "Used" })} 
+        />
+        <KpiCard 
+          label="No Images" 
+          value={kpis.noImagesCount.toLocaleString()} 
+          sublabel="need upload"
+          accent="red" 
+          onClick={() => applyFilter(router, { type: "noImage", value: true })} 
+        />
       </div>
+
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <ChartCard title="Vehicles by Category" subtitle="Distribution across categories">
+          <VehiclesByCategoryChart data={byCategory} />
+        </ChartCard>
+
+        <ChartCard title="New vs Used" subtitle="Condition ratio">
+          <NewVsUsedChart data={newVsUsed} />
+        </ChartCard>
+      </div>
+
+      <div className="space-y-4">
+        <ChartCard title="Vehicles by Brand" subtitle="Top brands (others grouped)">
+          <VehiclesByBrandChart data={byBrand} />
+        </ChartCard>
+
+        <ChartCard title="Monthly Added Vehicles" subtitle="Based on Time column">
+          <MonthlyAddedChart data={monthlyAdded} />
+        </ChartCard>
+
+        <ChartCard
+          title="Market Price Distribution"
+          subtitle={`Histogram of MARKET PRICE (priced vehicles: ${kpis.pricedCount.toLocaleString()})`}
+          right={
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium text-right space-y-0.5">
+              <div>
+                Total: <span className="font-mono text-slate-700 dark:text-slate-300">{formatMoney(kpis.totalMarketValue)}</span>
+              </div>
+              <div>
+                Avg: <span className="font-mono text-slate-700 dark:text-slate-300">{formatMoney(kpis.avgPrice)}</span>
+                <span className="mx-1 text-slate-400">•</span>
+                Median: <span className="font-mono text-slate-700 dark:text-slate-300">{formatMoney(kpis.medianPrice)}</span>
+              </div>
+            </div>
+          }
+        >
+          <PriceDistributionChart data={priceDistribution} />
+        </ChartCard>
+      </div>
+
+      {/* Vehicle Modal for Add/Edit */}
+      <VehicleModal
+        isOpen={isModalOpen}
+        vehicle={selectedVehicle}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSaveVehicle}
+      />
     </div>
   );
 }
-

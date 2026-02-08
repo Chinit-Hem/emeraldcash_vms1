@@ -8,8 +8,16 @@ const nextConfig = {
         ? vercelUrl
         : `https://${vercelUrl}`
       : "";
-    const allowedOrigin = appOrigin || vercelOrigin || "*";
-    const allowCredentials = allowedOrigin !== "*";
+    
+    // In development, allow all origins to prevent CORS issues
+    // In production, use strict origin checking
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const allowedOrigin = isDevelopment 
+      ? "*" 
+      : (appOrigin || vercelOrigin || "http://localhost:3000");
+    const allowCredentials = !isDevelopment; // Credentials not allowed with wildcard
+
+
 
     const apiHeaders = [
       {
@@ -22,8 +30,10 @@ const nextConfig = {
             value: "Content-Type, Authorization, X-Requested-With",
           },
           { key: "Access-Control-Max-Age", value: "86400" },
+          ...(allowCredentials ? [{ key: "Access-Control-Allow-Credentials", value: "true" }] : []),
         ],
       },
+
       {
         source: "/(.*)",
         headers: [
@@ -33,14 +43,8 @@ const nextConfig = {
       },
     ];
 
-    if (allowCredentials) {
-      apiHeaders[0].headers.push({
-        key: "Access-Control-Allow-Credentials",
-        value: "true",
-      });
-    }
-
     return apiHeaders;
+
   },
 };
 

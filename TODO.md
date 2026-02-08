@@ -1,43 +1,40 @@
-# TODO - Emerald Cash Login Fix
+# Vehicle Loading Error Fix Plan
 
-## Issue: "Invalid username/password" Error
+## Information Gathered
+- Vehicles page (`VehiclesClient.tsx`) fetches directly using `fetch("/api/vehicles")` without robust error handling
+- Existing API client (`lib/api.ts`) has some error handling but not used in vehicles page
+- Auth uses cookies, not localStorage
+- API returns `{ ok: true, data: vehicles, meta }` or `{ ok: false, error }`
+- No environment variable validation for NEXT_PUBLIC_API_URL
+- No auth header handling in client requests
+- Response shape normalization needed (API returns either `{ data, meta }` or `Vehicle[]`)
 
-### Root Cause
-The username was NOT being normalized to lowercase when checking against DEMO_USERS. This caused login failures when users typed "Admin", "ADMIN", or any mixed case variation.
+## Plan
+1. **Update API client (`lib/api.ts`)**:
+   - Add `fetchJSON()` with 15s timeout + AbortController
+   - Add dev-only logging of URL, status, response text
+   - Handle 401 (redirect to /login, clear token), 403/404/500 with user-friendly messages
+   - Handle non-JSON responses
+   - Add auth header support (Authorization: Bearer <token>)
+   - Add runtime check for NEXT_PUBLIC_API_URL
 
-### Fix Applied
-- [x] 1. Fix `getUserConfig()` function to normalize username to lowercase when checking DEMO_USERS
-- [x] 2. Fixed environment variable lookup to use normalized username
+2. **Update vehicles fetch hook**:
+   - Create `useVehicles` hook using the robust API client
+   - Handle loading/success/error states
+   - Normalize response shapes ({ data, meta } or Vehicle[])
+   - Add retry functionality
 
-## Files Modified
-- `src/app/api/auth/login/route.ts` - Fixed username case normalization
+3. **Update vehicles page**:
+   - Use new `useVehicles` hook
+   - Show exact error in dev mode
+   - Ensure UI shows 0 only when request fails, not when loading
 
-## Testing Checklist
-- [x] Login with "admin" (lowercase) - should work
-- [x] Login with "Admin" (mixed case) - should now work
-- [x] Login with "ADMIN" (uppercase) - should now work
-- [x] Login with "staff" (lowercase) - should work
-- [x] Login with "Staff" (mixed case) - should now work
+## Dependent Files to be edited
+- `src/lib/api.ts` - Add robust fetchJSON wrapper
+- `src/app/(app)/vehicles/VehiclesClient.tsx` - Update to use new hook
+- `src/lib/auth.ts` - Add token management functions
 
----
-
-## ✅ FIX COMPLETED
-
-### Changes Made:
-1. Normalized username to lowercase at the beginning of `getUserConfig()` function
-2. Used normalized username for:
-   - Environment variable lookup (`ADMIN_USERNAME`, `STAFF_USERNAME`, etc.)
-   - Role detection ("admin" in username → Admin role)
-   - DEMO_USERS lookup (case-insensitive)
-
-### What This Fixes:
-- **Before**: Only "admin" worked (case-sensitive)
-- **After**: "admin", "Admin", "ADMIN" all work (case-insensitive)
-
-### Demo Credentials (All case variations now work):
-- **Username:** `admin` or `Admin` or `ADMIN`
-- **Password:** `1234`
-
-- **Username:** `staff` or `Staff` or `STAFF`
-- **Password:** `1234`
-
+## Followup steps
+- Test API client with various error scenarios
+- Verify auth flow works correctly
+- Check environment variable setup

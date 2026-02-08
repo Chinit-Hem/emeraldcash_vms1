@@ -1,4 +1,4 @@
-import { driveThumbnailUrl } from "@/lib/drive";
+import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 
@@ -68,7 +68,7 @@ export function parseImageDataUrl(
   return { mimeType, base64Data };
 }
 
-export { driveThumbnailUrl };
+export { driveThumbnailUrl, extractDriveFileId };
 
 function toNumberOrNull(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;

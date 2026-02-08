@@ -16,7 +16,7 @@ export type MarketPriceStats = {
 };
 
 export function normalizeCategoryLabel(value: unknown): CategoryLabel {
-  const raw = String(value ?? "").trim().toLowerCase();
+  const raw = String(value ?? "").trim().replace(/\s+/g, ' ').toLowerCase();
   if (!raw) return "Other";
   if (raw === "cars" || raw === "car") return "Cars";
   if (raw === "motorcycles" || raw === "motorcycle") return "Motorcycles";

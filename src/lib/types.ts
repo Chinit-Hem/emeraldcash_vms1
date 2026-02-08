@@ -1,3 +1,4 @@
+
 export type Role = "Admin" | "Staff";
 
 export type User = {
@@ -114,3 +115,23 @@ export type Vehicle = {
   MarketPriceUpdatedAt?: string | null;
   MarketPriceConfidence?: "High" | "Medium" | "Low" | null;
 };
+
+// VehicleMeta represents the FULL dataset metadata from API
+// This is computed from all records, not just the current page
+export type VehicleMeta = {
+  total?: number;           // Total count of ALL vehicles (not max ID)
+  countsByCategory?: {
+    Cars?: number;
+    Motorcycles?: number;
+    TukTuks?: number;
+  };
+  avgPrice?: number;        // Average price across ALL vehicles
+  noImageCount?: number;    // Count of vehicles without images
+  countsByCondition?: {
+    New?: number;
+    Used?: number;
+  };
+};
+
+// Helper type for computed filtered metadata (client-side)
+export type FilteredVehicleMeta = VehicleMeta;

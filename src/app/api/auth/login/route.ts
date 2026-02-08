@@ -7,7 +7,6 @@ import type { Role } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
 // ============ Rate Limiting ============
-// Simple in-memory rate limiter (use Redis in production)
 interface RateLimitEntry {
   count: number;
   firstAttempt: number;
@@ -29,7 +28,6 @@ function isRateLimited(key: string): { limited: boolean; remaining?: number; res
     return { limited: false, remaining: MAX_ATTEMPTS };
   }
 
-  // Check if we're in the lockout window
   if (now - entry.firstAttempt < LOCKOUT_WINDOW_MS) {
     if (entry.count >= MAX_ATTEMPTS) {
       const remaining = Math.ceil((LOCKOUT_WINDOW_MS - (now - entry.firstAttempt)) / 1000);
@@ -38,7 +36,6 @@ function isRateLimited(key: string): { limited: boolean; remaining?: number; res
     return { limited: false, remaining: MAX_ATTEMPTS - entry.count };
   }
 
-  // Window expired, reset
   loginAttempts.delete(key);
   return { limited: false, remaining: MAX_ATTEMPTS };
 }
@@ -58,18 +55,16 @@ function recordSuccessfulAttempt(key: string): void {
   loginAttempts.delete(key);
 }
 
-// ============ Credentials from Environment ============
+// ============ Credentials ============
 interface UserConfig {
   passwordHash: string;
   role: Role;
 }
 
 function getUserConfig(username: string): UserConfig | null {
-  // Normalize username to lowercase for consistent lookup
   const normalizedUsername = username.toLowerCase();
 
-  // Environment-based user configuration
-  // Format: ADMIN_USERNAME, ADMIN_PASSWORD_HASH (bcrypt), STAFF_USERNAME, STAFF_PASSWORD_HASH
+  // Check environment variables first
   const envUsername = process.env[`${normalizedUsername.toUpperCase()}_USERNAME`];
   const envPasswordHash = process.env[`${normalizedUsername.toUpperCase()}_PASSWORD_HASH`];
 
@@ -80,7 +75,7 @@ function getUserConfig(username: string): UserConfig | null {
     };
   }
 
-  // Fallback to hardcoded demo users (WEAK - for development only)
+  // Fallback demo users
   const DEMO_USERS: Record<string, { passwordHash: string; role: Role }> = {
     admin: {
       passwordHash: "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy", // password: 1234
@@ -106,25 +101,16 @@ function validatePasswordStrength(password: string): { valid: boolean; message?:
   if (password.length < 4) {
     return { valid: false, message: "Password must be at least 4 characters" };
   }
-
-  // Check for common weak passwords (but allow 1234 for demo users)
-  const weakPasswords = ["123456", "password", "admin", "demo", "test"];
-  if (weakPasswords.includes(password.toLowerCase()) && password.length < 6) {
-    return { valid: false, message: "Password is too common" };
-  }
-
   return { valid: true };
 }
 
 // ============ BCrypt Comparison ============
 async function comparePassword(password: string, hash: string): Promise<boolean> {
-  // Try to use bcrypt for secure password comparison
   try {
     const bcrypt = await import("bcryptjs");
     return bcrypt.compare(password, hash);
   } catch {
-    // Fallback to simple comparison (WEAK - only for demo passwords)
-    // This matches the hardcoded demo password hash for "1234"
+    // Fallback for demo
     return password === "1234" && hash === "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy";
   }
 }
@@ -136,6 +122,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const username = typeof body?.username === "string" ? body.username.trim() : "";
   const password = typeof body?.password === "string" ? body.password : "";
+
+  console.log(`[LOGIN_API] Attempt for user: ${username}`);
 
   if (!username || !password) {
     return NextResponse.json(
@@ -158,7 +146,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Validate password strength first (before checking user existence)
   const passwordValidation = validatePasswordStrength(password);
   if (!passwordValidation.valid) {
     recordFailedAttempt(rateLimitKey);
@@ -194,32 +181,54 @@ export async function POST(req: NextRequest) {
 
   try {
     sessionCookie = createSessionCookie(user, userAgent, ip);
+    console.log(`[LOGIN_API] Session created for ${username}`);
   } catch (err) {
-    console.warn("Failed to create session:", err);
+    console.error("[LOGIN_API] Failed to create session:", err);
     return NextResponse.json(
       { ok: false, error: "Failed to create session" },
       { status: 500 }
     );
   }
 
-  const isHttps =
-    req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
+  // Detect if we're on HTTPS (production) or HTTP (local development)
+  const protocol = req.headers.get("x-forwarded-proto") || "http";
+  const isHttps = protocol === "https";
+  
+  // Get host for domain setting (important for mobile browsers)
+  const host = req.headers.get("host") || "";
+  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
 
-  // Debug logging for mobile troubleshooting
-  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-  if (isMobile) {
-    console.log(`[LOGIN] Mobile login detected: ${userAgent.substring(0, 50)}...`);
-    console.log(`[LOGIN] Setting cookie - secure: ${isHttps}, sameSite: lax`);
-  }
-
-  const res = NextResponse.json({ ok: true, user });
-  res.cookies.set("session", sessionCookie, {
+  const res = NextResponse.json({ 
+    ok: true, 
+    user,
+    message: "Login successful"
+  });
+  
+  // Cookie options optimized for mobile Safari/Chrome and local development
+  // IMPORTANT: Do NOT set domain - let browser use default (current domain)
+  // Setting domain incorrectly can cause cookies to not be sent to API routes
+  // For localhost development: secure must be false (HTTP), sameSite must be "lax"
+  const cookieOptions = {
     httpOnly: true,
-    sameSite: "lax", // Changed from "strict" for mobile compatibility
-    secure: true, // Always secure for Vercel (HTTPS)
+    sameSite: "lax" as const, // "lax" works better for mobile than "strict"
+    secure: isHttps && !isLocalhost, // false for HTTP localhost, true for HTTPS production
     path: "/",
     maxAge: 60 * 60 * 8, // 8 hours
+  };
+
+  res.cookies.set("session", sessionCookie, cookieOptions);
+
+  console.log(`[LOGIN_API] Cookie set for ${username}`);
+  console.log(`[LOGIN_API] Cookie options:`, {
+    httpOnly: cookieOptions.httpOnly,
+    sameSite: cookieOptions.sameSite,
+    secure: cookieOptions.secure,
+    path: cookieOptions.path,
+    maxAge: cookieOptions.maxAge,
+    // Don't log the actual cookie value for security
+    valueLength: sessionCookie.length,
   });
+  console.log(`[LOGIN_API] Host: ${host}, Protocol: ${protocol}, isHttps: ${isHttps}, isLocalhost: ${isLocalhost}`);
 
   return res;
 }

@@ -11,6 +11,7 @@ export function tokenizeQuery(query: string) {
 export function vehicleSearchText(vehicle: Vehicle) {
   return [
     vehicle.VehicleId,
+    vehicle.Image,
     vehicle.Category,
     vehicle.Brand,
     vehicle.Model,

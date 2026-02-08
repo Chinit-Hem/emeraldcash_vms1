@@ -25,11 +25,29 @@ function requireSession(req: NextRequest) {
   const ip = getClientIp(req.headers);
   const userAgent = getClientUserAgent(req.headers);
   const sessionCookie = req.cookies.get("session")?.value;
-  if (!sessionCookie) return null;
+  
+  console.log(`[VEHICLE_API] requireSession called`);
+  console.log(`[VEHICLE_API] Cookie exists: ${!!sessionCookie}`);
+  
+  if (!sessionCookie) {
+    console.log(`[VEHICLE_API] No session cookie found`);
+    return null;
+  }
 
   const session = getSessionFromRequest(userAgent, ip, sessionCookie);
-  if (!session || !validateSession(session)) return null;
+  
+  if (!session) {
+    console.log(`[VEHICLE_API] Session cookie exists but failed to parse`);
+    return null;
+  }
+  
+  if (!validateSession(session)) {
+    const age = Date.now() - session.ts;
+    console.log(`[VEHICLE_API] Session expired or invalid. Age: ${age}ms`);
+    return null;
+  }
 
+  console.log(`[VEHICLE_API] Session valid for user: ${session.username}`);
   return session;
 }
 
@@ -524,4 +542,3 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
-

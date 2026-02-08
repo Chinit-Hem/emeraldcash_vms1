@@ -10,25 +10,25 @@
 - Fixed pathname reference error
 
 ### 2. ✅ Fixed src/lib/auth.ts
+- **CRITICAL FIX**: Simplified session fingerprint to `ec-vms|v1` to prevent session invalidation on mobile
+- Removed device-specific fingerprinting that caused "No session cookie" errors
 - Added role-based permission system
 - Added `hasPermission()`, `canDelete()`, `canModify()`, `isAdmin()`, `requireAdmin()` helpers
-- Mobile fingerprint handling already existed and is stable
 
 ### 3. ✅ Fixed src/app/api/auth/login/route.ts
 - **CRITICAL FIX**: Changed `sameSite: "strict"` to `sameSite: "lax"` for mobile browser compatibility
-- Changed `secure: isHttps` to `secure: true` (always secure for Vercel)
+- Changed to dynamic `secure` based on `x-forwarded-proto` header (HTTPS vs HTTP)
 - Added mobile debug logging
 
 ### 4. ✅ Fixed src/app/login/page.tsx
-- **CRITICAL FIX**: Removed `router.refresh()` that was causing race conditions
-- Changed `router.push()` to `router.replace()` to avoid history stack issues
-- Added 150ms delay to ensure cookie is set before navigation
+- **CRITICAL FIX**: Added retry logic (3 attempts) for session verification after login
+- Changed from `router.push()` to `window.location.href` for full page reload
+- Increased delay to 800ms between retries to ensure cookie propagation
 - Added mobile debug logging
 
 ### 5. ✅ Fixed src/app/components/AppShell.tsx
 - **CRITICAL FIX**: Added `hasRedirected` ref to prevent multiple redirects
 - Added retry logic (3 retries with 500ms delay) for auth check failures
-- Added `credentials: "same-origin"` to fetch requests
 - Changed `router.push()` to `router.replace()` for redirects
 - Added mobile debug logging
 
@@ -53,10 +53,11 @@
 
 ## Root Causes Fixed
 
-1. **Cookie SameSite Issue**: `sameSite: "strict"` was causing cookies to not be sent on mobile redirects
-2. **Double Navigation**: `router.refresh()` after `router.push()` caused race conditions
-3. **Redirect Loops**: No protection against multiple redirects in AppShell
-4. **No Retry Logic**: Network failures on mobile caused immediate redirects to login
+1. **Session Fingerprint Mismatch**: Device-specific fingerprints caused sessions to be rejected when user agent changed
+2. **Cookie SameSite Issue**: `sameSite: "strict"` was causing cookies to not be sent on mobile redirects
+3. **Race Condition**: Cookie not set before navigation caused "No session cookie" errors
+4. **Redirect Loops**: No protection against multiple redirects in AppShell
+5. **No Retry Logic**: Network failures on mobile caused immediate redirects to login
 
 ## Testing Checklist
 
@@ -70,11 +71,9 @@
 ## Debug Logging
 
 All mobile devices will now log to console:
-- `[LOGIN] Mobile login detected...`
-- `[LOGIN_PAGE] Login successful, navigating to dashboard`
-- `[MIDDLEWARE] Mobile request without session: ...`
-- `[APPSHELL] Auth check attempt X, pathname: ...`
-- `[APPSHELL] Auth success for user: ...`
+- `[LOGIN_API] Session created for ${username}`
+- `[LOGIN] Session check attempt X failed: ...`
+- `[APPSHELL] Auth check failed (retries left: X): ...`
 - `[API_ME] Request from mobile: ...`
 - `[API_ME] Session cookie exists: true/false`
 
@@ -84,7 +83,7 @@ All mobile devices will now log to console:
 {
   httpOnly: true,
   sameSite: "lax",        // Changed from "strict"
-  secure: true,           // Always true for Vercel HTTPS
+  secure: isHttps,        // Dynamic based on protocol
   path: "/",
   maxAge: 60 * 60 * 8,    // 8 hours
 }

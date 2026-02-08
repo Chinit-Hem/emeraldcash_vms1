@@ -9,173 +9,158 @@ import Sidebar from "@/app/components/Sidebar";
 import MobileBottomNav from "@/app/components/MobileBottomNav";
 import { AuthUserProvider } from "@/app/components/AuthContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/app/components/authCache";
-import ThemeToggle from "@/app/components/ThemeToggle";
 
 type AppShellProps = {
   children: ReactNode;
 };
 
-// Maximum retries for auth check
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 500;
-
 export default function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(() => getCachedUser());
-  const [loading, setLoading] = useState(() => !getCachedUser());
+  
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasChecked = useRef(false);
   const hasRedirected = useRef(false);
-  const retryCount = useRef(0);
 
   useEffect(() => {
-    let alive = true;
+    // Prevent double-check on React StrictMode
+    if (hasChecked.current) return;
+    hasChecked.current = true;
+
+    console.log("[APPSHELL] Starting auth check...");
 
     async function checkAuth() {
-      try {
-        // Debug logging for mobile
-        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile) {
-          console.log(`[APPSHELL] Auth check attempt ${retryCount.current + 1}, pathname: ${pathname}`);
-        }
+      let retries = 3;
+      
+      while (retries > 0) {
+        try {
+          // Check cached user first for immediate display
+          const cached = getCachedUser();
+          console.log("[APPSHELL] Cached user:", cached ? "found" : "none");
+          
+          if (cached && retries === 3) {
+            console.log("[APPSHELL] Using cached user for immediate display");
+            setUser(cached);
+            setLoading(false);
+          }
 
-        const res = await fetch("/api/auth/me", { 
-          cache: "no-store",
-          credentials: "same-origin",
-        });
-        
-        if (!alive) return;
+          // Verify with server - add timeout to prevent hanging
+          console.log("[APPSHELL] Fetching /api/auth/me...");
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          
+          const res = await fetch("/api/auth/me", { 
+            credentials: "include",
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          
+          console.log("[APPSHELL] Auth response status:", res.status);
+          const data = await res.json();
+          console.log("[APPSHELL] Auth response data:", data);
 
-        if (!res.ok) {
-          // Retry on network errors
-          if (retryCount.current < MAX_RETRIES) {
-            retryCount.current++;
-            if (isMobile) {
-              console.log(`[APPSHELL] Retry ${retryCount.current}/${MAX_RETRIES} after ${RETRY_DELAY_MS}ms`);
+          if (!res.ok || !data?.ok || !data?.user) {
+            console.log("[APPSHELL] Auth failed:", data?.error || "unknown error");
+            clearCachedUser();
+            setLoading(false); // Ensure loading is cleared
+            if (!cached && !hasRedirected.current) {
+              // Only redirect if we don't have cached data
+              hasRedirected.current = true;
+              router.replace("/login");
             }
-            setTimeout(checkAuth, RETRY_DELAY_MS);
+            return;
+          }
+
+          // Update with fresh data
+          console.log("[APPSHELL] Auth successful, user:", data.user.username);
+          setCachedUser(data.user as User);
+          setUser(data.user as User);
+          setLoading(false); // Ensure loading is cleared on success
+          return; // Success, exit retry loop
+        } catch (err) {
+          console.error(`[APPSHELL] Auth check failed (retries left: ${retries - 1}):`, err);
+          retries--;
+          
+          if (retries === 0) {
+            // Don't redirect on error, show error state instead
+            setError("Connection error. Please refresh the page.");
+            setLoading(false);
             return;
           }
           
-          clearCachedUser();
-          if (!hasRedirected.current) {
-            hasRedirected.current = true;
-            router.replace("/login");
-          }
-          return;
+          // Wait before retry
+          await new Promise(r => setTimeout(r, 500));
         }
-
-        const data = await res.json();
-        if (!alive) return;
-
-        if (!data?.ok || !data?.user) {
-          clearCachedUser();
-          if (!hasRedirected.current) {
-            hasRedirected.current = true;
-            router.replace("/login");
-          }
-          return;
-        }
-
-        // Success - reset retry count
-        retryCount.current = 0;
-        if (isMobile) {
-          console.log(`[APPSHELL] Auth success for user: ${data.user.username}`);
-        }
-
-        setCachedUser(data.user as User);
-        setUser(data.user as User);
-      } catch (err) {
-        if (!alive) return;
-        
-        // Retry on errors
-        if (retryCount.current < MAX_RETRIES) {
-          retryCount.current++;
-          if (isMobile) {
-            console.log(`[APPSHELL] Retry ${retryCount.current}/${MAX_RETRIES} after error:`, err);
-          }
-          setTimeout(checkAuth, RETRY_DELAY_MS);
-          return;
-        }
-
-        setError("Failed to authenticate. Please try again.");
-        clearCachedUser();
-        if (!hasRedirected.current) {
-          hasRedirected.current = true;
-          router.replace("/login");
-        }
-      } finally {
-        if (alive) setLoading(false);
       }
     }
 
-    checkAuth();
-    return () => {
-      alive = false;
-    };
-  }, [router, pathname]);
+    // Add overall timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.error("[APPSHELL] Auth check timed out after 15 seconds");
+        setError("Connection timeout. Please check your network and refresh.");
+        setLoading(false);
+      }
+    }, 15000);
 
+    checkAuth().finally(() => {
+      clearTimeout(timeoutId);
+    });
+  }, [router, loading]);
+
+  // Close sidebar when pathname changes (using layout effect to avoid setState in render warning)
   useEffect(() => {
-    setIsSidebarOpen(false);
+    // Use requestAnimationFrame to defer state update to next frame
+    const rafId = requestAnimationFrame(() => {
+      setIsSidebarOpen(false);
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [pathname]);
 
-  // Error boundary fallback
-  if (error && !loading) {
-    return (
-      <div className="min-h-screen-safe flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-        <div className="w-full max-w-md">
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-black/5 dark:ring-white/10 p-8 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-8 w-8 text-red-600"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            </div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              Connection Error
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold rounded-xl shadow-lg transition-all active:scale-[0.98] touch-target"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen-safe flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
         <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-emerald-200 dark:border-emerald-800" />
-            <div className="absolute inset-0 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin" />
-          </div>
-          <p className="text-gray-600 dark:text-gray-400 font-medium">Loading...</p>
+          <div className="w-12 h-12 mx-auto mb-4 rounded-full border-4 border-emerald-200 dark:border-emerald-800 border-t-emerald-600 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) return null;
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+        <div className="w-full max-w-md p-8 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Connection Error</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold rounded-xl"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated
+  if (!user) {
+    return null;
+  }
 
   return (
-    <div className="flex min-h-screen-safe bg-transparent print:bg-white pb-safe lg:pb-0">
+    <div className="flex min-h-screen bg-transparent pb-safe lg:pb-0">
       <AuthUserProvider user={user}>
         {/* Desktop sidebar */}
         <div className="hidden lg:block">
@@ -184,80 +169,73 @@ export default function AppShell({ children }: AppShellProps) {
           </Suspense>
         </div>
 
-        {/* Mobile drawer */}
-        {isSidebarOpen ? (
-          <div className="fixed inset-0 z-50 lg:hidden print:hidden">
+        {/* Mobile drawer - Premium glass slide-over */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 z-50 lg:hidden"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setIsSidebarOpen(false);
+            }}
+          >
             <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              className="absolute inset-0 ec-sidebar-drawer-backdrop transition-opacity duration-300"
               onClick={() => setIsSidebarOpen(false)}
+              aria-hidden="true"
             />
-            <div className="absolute inset-y-0 left-0 w-72 max-w-[82vw] ec-glassPanel shadow-xl">
+            <div 
+              className="absolute inset-y-0 left-0 w-[280px] max-w-[85vw] h-full overflow-hidden shadow-2xl animate-in slide-in-from-left duration-300"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Navigation menu"
+            >
               <Suspense fallback={null}>
                 <Sidebar user={user} onNavigate={() => setIsSidebarOpen(false)} />
               </Suspense>
             </div>
           </div>
-        ) : null}
+        )}
 
         <div className="flex-1 min-w-0 flex flex-col">
-          {/* Mobile top bar */}
-          <header className="lg:hidden sticky top-0 z-40 ec-glassPanel border-b border-black/5 dark:border-white/5 print:hidden">
-            <div className="h-14 px-4 flex items-center justify-between gap-3">
+          {/* Mobile header - Liquid Glass White */}
+          <header className="lg:hidden sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-white/60 dark:border-white/10">
+            <div className="h-14 px-4 flex items-center justify-between">
               <button
-                type="button"
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-target"
-                aria-label="Open menu"
+                className="p-2 rounded-xl hover:bg-emerald-50 dark:hover:bg-white/10 text-slate-600 dark:text-white/80 hover:text-emerald-600 dark:hover:text-white transition-all touch-target active-scale"
+                aria-label="Open navigation menu"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-5 w-5 text-gray-800 dark:text-gray-200"
-                  aria-hidden="true"
-                >
-                  <path d="M4 6h16" />
-                  <path d="M4 12h16" />
-                  <path d="M4 18h16" />
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
 
-              <div className="flex items-center gap-2 min-w-0">
-                <Image
-                  src="/logo.png"
-                  alt="Emerald Cash"
-                  width={28}
-                  height={28}
-                  className="h-7 w-7 object-contain"
-                  priority
-                />
-                <div className="min-w-0">
-                  <div className="text-sm font-extrabold text-gray-900 dark:text-white truncate">
-                    Emerald Cash
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400 truncate">VMS</div>
+              <div className="flex items-center gap-3">
+                <div className="relative w-9 h-9 rounded-lg bg-white flex items-center justify-center overflow-hidden shadow-lg ring-2 ring-emerald-100">
+                  <Image 
+                    src="/logo.png" 
+                    alt="Emerald Cash" 
+                    width={28} 
+                    height={28} 
+                    className="w-7 h-7 object-contain" 
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-800 dark:text-white text-sm leading-tight">Emerald Cash</span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">VMS PRO</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="hidden sm:block text-xs text-gray-600 dark:text-gray-400 truncate max-w-[100px]">
-                  {user.role}: {user.username}
-                </div>
-                <ThemeToggle className="p-2 touch-target" />
-              </div>
+              <div className="w-10" /> {/* Spacer for balance */}
             </div>
           </header>
 
+
           {/* Main content */}
-          <main className="flex-1 overflow-auto print:overflow-visible pb-20 lg:pb-0">
+          <main className="flex-1 overflow-auto pb-20 lg:pb-0">
             {children}
           </main>
 
-          {/* Mobile bottom navigation */}
+          {/* Mobile nav */}
           <MobileBottomNav onSettingsClick={() => setIsSidebarOpen(true)} />
         </div>
       </AuthUserProvider>

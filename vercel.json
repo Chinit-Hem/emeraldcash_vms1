@@ -5,7 +5,7 @@
   "framework": "nextjs",
   "outputDirectory": ".next",
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://script.google.com/macros/s/AKfycbx5SyxFn2NmSeXvh-RAq16upfc4-B0TiGRU7kfldDgXbYQI2WF37ZM-W8RVcVrMFYWcSQ/exec"
+    "NEXT_PUBLIC_API_URL": "https://script.google.com/macros/s/AKfycbwlIp823Km3GEcMhWip_cZSlZ9GRlf1HptIucXdvz2qI14vsn_3Zq_Z27QyblOOLdUuMQ/exec"
   },
   "headers": [
     {
@@ -93,6 +93,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/sync-vehicles",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }
-

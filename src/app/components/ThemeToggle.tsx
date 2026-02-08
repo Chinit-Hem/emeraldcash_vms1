@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "@/app/components/useTheme";
+import { useTheme } from "@/app/components/ThemeProvider";
 
 function IconSun() {
   return (
@@ -54,7 +54,7 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
     <button
       type="button"
       onClick={toggleTheme}
-      className={`ec-glassBtn inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${className}`}
+      className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 border border-white/20 dark:border-white/10 text-gray-900 dark:text-white transition-colors ${className}`}
       aria-label={label}
       title={label}
     >
