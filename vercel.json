@@ -97,7 +97,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-vehicles",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
