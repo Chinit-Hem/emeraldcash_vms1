@@ -1,9 +1,6 @@
 
 import {
-  getClientIp,
-  getClientUserAgent,
-  getSessionFromRequest,
-  validateSession,
+  requireSession,
 } from "@/lib/auth";
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
@@ -21,35 +18,6 @@ import {
   toVehicle
 } from "../_shared";
 
-function requireSession(req: NextRequest) {
-  const ip = getClientIp(req.headers);
-  const userAgent = getClientUserAgent(req.headers);
-  const sessionCookie = req.cookies.get("session")?.value;
-  
-  console.log(`[VEHICLE_API] requireSession called`);
-  console.log(`[VEHICLE_API] Cookie exists: ${!!sessionCookie}`);
-  
-  if (!sessionCookie) {
-    console.log(`[VEHICLE_API] No session cookie found`);
-    return null;
-  }
-
-  const session = getSessionFromRequest(userAgent, ip, sessionCookie);
-  
-  if (!session) {
-    console.log(`[VEHICLE_API] Session cookie exists but failed to parse`);
-    return null;
-  }
-  
-  if (!validateSession(session)) {
-    const age = Date.now() - session.ts;
-    console.log(`[VEHICLE_API] Session expired or invalid. Age: ${age}ms`);
-    return null;
-  }
-
-  console.log(`[VEHICLE_API] Session valid for user: ${session.username}`);
-  return session;
-}
 
 // Input validation helper
 function sanitizeString(value: unknown, maxLength = 1000): string {

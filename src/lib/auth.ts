@@ -17,16 +17,20 @@ let ephemeralSessionSecret: string | null = null;
 
 /**
  * Generate a session fingerprint
- * ULTRA-SIMPLIFIED: Use a stable fingerprint that works across all requests
- * The fingerprint is intentionally simple to avoid session issues on mobile
+ * ULTRA-SIMPLIFIED: Use a completely static fingerprint that works across all devices
+ * The fingerprint is intentionally static to avoid ANY session issues on mobile
+ * Mobile browsers often change user-agent or IP between requests due to:
+ * - Network switching (WiFi to cellular)
+ * - Carrier-grade NAT
+ * - Browser privacy features
  */
 function getRequestFingerprint(
-  userAgent: string,
-  ip: string
+  _userAgent: string,
+  _ip: string
 ): string {
-  // Use a very simple, stable fingerprint that doesn't change between requests
-  // This prevents session invalidation when user agent changes slightly
-  const data = `ec-vms|v${SESSION_VERSION}`;
+  // Use a completely static fingerprint - no userAgent or IP dependency
+  // This ensures sessions work consistently across all devices and networks
+  const data = `ec-vms-static|v${SESSION_VERSION}`;
   return crypto.createHash("sha256").update(data).digest("hex");
 }
 
@@ -161,14 +165,20 @@ export function requireSessionFromRequest(req: {
   const userAgent = getClientUserAgent(req.headers);
   const sessionCookie = req.cookies.get("session")?.value;
 
+  // Detect mobile for enhanced debugging
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  const mobilePrefix = isMobile ? "[MOBILE] " : "";
+
   const debugInfo = {
     ip,
     userAgent: userAgent?.substring(0, 50),
     cookieExists: !!sessionCookie,
     cookieLength: sessionCookie?.length || 0,
+    isMobile,
   };
 
   if (!sessionCookie) {
+    console.log(`[AUTH] ${mobilePrefix}No session cookie found. Debug:`, debugInfo);
     return {
       session: null,
       debug: `No session cookie found. Debug: ${JSON.stringify(debugInfo)}`,
@@ -178,6 +188,7 @@ export function requireSessionFromRequest(req: {
   const session = getSessionFromRequest(userAgent, ip, sessionCookie);
 
   if (!session) {
+    console.log(`[AUTH] ${mobilePrefix}Session cookie exists but failed to parse/validate. Debug:`, debugInfo);
     return {
       session: null,
       debug: `Session cookie exists but failed to parse/validate. Debug: ${JSON.stringify(debugInfo)}`,
@@ -186,16 +197,36 @@ export function requireSessionFromRequest(req: {
 
   if (!validateSession(session)) {
     const age = Date.now() - session.ts;
+    console.log(`[AUTH] ${mobilePrefix}Session expired or invalid. Age: ${age}ms. Debug:`, debugInfo);
     return {
       session: null,
       debug: `Session expired or invalid. Age: ${age}ms, Max: ${8 * 60 * 60 * 1000}ms. Debug: ${JSON.stringify(debugInfo)}`,
     };
   }
 
+  console.log(`[AUTH] ${mobilePrefix}Session valid for user: ${session.username}`);
   return {
     session,
     debug: `Session valid for user: ${session.username}`,
   };
+}
+
+/**
+ * Standardized requireSession helper for API routes
+ * Use this in all API route handlers for consistent session validation
+ * 
+ * Example usage:
+ *   const session = requireSession(req);
+ *   if (!session) {
+ *     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+ *   }
+ */
+export function requireSession(req: {
+  headers: Headers;
+  cookies: { get(name: string): { value?: string } | undefined };
+}): SessionPayload | null {
+  const result = requireSessionFromRequest(req);
+  return result.session;
 }
 
 // ============ Helper Functions ============

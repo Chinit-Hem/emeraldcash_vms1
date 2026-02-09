@@ -1,10 +1,7 @@
 import crypto from "node:crypto";
 
 import {
-  getClientIp,
-  getClientUserAgent,
-  getSessionFromRequest,
-  validateSession,
+  requireSession,
 } from "@/lib/auth";
 import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import type { Vehicle, VehicleMeta } from "@/lib/types";
@@ -53,18 +50,6 @@ export async function OPTIONS(req: NextRequest) {
     status: 204,
     headers: buildCorsHeaders(req),
   });
-}
-
-function requireSession(req: NextRequest) {
-  const ip = getClientIp(req.headers);
-  const userAgent = getClientUserAgent(req.headers);
-  const sessionCookie = req.cookies.get("session")?.value;
-  if (!sessionCookie) return null;
-
-  const session = getSessionFromRequest(userAgent, ip, sessionCookie);
-  if (!session || !validateSession(session)) return null;
-
-  return session;
 }
 
 function cacheHeaders() {

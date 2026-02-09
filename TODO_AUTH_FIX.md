@@ -1,89 +1,71 @@
-# Mobile Login Reload Loop Fix - COMPLETED
+# Mobile Auth/Session Fix - Implementation Tracking
 
-## Summary of Changes
+## Problem Summary
+- Desktop works fine
+- Phone can login but after login it reloads and cannot fetch data
+- API calls return 401 repeatedly: `[VEHICLE_API] Cookie exists: false` → `No session cookie found`
+- `/api/vehicles/:id` fails and UI shows "Failed to fetch vehicle"
 
-### 1. ✅ Fixed middleware.ts
-- Added comprehensive public path exclusions (login, api/auth/*, health, static assets)
-- Added file extension checks for static files
-- Added debug logging for mobile requests without sessions
-- Changed API 401 responses to JSON instead of redirects
-- Fixed pathname reference error
+## Root Causes Identified
+1. Cookie `secure` flag logic may not correctly detect HTTPS on Vercel/mobile
+2. Session fingerprinting may still cause mismatches on mobile browsers
+3. Missing `partitioned` attribute for cross-site cookie compatibility (CHIPS)
+4. Login redirect uses `window.location.href` causing full page reload
+5. Duplicate session validation logic across files
 
-### 2. ✅ Fixed src/lib/auth.ts
-- **CRITICAL FIX**: Simplified session fingerprint to `ec-vms|v1` to prevent session invalidation on mobile
-- Removed device-specific fingerprinting that caused "No session cookie" errors
-- Added role-based permission system
-- Added `hasPermission()`, `canDelete()`, `canModify()`, `isAdmin()`, `requireAdmin()` helpers
+## Implementation Checklist
 
-### 3. ✅ Fixed src/app/api/auth/login/route.ts
-- **CRITICAL FIX**: Changed `sameSite: "strict"` to `sameSite: "lax"` for mobile browser compatibility
-- Changed to dynamic `secure` based on `x-forwarded-proto` header (HTTPS vs HTTP)
-- Added mobile debug logging
+### Phase 1: Fix Login Cookie Options
+- [x] Update `ecvms/src/app/api/auth/login/route.ts`
+  - [x] Improve HTTPS detection for Vercel/mobile
+  - [x] Add `partitioned` attribute for CHIPS support
+  - [x] Ensure `secure: true` in production
+  - [x] Add better mobile debugging
 
-### 4. ✅ Fixed src/app/login/page.tsx
-- **CRITICAL FIX**: Added retry logic (3 attempts) for session verification after login
-- Changed from `router.push()` to `window.location.href` for full page reload
-- Increased delay to 800ms between retries to ensure cookie propagation
-- Added mobile debug logging
+### Phase 2: Fix Session Fingerprinting
+- [x] Update `ecvms/src/lib/auth.ts`
+  - [x] Make fingerprint completely stable (static hash)
+  - [x] Add mobile-specific debug logging
+  - [x] Remove IP dependency from fingerprint
 
-### 5. ✅ Fixed src/app/components/AppShell.tsx
-- **CRITICAL FIX**: Added `hasRedirected` ref to prevent multiple redirects
-- Added retry logic (3 retries with 500ms delay) for auth check failures
-- Changed `router.push()` to `router.replace()` for redirects
-- Added mobile debug logging
+### Phase 3: Standardize requireSession Helper
+- [x] Update `ecvms/src/lib/auth.ts`
+  - [x] Create robust `requireSession` function for API routes
+  - [x] Export for use in all API routes
+  - [x] Add mobile-specific error messages
 
-### 6. ✅ Created /api/health endpoint
-- Created `src/app/api/health/route.ts`
-- Returns health status, timestamp, and version
+### Phase 4: Update API Routes
+- [x] Update `ecvms/src/app/api/vehicles/[id]/route.ts`
+  - [x] Use standardized `requireSession` from auth.ts
+  - [x] Remove duplicated logic
+- [x] Update `ecvms/src/app/api/vehicles/route.ts`
+  - [x] Use standardized `requireSession` from auth.ts
+  - [x] Remove duplicated logic
 
-### 7. ✅ Enhanced /api/me endpoint
-- Added better error handling with specific error messages
-- Added debug headers (`X-Auth-Debug`, `X-User-Role`) for mobile troubleshooting
-- Added mobile debug logging
+### Phase 5: Fix Login Page Redirect
+- [x] Update `ecvms/src/app/login/page.tsx`
+  - [x] Replace `window.location.href` with `router.replace()`
+  - [x] Add navigation guard to prevent loops
+  - [x] Improve session verification timing
 
-### 8. ✅ Added role-based permission helpers
-- Added to `src/lib/auth.ts`:
-  - `Permission` type
-  - `ROLE_PERMISSIONS` constant
-  - `hasPermission(role, permission)` - Check specific permission
-  - `canDelete(role)` - Admin only
-  - `canModify(role)` - Admin or Staff
-  - `isAdmin(role)` - Check if Admin
-  - `requireAdmin(session)` - Require admin role
 
-## Root Causes Fixed
+### Phase 6: Testing & Verification
+- [ ] Test on mobile Chrome
+- [ ] Test on mobile Safari
+- [ ] Verify cookies persist after login
+- [ ] Check that API calls succeed after redirect
 
-1. **Session Fingerprint Mismatch**: Device-specific fingerprints caused sessions to be rejected when user agent changed
-2. **Cookie SameSite Issue**: `sameSite: "strict"` was causing cookies to not be sent on mobile redirects
-3. **Race Condition**: Cookie not set before navigation caused "No session cookie" errors
-4. **Redirect Loops**: No protection against multiple redirects in AppShell
-5. **No Retry Logic**: Network failures on mobile caused immediate redirects to login
+## Files to Modify
+1. `ecvms/src/app/api/auth/login/route.ts`
+2. `ecvms/src/lib/auth.ts`
+3. `ecvms/src/app/api/vehicles/[id]/route.ts`
+4. `ecvms/src/app/api/vehicles/route.ts`
+5. `ecvms/src/app/login/page.tsx`
 
-## Testing Checklist
-
-- [ ] Test login on mobile (iOS Safari)
-- [ ] Test login on mobile (Android Chrome)
-- [ ] Test session persistence after refresh
-- [ ] Test role-based access control (Admin vs Staff)
-- [ ] Verify no reload loops occur
-- [ ] Check browser console for debug logs on mobile
-
-## Debug Logging
-
-All mobile devices will now log to console:
-- `[LOGIN_API] Session created for ${username}`
-- `[LOGIN] Session check attempt X failed: ...`
-- `[APPSHELL] Auth check failed (retries left: X): ...`
-- `[API_ME] Request from mobile: ...`
-- `[API_ME] Session cookie exists: true/false`
-
-## Cookie Settings (Final)
-
-```javascript
-{
-  httpOnly: true,
-  sameSite: "lax",        // Changed from "strict"
-  secure: isHttps,        // Dynamic based on protocol
-  path: "/",
-  maxAge: 60 * 60 * 8,    // 8 hours
-}
+## Testing Steps
+1. Deploy to Vercel
+2. Test login on desktop (should still work)
+3. Test login on mobile Chrome
+4. Test login on mobile Safari
+5. Verify data loads after login
+6. Check browser console for debug logs

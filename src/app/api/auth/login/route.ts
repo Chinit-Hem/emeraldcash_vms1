@@ -191,12 +191,16 @@ export async function POST(req: NextRequest) {
   }
 
   // Detect if we're on HTTPS (production) or HTTP (local development)
+  // Vercel sets x-forwarded-proto, but also check NODE_ENV for production
   const protocol = req.headers.get("x-forwarded-proto") || "http";
-  const isHttps = protocol === "https";
+  const isHttps = protocol === "https" || process.env.NODE_ENV === "production";
   
   // Get host for domain setting (important for mobile browsers)
   const host = req.headers.get("host") || "";
-  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
+  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("::1");
+  
+  // Detect mobile browser for debugging
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
 
   const res = NextResponse.json({ 
     ok: true, 
@@ -208,13 +212,27 @@ export async function POST(req: NextRequest) {
   // IMPORTANT: Do NOT set domain - let browser use default (current domain)
   // Setting domain incorrectly can cause cookies to not be sent to API routes
   // For localhost development: secure must be false (HTTP), sameSite must be "lax"
-  const cookieOptions = {
+  // For production: secure must be true (HTTPS required for cookies to work properly)
+  const cookieOptions: {
+    httpOnly: boolean;
+    sameSite: "lax" | "none" | "strict";
+    secure: boolean;
+    path: string;
+    maxAge: number;
+    partitioned?: boolean;
+  } = {
     httpOnly: true,
     sameSite: "lax" as const, // "lax" works better for mobile than "strict"
-    secure: isHttps && !isLocalhost, // false for HTTP localhost, true for HTTPS production
+    secure: !isLocalhost, // Always secure except for localhost development
     path: "/",
     maxAge: 60 * 60 * 8, // 8 hours
   };
+  
+  // Add partitioned attribute for CHIPS (Cookies Having Independent Partitioned State)
+  // This helps with cross-site cookie compatibility in modern browsers
+  if (!isLocalhost) {
+    cookieOptions.partitioned = true;
+  }
 
   res.cookies.set("session", sessionCookie, cookieOptions);
 
@@ -225,10 +243,11 @@ export async function POST(req: NextRequest) {
     secure: cookieOptions.secure,
     path: cookieOptions.path,
     maxAge: cookieOptions.maxAge,
+    partitioned: cookieOptions.partitioned,
     // Don't log the actual cookie value for security
     valueLength: sessionCookie.length,
   });
-  console.log(`[LOGIN_API] Host: ${host}, Protocol: ${protocol}, isHttps: ${isHttps}, isLocalhost: ${isLocalhost}`);
+  console.log(`[LOGIN_API] Host: ${host}, Protocol: ${protocol}, isHttps: ${isHttps}, isLocalhost: ${isLocalhost}, isMobile: ${isMobile}`);
 
   return res;
 }

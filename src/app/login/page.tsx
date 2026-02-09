@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { GlassButton } from "@/app/components/ui/GlassButton";
@@ -16,6 +16,9 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  
+  // Navigation guard to prevent redirect loops
+  const hasRedirected = useRef(false);
 
   // Load remembered username
   useEffect(() => {
@@ -91,12 +94,19 @@ function LoginForm() {
         localStorage.removeItem("ec_remember_username");
       }
 
-      // Redirect to dashboard with full page reload to ensure session is recognized
+      // Redirect to dashboard using router.replace() for smooth navigation
+      // The session cookie is already set, no need for full page reload
       const redirectTo = searchParams?.get("redirect") || "/vehicles";
       console.log("[LOGIN] Redirecting to:", redirectTo);
       
-      // Use window.location for full page reload to ensure middleware recognizes session
-      window.location.href = redirectTo;
+      // Prevent double navigation
+      if (!hasRedirected.current) {
+        hasRedirected.current = true;
+        // Small delay to ensure cookie is fully processed by browser
+        setTimeout(() => {
+          router.replace(redirectTo);
+        }, 100);
+      }
       
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Login error";
