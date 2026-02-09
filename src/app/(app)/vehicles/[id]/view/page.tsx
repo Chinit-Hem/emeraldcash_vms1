@@ -174,7 +174,7 @@ function ViewVehicleInner() {
   // Loading state
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
         <div className="max-w-6xl mx-auto space-y-6">
           <CardSkeleton className="h-96" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -189,7 +189,7 @@ function ViewVehicleInner() {
   // Error state
   if (error) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
         <div className="max-w-3xl mx-auto">
           <GlassCard variant="elevated" className="p-8 text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
@@ -235,7 +235,7 @@ function ViewVehicleInner() {
   // Not found state
   if (!vehicle) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
         <div className="max-w-3xl mx-auto">
           <GlassCard variant="elevated" className="p-8 text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
@@ -274,7 +274,7 @@ function ViewVehicleInner() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
       <div className="max-w-6xl mx-auto">
         <VehicleDetailsCard
           vehicle={vehicle}
