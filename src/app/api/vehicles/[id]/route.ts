@@ -103,10 +103,26 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Enhanced debugging for mobile
+  const userAgent = req.headers.get("user-agent") || "";
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  const mobilePrefix = isMobile ? "[MOBILE] " : "";
+  
+  // Log all cookies for debugging
+  const allCookies = req.cookies.getAll();
+  console.log(`[VEHICLE_API] ${mobilePrefix}GET request cookies:`, {
+    count: allCookies.length,
+    names: allCookies.map(c => c.name),
+    hasSession: allCookies.some(c => c.name === "session"),
+  });
+  
   const session = requireSession(req);
   if (!session) {
+    console.log(`[VEHICLE_API] ${mobilePrefix}Session check failed - returning 401`);
     return NextResponse.json({ ok: false, error: "Invalid or expired session" }, { status: 401 });
   }
+  
+  console.log(`[VEHICLE_API] ${mobilePrefix}Session valid for user: ${session.username}`);
 
   const { id } = await params;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL;

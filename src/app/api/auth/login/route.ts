@@ -228,12 +228,6 @@ export async function POST(req: NextRequest) {
     maxAge: 60 * 60 * 8, // 8 hours
   };
   
-  // Add partitioned attribute for CHIPS (Cookies Having Independent Partitioned State)
-  // This helps with cross-site cookie compatibility in modern browsers
-  if (!isLocalhost) {
-    cookieOptions.partitioned = true;
-  }
-
   res.cookies.set("session", sessionCookie, cookieOptions);
 
   console.log(`[LOGIN_API] Cookie set for ${username}`);
@@ -243,7 +237,6 @@ export async function POST(req: NextRequest) {
     secure: cookieOptions.secure,
     path: cookieOptions.path,
     maxAge: cookieOptions.maxAge,
-    partitioned: cookieOptions.partitioned,
     // Don't log the actual cookie value for security
     valueLength: sessionCookie.length,
   });
