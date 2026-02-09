@@ -29,10 +29,14 @@ function LoginForm() {
     }
   }, []);
 
+  // Debug info for troubleshooting mobile cookie issues
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setDebugInfo(null);
     setLoading(true);
 
     try {
@@ -55,12 +59,13 @@ function LoginForm() {
         throw new Error(loginData.error || "Login failed");
       }
 
-      setSuccess("Login successful! Loading your data...");
+      setSuccess("Login successful! Verifying session...");
 
       // Step 2: Verify session with retry logic
       let meData = null;
       let meRes = null;
       let retries = 3;
+      let lastError = null;
       
       while (retries > 0) {
         await new Promise(r => setTimeout(r, 800)); // Wait for cookie to be set
@@ -79,41 +84,42 @@ function LoginForm() {
           break; // Success!
         }
         
-        console.log(`[LOGIN] Session check attempt ${4 - retries} failed:`, meData.error);
+        lastError = meData.error || `HTTP ${meRes.status}`;
+        console.log(`[LOGIN] Session check attempt ${4 - retries} failed:`, lastError);
         retries--;
         
         if (retries === 0) {
-          throw new Error(meData.error || "Session verification failed after multiple attempts");
+          // Build debug info for troubleshooting
+          const debug = {
+            userAgent: navigator.userAgent,
+            cookies: document.cookie,
+            loginResponse: loginData,
+            meResponse: meData,
+            lastError,
+            timestamp: new Date().toISOString(),
+          };
+          setDebugInfo(JSON.stringify(debug, null, 2));
+          throw new Error(`Session verification failed: ${lastError}`);
         }
       }
 
-      // Success!
+      // Save username if remember me is checked
       if (rememberMe) {
         localStorage.setItem("ec_remember_username", trimmedUsername);
       } else {
         localStorage.removeItem("ec_remember_username");
       }
 
-      // Redirect to dashboard using router.replace() for smooth navigation
-      // The session cookie is already set, no need for full page reload
-      const redirectTo = searchParams?.get("redirect") || "/vehicles";
-      console.log("[LOGIN] Redirecting to:", redirectTo);
-      
-      // Prevent double navigation
-      if (!hasRedirected.current) {
-        hasRedirected.current = true;
-        // Small delay to ensure cookie is fully processed by browser
-        setTimeout(() => {
-          router.replace(redirectTo);
-        }, 100);
-      }
-      
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Login error";
-      setError(message);
+      // Redirect to dashboard or original destination
+      const redirectTo = searchParams.get("redirect") || "/dashboard";
+      console.log(`[LOGIN] Redirecting to ${redirectTo}`);
+      window.location.href = redirectTo;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
       setLoading(false);
     }
   }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 relative">
@@ -260,6 +266,29 @@ function LoginForm() {
               {error && (
                 <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm text-center">
                   {error}
+                </div>
+              )}
+
+              {/* Debug info for troubleshooting */}
+              {debugInfo && (
+                <div className="mt-4">
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                      Debug Info (tap to expand)
+                    </summary>
+                    <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded overflow-x-auto text-gray-600 dark:text-gray-400">
+                      {debugInfo}
+                    </pre>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(debugInfo);
+                        alert("Debug info copied to clipboard!");
+                      }}
+                      className="mt-2 text-emerald-600 hover:text-emerald-700 text-xs underline"
+                    >
+                      Copy to clipboard
+                    </button>
+                  </details>
                 </div>
               )}
 

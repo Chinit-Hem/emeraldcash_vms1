@@ -51,42 +51,63 @@ function isAuthenticated(request: NextRequest): { authenticated: boolean; reason
   const userAgent = getClientUserAgent(request.headers);
   const sessionCookie = request.cookies.get("session")?.value;
 
-  console.log(`[MIDDLEWARE_AUTH] Checking auth for ${request.nextUrl.pathname}`);
-  console.log(`[MIDDLEWARE_AUTH] IP: ${ip}, UA: ${userAgent?.substring(0, 50)}`);
-  console.log(`[MIDDLEWARE_AUTH] Cookie exists: ${!!sessionCookie}`);
+  // Enhanced mobile detection and logging
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  const mobilePrefix = isMobile ? "[MOBILE] " : "";
+  
+  // Get all cookies for debugging
+  const allCookies = request.cookies.getAll();
+
+  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Checking auth for ${request.nextUrl.pathname}`);
+  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}IP: ${ip}, UA: ${userAgent?.substring(0, 50)}`);
+  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}All cookies count: ${allCookies.length}`);
+  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Cookie names: ${allCookies.map(c => c.name).join(", ")}`);
+  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session cookie exists: ${!!sessionCookie}`);
 
   if (!sessionCookie) {
-    console.log(`[MIDDLEWARE_AUTH] No session cookie found`);
-    return { authenticated: false, reason: "no-cookie", debug: "Session cookie is missing" };
+    console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}No session cookie found`);
+    return { 
+      authenticated: false, 
+      reason: "no-cookie", 
+      debug: `Session cookie is missing. Available cookies: ${allCookies.map(c => c.name).join(", ")}` 
+    };
   }
 
   const session = getSessionFromRequest(userAgent, ip, sessionCookie);
   
   if (!session) {
-    console.log(`[MIDDLEWARE_AUTH] Session cookie exists but failed to parse/validate`);
+    console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session cookie exists but failed to parse/validate`);
     // Try to get more details about why parsing failed
     try {
       const [encodedPayload] = sessionCookie.split(".");
       if (encodedPayload) {
         const decoded = Buffer.from(encodedPayload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
         const payload = JSON.parse(decoded);
-        console.log(`[MIDDLEWARE_AUTH] Session payload version: ${payload.version}, ts: ${payload.ts}`);
-        console.log(`[MIDDLEWARE_AUTH] Session age: ${Date.now() - payload.ts}ms`);
+        console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session payload version: ${payload.version}, ts: ${payload.ts}`);
+        console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session age: ${Date.now() - payload.ts}ms`);
       }
     } catch (e) {
-      console.log(`[MIDDLEWARE_AUTH] Could not decode session for debugging: ${e}`);
+      console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Could not decode session for debugging: ${e}`);
     }
-    return { authenticated: false, reason: "invalid-session", debug: "Session cookie exists but is invalid or fingerprint mismatch" };
+    return { 
+      authenticated: false, 
+      reason: "invalid-session", 
+      debug: "Session cookie exists but is invalid or fingerprint mismatch" 
+    };
   }
 
   if (!validateSession(session)) {
     const age = Date.now() - session.ts;
     const maxAge = 8 * 60 * 60 * 1000; // 8 hours
-    console.log(`[MIDDLEWARE_AUTH] Session validation failed. Age: ${age}ms, Max: ${maxAge}ms`);
-    return { authenticated: false, reason: "expired-session", debug: `Session expired or invalid. Age: ${age}ms` };
+    console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session validation failed. Age: ${age}ms, Max: ${maxAge}ms`);
+    return { 
+      authenticated: false, 
+      reason: "expired-session", 
+      debug: `Session expired or invalid. Age: ${age}ms` 
+    };
   }
 
-  console.log(`[MIDDLEWARE_AUTH] Session valid for user: ${session.username}`);
+  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session valid for user: ${session.username}`);
   return { authenticated: true };
 }
 
