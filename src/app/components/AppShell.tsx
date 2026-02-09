@@ -8,16 +8,18 @@ import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
 import Sidebar from "@/app/components/Sidebar";
 import MobileBottomNav from "@/app/components/MobileBottomNav";
 import { AuthUserProvider } from "@/app/components/AuthContext";
+import { UIProvider, useUI } from "@/app/components/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/app/components/authCache";
 
 type AppShellProps = {
   children: ReactNode;
 };
 
-export default function AppShell({ children }: AppShellProps) {
+function AppShellContent({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
-  
+  const { isModalOpen } = useUI();
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -235,10 +237,20 @@ export default function AppShell({ children }: AppShellProps) {
             {children}
           </main>
 
-          {/* Mobile nav */}
-          <MobileBottomNav onSettingsClick={() => setIsSidebarOpen(true)} />
+          {/* Mobile nav - Hide when modal is open */}
+          {!isModalOpen && (
+            <MobileBottomNav onSettingsClick={() => setIsSidebarOpen(true)} />
+          )}
         </div>
       </AuthUserProvider>
     </div>
+  );
+}
+
+export default function AppShell({ children }: AppShellProps) {
+  return (
+    <UIProvider>
+      <AppShellContent>{children}</AppShellContent>
+    </UIProvider>
   );
 }

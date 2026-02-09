@@ -1,6 +1,8 @@
 "use client";
 
 import { GlassInput } from "@/app/components/ui/GlassInput";
+import { useUI } from "@/app/components/UIContext";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { COLOR_OPTIONS, TAX_TYPE_OPTIONS, type Vehicle } from "@/lib/types";
 import { useEffect, useState, useCallback } from "react";
 
@@ -17,6 +19,7 @@ const CONDITIONS = ["New", "Used"];
 const BODY_TYPES = ["Sedan", "SUV", "Truck", "Van", "Coupe", "Hatchback", "Convertible", "Wagon", "Pickup", "Other"];
 
 export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: VehicleModalProps) {
+  const { setIsModalOpen } = useUI();
   const [formData, setFormData] = useState<Partial<Vehicle>>({});
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -27,8 +30,12 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
   const isEditing = !!vehicle;
 
+  // Lock body scroll when modal is open
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
     if (isOpen) {
+      setIsModalOpen(true);
       if (vehicle) {
         setFormData({ ...vehicle });
         setImagePreview(vehicle.Image || null);
@@ -46,8 +53,10 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
       }
       setImageFile(null);
       setErrors({});
+    } else {
+      setIsModalOpen(false);
     }
-  }, [isOpen, vehicle]);
+  }, [isOpen, vehicle, setIsModalOpen]);
 
   const handleChange = (field: keyof Vehicle, value: string | number | null) => {
     setFormData((prev) => {
@@ -621,20 +630,20 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
             </div>
           </div>
 
-          {/* Actions - Liquid Glass Footer */}
-          <div className="flex justify-end gap-3 px-6 py-5 border-t border-white/20 bg-gradient-to-r from-gray-50/80 to-gray-100/50 dark:from-gray-800/80 dark:to-gray-900/50 backdrop-blur-xl">
+          {/* Actions - Sticky Footer */}
+          <div className="sticky bottom-0 flex flex-col sm:flex-row justify-end gap-3 px-6 py-5 border-t border-white/20 bg-gradient-to-r from-gray-50/80 to-gray-100/50 dark:from-gray-800/80 dark:to-gray-900/50 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white/70 dark:bg-gray-700/70 hover:bg-white dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 backdrop-blur-sm"
+              className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white/70 dark:bg-gray-700/70 hover:bg-white dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 backdrop-blur-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="ec-glassBtnPrimary relative px-6 py-2.5 text-sm font-medium rounded-xl overflow-hidden active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="w-full sm:w-auto ec-glassBtnPrimary relative px-6 py-2.5 text-sm font-medium rounded-xl overflow-hidden active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>

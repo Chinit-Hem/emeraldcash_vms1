@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthUser } from "@/app/components/AuthContext";
+import { useUI } from "@/app/components/UIContext";
 import ChartCard from "@/app/components/dashboard/ChartCard";
 import KpiCard from "@/app/components/dashboard/KpiCard";
 import SkeletonDashboard from "@/app/components/dashboard/SkeletonDashboard";
@@ -93,6 +94,7 @@ function IconAlert({ className = "h-5 w-5" }: { className?: string }) {
 
 export default function Dashboard() {
   const user = useAuthUser();
+  const { isModalOpen, setIsModalOpen } = useUI();
   const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -102,8 +104,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const fetchAbortRef = useRef<AbortController | null>(null);
 
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Modal state - now using global UI state
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
   useEffect(() => {
@@ -245,6 +246,11 @@ export default function Dashboard() {
   const handleOpenAddModal = () => {
     setSelectedVehicle(null);
     setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedVehicle(null);
   };
 
   const kpis = useMemo(() => {
@@ -470,7 +476,7 @@ export default function Dashboard() {
       <VehicleModal
         isOpen={isModalOpen}
         vehicle={selectedVehicle}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         onSave={handleSaveVehicle}
       />
     </div>
