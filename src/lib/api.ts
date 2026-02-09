@@ -11,6 +11,11 @@ const FETCH_TIMEOUT_MS = 15000; // 15 seconds for fetchJSON
 // Auth configuration - support both Bearer header and query token
 const USE_QUERY_TOKEN = process.env.NEXT_PUBLIC_USE_QUERY_TOKEN === "true";
 
+// Global flag to prevent multiple simultaneous redirects
+let isRedirecting = false;
+let redirectTimeout: NodeJS.Timeout | null = null;
+
+
 // Error types
 export class ApiError extends Error {
   constructor(
@@ -77,6 +82,33 @@ export function validateApiUrl(url: string): { valid: boolean; error?: string } 
   }
 }
 
+function resolveRequestUrl(endpoint: string): string {
+  if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
+    return endpoint;
+  }
+
+  if (endpoint.startsWith("/api/")) {
+    return endpoint;
+  }
+
+  // Direct Apps Script calls still require NEXT_PUBLIC_API_URL.
+  if (!API_BASE_URL) {
+    throw new ConfigError(
+      "API URL not configured. Please set NEXT_PUBLIC_API_URL environment variable.\n\n" +
+      "For local development: Add to .env.local\n" +
+      "For Vercel: Add to Project Settings > Environment Variables"
+    );
+  }
+
+  const urlValidation = validateApiUrl(API_BASE_URL);
+  if (!urlValidation.valid) {
+    throw new ConfigError(urlValidation.error || "Invalid API URL configuration");
+  }
+
+  const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  return `${API_BASE_URL}${normalizedEndpoint}`;
+}
+
 
 // Robust fetch wrapper with timeout and error handling
 export async function fetchJSON<T = unknown>(
@@ -84,52 +116,23 @@ export async function fetchJSON<T = unknown>(
   url: string,
   options: RequestInit = {}
 ): Promise<T> {
-  // Determine if this is a Next.js API route or external API call
-  const isNextJsApiRoute = url.startsWith('/api/');
-  const isExternalUrl = url.startsWith('http');
-  
-  // Build full URL
-  let fullUrl: string;
-  
-  if (isExternalUrl) {
-    // External URL - use as-is
-    fullUrl = url;
-  } else if (isNextJsApiRoute) {
-    // Next.js API route - use relative URL (browser will resolve against current origin)
-    fullUrl = url;
-  } else {
-    // Apps Script direct call - need API_BASE_URL
-    if (!API_BASE_URL) {
-      throw new ConfigError(
-        "API URL not configured. Please set NEXT_PUBLIC_API_URL environment variable.\n\n" +
-        "For local development: Add to .env.local\n" +
-        "For Vercel: Add to Project Settings > Environment Variables"
-      );
-    }
-    
-    // Validate API URL for Apps Script calls
-    const urlValidation = validateApiUrl(API_BASE_URL);
-    if (!urlValidation.valid) {
-      throw new ConfigError(urlValidation.error || "Invalid API URL configuration");
-    }
-    
-    fullUrl = `${API_BASE_URL}${url}`;
-  }
+  const fullUrl = resolveRequestUrl(url);
+  let requestUrl = fullUrl;
 
 
   // Get auth token
   const token = getAuthToken();
 
   // Add token to query param if configured (for Apps Script compatibility)
-  if (USE_QUERY_TOKEN && token) {
-    const urlObj = new URL(fullUrl);
+  if (USE_QUERY_TOKEN && token && !requestUrl.startsWith("/")) {
+    const urlObj = new URL(requestUrl);
     urlObj.searchParams.set("token", token);
-    fullUrl = urlObj.toString();
+    requestUrl = urlObj.toString();
   }
 
   // Log request in development
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[API] ${options.method || 'GET'} ${fullUrl}`);
+    console.log(`[API] ${options.method || 'GET'} ${requestUrl}`);
     if (token && !USE_QUERY_TOKEN) {
       console.log(`[API] Auth: Bearer token present`);
     }
@@ -150,7 +153,7 @@ export async function fetchJSON<T = unknown>(
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(fullUrl, {
+    const response = await fetch(requestUrl, {
       ...options,
       signal: controller.signal,
       credentials: "include", // CRITICAL: Required for cookies to be sent
@@ -182,12 +185,33 @@ export async function fetchJSON<T = unknown>(
           );
         }
         
+        // Prevent multiple simultaneous redirects
+        if (isRedirecting) {
+          throw new ApiError(
+            "Authentication required. Redirecting to login...", 
+            401, 
+            "AUTH_REQUIRED"
+          );
+        }
+        
+        isRedirecting = true;
+        
         // Clear any stored auth state and redirect to login (once)
         import('./auth').then(({ clearAuthToken }) => {
           clearAuthToken();
           // Use replace to prevent back button from returning to 401 page
-          window.location.replace('/login?redirect=' + encodeURIComponent(currentPath));
+          const redirectUrl = '/login?redirect=' + encodeURIComponent(currentPath);
+          window.location.replace(redirectUrl);
+        }).catch(() => {
+          // Fallback if dynamic import fails
+          window.location.href = '/login';
         });
+        
+        // Reset flag after delay (in case redirect fails)
+        if (redirectTimeout) clearTimeout(redirectTimeout);
+        redirectTimeout = setTimeout(() => {
+          isRedirecting = false;
+        }, 5000);
       }
 
       throw new ApiError(
@@ -196,6 +220,7 @@ export async function fetchJSON<T = unknown>(
         "AUTH_REQUIRED"
       );
     }
+
 
 
     // Handle other HTTP errors with user-friendly messages
@@ -256,7 +281,7 @@ export async function fetchJSON<T = unknown>(
     if (error.name === 'AbortError') {
       throw new NetworkError(
         `Request timed out after ${FETCH_TIMEOUT_MS/1000} seconds.\n\n` +
-        `URL: ${fullUrl}\n` +
+        `URL: ${requestUrl}\n` +
         `The server may be slow or unreachable.`
       );
     }
@@ -284,7 +309,7 @@ export async function fetchJSON<T = unknown>(
       
       throw new NetworkError(
         `Network connection failed.\n\n` +
-        `URL: ${fullUrl}\n` +
+        `URL: ${requestUrl}\n` +
         `Error: ${error.message}\n\n` +
         troubleshooting + `\n\n` +
         `Troubleshooting steps:\n` +
@@ -298,7 +323,7 @@ export async function fetchJSON<T = unknown>(
 
     throw new NetworkError(
       `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
-      `URL: ${fullUrl}\n\n` +
+      `URL: ${requestUrl}\n\n` +
       `This may indicate:\n` +
       `• The server returned an unexpected response\n` +
       `• There's a network connectivity issue\n` +
@@ -316,7 +341,7 @@ async function apiRequest<T>(
   options: RequestInit = {},
   retries = MAX_RETRIES
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = resolveRequestUrl(endpoint);
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -411,27 +436,6 @@ async function apiRequest<T>(
 export const vehicleApi = {
   // Get all vehicles with robust error handling
   async getVehicles(noCache = false): Promise<{ data: Vehicle[]; meta?: VehicleMeta }> {
-
-    // Check API URL before making request
-    if (!API_BASE_URL) {
-      throw new ConfigError(
-        "Cannot fetch vehicles: API URL is not configured.\n\n" +
-        "Please set NEXT_PUBLIC_API_URL in your environment variables.\n" +
-        "This should point to your Google Apps Script HTTPS endpoint.\n\n" +
-        "Current value: " + (process.env.NEXT_PUBLIC_API_URL || "undefined")
-      );
-    }
-
-    // Validate the API URL format
-    const urlValidation = validateApiUrl(API_BASE_URL);
-    if (!urlValidation.valid) {
-      throw new ConfigError(
-        `Invalid API URL: ${urlValidation.error}\n\n` +
-        `Current value: ${API_BASE_URL}\n\n` +
-        `Please check your NEXT_PUBLIC_API_URL configuration.`
-      );
-    }
-
     const params = new URLSearchParams();
     if (noCache) params.set("noCache", "1");
 
@@ -439,7 +443,6 @@ export const vehicleApi = {
     
     if (process.env.NODE_ENV === 'development') {
       console.log('[vehicleApi] Fetching from endpoint:', endpoint);
-      console.log('[vehicleApi] API_BASE_URL:', API_BASE_URL);
     }
     
     try {
@@ -501,10 +504,6 @@ export const vehicleApi = {
 
   // Get single vehicle by ID
   async getVehicle(id: string): Promise<Vehicle> {
-    if (!API_BASE_URL) {
-      throw new ApiError("API URL not configured", 500, "CONFIG_ERROR");
-    }
-
     // Use fetchJSON for proper credential handling
     const response = await fetchJSON<{ ok: boolean; data: Vehicle; error?: string }>(
       `/api/vehicles/${encodeURIComponent(id)}`
@@ -520,10 +519,6 @@ export const vehicleApi = {
 
   // Add new vehicle
   async addVehicle(vehicleData: Partial<Vehicle>): Promise<Vehicle> {
-    if (!API_BASE_URL) {
-      throw new ApiError("API URL not configured", 500, "CONFIG_ERROR");
-    }
-
     return apiRequest<Vehicle>("/api/vehicles", {
       method: "POST",
       body: JSON.stringify(vehicleData),
@@ -532,10 +527,6 @@ export const vehicleApi = {
 
   // Update vehicle
   async updateVehicle(id: string, vehicleData: Partial<Vehicle>): Promise<Vehicle> {
-    if (!API_BASE_URL) {
-      throw new ApiError("API URL not configured", 500, "CONFIG_ERROR");
-    }
-
     return apiRequest<Vehicle>(`/api/vehicles/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: JSON.stringify(vehicleData),
@@ -544,10 +535,6 @@ export const vehicleApi = {
 
   // Delete vehicle
   async deleteVehicle(id: string): Promise<void> {
-    if (!API_BASE_URL) {
-      throw new ApiError("API URL not configured", 500, "CONFIG_ERROR");
-    }
-
     return apiRequest<void>(`/api/vehicles/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
@@ -555,10 +542,6 @@ export const vehicleApi = {
 
   // Clear cache
   async clearCache(): Promise<void> {
-    if (!API_BASE_URL) {
-      throw new ApiError("API URL not configured", 500, "CONFIG_ERROR");
-    }
-
     return apiRequest<void>("/api/vehicles/clear-cache", {
       method: "POST",
     });
@@ -568,22 +551,12 @@ export const vehicleApi = {
 // Market price API
 export const marketPriceApi = {
   async fetchPrices(): Promise<unknown> {
-
-    if (!API_BASE_URL) {
-      throw new ApiError("API URL not configured", 500, "CONFIG_ERROR");
-    }
-
     return apiRequest("/api/market-price/fetch", {
       method: "POST",
     });
   },
 
   async updatePrices(data: unknown): Promise<unknown> {
-
-    if (!API_BASE_URL) {
-      throw new ApiError("API URL not configured", 500, "CONFIG_ERROR");
-    }
-
     return apiRequest("/api/market-price/update", {
       method: "POST",
       body: JSON.stringify(data),
@@ -594,10 +567,6 @@ export const marketPriceApi = {
 // Health check
 export const healthApi = {
   async check(): Promise<{ status: string; timestamp: string }> {
-    if (!API_BASE_URL) {
-      throw new ApiError("API URL not configured", 500, "CONFIG_ERROR");
-    }
-
     return apiRequest("/api/health");
   },
 };

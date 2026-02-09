@@ -22,10 +22,14 @@ function LoginForm() {
 
   // Load remembered username
   useEffect(() => {
-    const remembered = localStorage.getItem("ec_remember_username");
-    if (remembered) {
-      setUsername(remembered);
-      setRememberMe(true);
+    try {
+      const remembered = localStorage.getItem("ec_remember_username");
+      if (remembered) {
+        setUsername(remembered);
+        setRememberMe(true);
+      }
+    } catch {
+      // Ignore storage access errors in restricted browser modes.
     }
   }, []);
 
@@ -67,10 +71,12 @@ function LoginForm() {
       let retries = 3;
       let lastError = null;
       
+      // Wait longer for cookie to be properly set (especially on mobile)
+      await new Promise(r => setTimeout(r, 500));
+      
       while (retries > 0) {
-        await new Promise(r => setTimeout(r, 800)); // Wait for cookie to be set
-        
         meRes = await fetch("/api/auth/me", {
+          method: "GET",
           credentials: "include",
           cache: "no-store",
           headers: {
@@ -86,32 +92,47 @@ function LoginForm() {
         
         lastError = meData.error || `HTTP ${meRes.status}`;
         console.log(`[LOGIN] Session check attempt ${4 - retries} failed:`, lastError);
+        console.log(`[LOGIN] Current cookies:`, document.cookie);
         retries--;
         
-        if (retries === 0) {
-          // Build debug info for troubleshooting
-          const debug = {
-            userAgent: navigator.userAgent,
-            cookies: document.cookie,
-            loginResponse: loginData,
-            meResponse: meData,
-            lastError,
-            timestamp: new Date().toISOString(),
-          };
-          setDebugInfo(JSON.stringify(debug, null, 2));
-          throw new Error(`Session verification failed: ${lastError}`);
+        if (retries > 0) {
+          // Wait before retry
+          await new Promise(r => setTimeout(r, 1000));
         }
+      }
+      
+      if (retries === 0 && (!meRes?.ok || !meData?.ok)) {
+        // Build debug info for troubleshooting
+        const debug = {
+          userAgent: navigator.userAgent,
+          cookies: document.cookie,
+          loginResponse: loginData,
+          meResponse: meData,
+          lastError,
+          timestamp: new Date().toISOString(),
+        };
+        setDebugInfo(JSON.stringify(debug, null, 2));
+        throw new Error(`Session verification failed: ${lastError}`);
       }
 
       // Save username if remember me is checked
-      if (rememberMe) {
-        localStorage.setItem("ec_remember_username", trimmedUsername);
-      } else {
-        localStorage.removeItem("ec_remember_username");
+      try {
+        if (rememberMe) {
+          localStorage.setItem("ec_remember_username", trimmedUsername);
+        } else {
+          localStorage.removeItem("ec_remember_username");
+        }
+      } catch {
+        // Ignore storage errors; login can continue without remember-me persistence.
       }
 
-      // Redirect to dashboard or original destination
-      const redirectTo = searchParams.get("redirect") || "/dashboard";
+      // Redirect to original destination when safe, otherwise app home.
+      // Keep legacy /dashboard links working by mapping them to root.
+      const requestedRedirect = searchParams.get("redirect");
+      const safeRedirect = requestedRedirect && requestedRedirect.startsWith("/") && !requestedRedirect.startsWith("//")
+        ? requestedRedirect
+        : "/";
+      const redirectTo = safeRedirect === "/dashboard" ? "/" : safeRedirect;
       console.log(`[LOGIN] Redirecting to ${redirectTo}`);
       router.replace(redirectTo);
     } catch (err) {
@@ -281,8 +302,12 @@ function LoginForm() {
                     </pre>
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(debugInfo);
-                        alert("Debug info copied to clipboard!");
+                        if (navigator.clipboard?.writeText) {
+                          navigator.clipboard.writeText(debugInfo);
+                          alert("Debug info copied to clipboard!");
+                        } else {
+                          alert("Clipboard API is not available in this browser.");
+                        }
                       }}
                       className="mt-2 text-emerald-600 hover:text-emerald-700 text-xs underline"
                     >
