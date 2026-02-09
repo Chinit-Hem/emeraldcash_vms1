@@ -293,7 +293,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 min-h-screen">
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen pb-20 lg:pb-8">
       {/* Glass Hero Header */}
       <div className="ec-dashboard-hero rounded-2xl p-5 sm:p-6 mb-6">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
