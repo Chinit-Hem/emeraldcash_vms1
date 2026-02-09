@@ -113,7 +113,7 @@ function LoginForm() {
       // Redirect to dashboard or original destination
       const redirectTo = searchParams.get("redirect") || "/dashboard";
       console.log(`[LOGIN] Redirecting to ${redirectTo}`);
-      window.location.href = redirectTo;
+      router.replace(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
       setLoading(false);

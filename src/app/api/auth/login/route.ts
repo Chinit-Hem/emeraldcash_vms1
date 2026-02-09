@@ -194,20 +194,20 @@ export async function POST(req: NextRequest) {
   // Vercel sets x-forwarded-proto, but also check NODE_ENV for production
   const protocol = req.headers.get("x-forwarded-proto") || "http";
   const isHttps = protocol === "https" || process.env.NODE_ENV === "production";
-  
+
   // Get host for domain setting (important for mobile browsers)
   const host = req.headers.get("host") || "";
   const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("::1");
-  
+
   // Detect mobile browser for debugging
   const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
 
-  const res = NextResponse.json({ 
-    ok: true, 
+  const res = NextResponse.json({
+    ok: true,
     user,
     message: "Login successful"
   });
-  
+
   // Cookie options optimized for mobile Safari/Chrome and local development
   // IMPORTANT: Do NOT set domain - let browser use default (current domain)
   // Setting domain incorrectly can cause cookies to not be sent to API routes
@@ -223,9 +223,10 @@ export async function POST(req: NextRequest) {
   } = {
     httpOnly: true,
     sameSite: "lax" as const, // "lax" works better for mobile than "strict"
-    secure: !isLocalhost, // Always secure except for localhost development
+    secure: isHttps, // Secure based on HTTPS detection, not localhost
     path: "/",
     maxAge: 60 * 60 * 8, // 8 hours
+    partitioned: true, // Add partitioned for CHIPS support on mobile
   };
   
   res.cookies.set("session", sessionCookie, cookieOptions);
