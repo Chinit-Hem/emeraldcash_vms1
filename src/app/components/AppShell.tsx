@@ -28,6 +28,7 @@ function AppShellContent({ children }: AppShellProps) {
 
   useEffect(() => {
     let isActive = true;
+    const controller = new AbortController();
 
     console.log("[APPSHELL] Starting auth check...");
 
@@ -42,111 +43,56 @@ function AppShellContent({ children }: AppShellProps) {
       });
     }
 
-    // Safety timeout - always clear loading after max 5 seconds
-    const safetyTimeoutId = setTimeout(() => {
-      if (!isActive) return;
-      console.error("[APPSHELL] Safety timeout triggered - forcing loading complete");
-      setLoading(false);
-      if (!cached) {
-        // No user at all, redirect to login
-        if (!hasRedirected.current) {
-          hasRedirected.current = true;
-          router.replace("/login");
-        }
-      }
-    }, 5000);
-
     async function checkAuth() {
-      let retries = 2;
-      
-      while (retries > 0) {
+      try {
+        console.log("[APPSHELL] Fetching /api/auth/me...");
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch("/api/auth/me", {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
         if (!isActive) {
-          clearTimeout(safetyTimeoutId);
           return;
         }
-        
-        try {
-          console.log("[APPSHELL] Fetching /api/auth/me... (retries left:", retries, ")");
-          
-          // Use Promise.race to add timeout
-          const fetchPromise = fetch("/api/auth/me", { 
-            credentials: "include",
-            cache: "no-store",
-          });
-          
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Fetch timeout")), 3000)
-          );
-          
-          const res = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-          
-          if (!isActive) {
-            clearTimeout(safetyTimeoutId);
-            return;
-          }
-          
-          console.log("[APPSHELL] Auth response status:", res.status);
-          const data = await res.json();
-          console.log("[APPSHELL] Auth response:", data);
 
-          if (!res.ok || !data?.ok || !data?.user) {
-            console.log("[APPSHELL] Auth failed:", data?.error || "no user");
-            clearCachedUser();
-            
-            // If we had cached user, clear it and redirect
-            if (cached) {
-              setUser(null);
-            }
-            
-            if (!hasRedirected.current) {
-              hasRedirected.current = true;
-              router.replace("/login");
-            }
-            setLoading(false);
-            clearTimeout(safetyTimeoutId);
-            return;
-          }
+        console.log("[APPSHELL] Auth response status:", res.status);
+        const data = await res.json().catch(() => null);
+        console.log("[APPSHELL] Auth response:", data);
 
-          // Success - update with fresh data
-          console.log("[APPSHELL] Auth success:", data.user.username);
-          setCachedUser(data.user as User);
-          setUser(data.user as User);
+        if (!res.ok || !data?.ok || !data?.user) {
+          console.log("[APPSHELL] Auth failed:", data?.error || "no user");
+          clearCachedUser();
+          setUser(null);
           setLoading(false);
-          clearTimeout(safetyTimeoutId);
-          return;
-          
-        } catch (err) {
-          console.error(`[APPSHELL] Auth error (retries left: ${retries - 1}):`, err);
-          retries--;
-          
-          if (retries === 0) {
-            if (!isActive) {
-              clearTimeout(safetyTimeoutId);
-              return;
-            }
-            
-            // Final failure - if we have cached user, keep it but show warning
-            if (cached) {
-              console.log("[APPSHELL] Keeping cached user despite error");
-              setLoading(false);
-            } else {
-              // No cached user, show error and redirect
-              setError("Connection failed. Please check your network and try again.");
-              setLoading(false);
-              setTimeout(() => {
-                if (!hasRedirected.current) {
-                  hasRedirected.current = true;
-                  router.replace("/login");
-                }
-              }, 2000);
-            }
-            clearTimeout(safetyTimeoutId);
-            return;
+
+          if (!hasRedirected.current) {
+            hasRedirected.current = true;
+            router.replace("/login");
           }
-          
-          // Wait before retry
-          await new Promise(r => setTimeout(r, 800));
+          return;
         }
+
+        console.log("[APPSHELL] Auth success:", data.user.username);
+        setCachedUser(data.user as User);
+        setUser(data.user as User);
+        setError(null);
+        setLoading(false);
+      } catch (err) {
+        if (!isActive) return;
+        console.error("[APPSHELL] Auth error:", err);
+
+        const isAbortError = err instanceof Error && err.name === "AbortError";
+        if (!cached) {
+          setError(
+            isAbortError
+              ? "Connection timed out. Please check your network and try again."
+              : "Connection failed. Please check your network and try again."
+          );
+        }
+        setLoading(false);
       }
     }
 
@@ -155,7 +101,7 @@ function AppShellContent({ children }: AppShellProps) {
     
     return () => {
       isActive = false;
-      clearTimeout(safetyTimeoutId);
+      controller.abort();
     };
   }, [router]);
 

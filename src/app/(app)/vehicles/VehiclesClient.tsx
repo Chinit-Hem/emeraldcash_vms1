@@ -282,21 +282,36 @@ export default function VehiclesClient() {
 
   // Initialize filters from URL query params (so dashboard links like
   // `/vehicles?category=car&condition=new&noImage=1` work).
+  const categoryParam = searchParams.get("category");
+  const conditionParam = searchParams.get("condition");
+  const noImageParam = searchParams.get("noImage");
+
   useEffect(() => {
-    const categoryParam = searchParams.get("category");
-    const conditionParam = searchParams.get("condition");
-    const noImageParam = searchParams.get("noImage");
+    const nextCategory = categoryParam ? normalizeCategoryLabel(categoryParam) : "All";
+    const nextCondition = conditionParam ? normalizeConditionLabel(conditionParam) : "All";
+    const nextWithoutImage = noImageParam === "1";
 
     // Use queueMicrotask to defer state update to after render
     queueMicrotask(() => {
-      setFilters((prev) => ({
-        ...prev,
-        category: categoryParam ? normalizeCategoryLabel(categoryParam) : "All",
-        condition: conditionParam ? normalizeConditionLabel(conditionParam) : "All",
-        withoutImage: noImageParam === "1",
-      }));
+      setFilters((prev) => {
+        // Avoid no-op state writes that can cause render loops on some mobile browsers.
+        if (
+          prev.category === nextCategory &&
+          prev.condition === nextCondition &&
+          prev.withoutImage === nextWithoutImage
+        ) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          category: nextCategory,
+          condition: nextCondition,
+          withoutImage: nextWithoutImage,
+        };
+      });
     });
-  }, [searchParams]);
+  }, [categoryParam, conditionParam, noImageParam]);
 
 
   // Check if filters are active
