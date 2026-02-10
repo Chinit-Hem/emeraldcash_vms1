@@ -7,157 +7,126 @@ import {
   validateSession,
 } from "@/lib/auth";
 
-// Public paths that don't require authentication
-const PUBLIC_PATHS = [
-  "/login",
+const PUBLIC_PAGE_ROUTES = new Set(["/login"]);
+const PUBLIC_API_ROUTES = new Set([
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/me",
   "/api/auth/debug",
   "/api/health",
-  "/favicon.ico",
-  "/logo.png",
-  "/_next",
-  "/static",
-];
+]);
 
+const PUBLIC_FILE_REGEX =
+  /\.(?:svg|png|jpe?g|gif|ico|webp|avif|css|js|map|txt|xml|woff2?|ttf)$/i;
 
-// Static file extensions that should be public
-const PUBLIC_EXTENSIONS = [
-  ".svg",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".ico",
-  ".woff",
-  ".woff2",
-  ".ttf",
-  ".css",
-  ".js",
-];
-
-function isPublicPath(pathname: string): boolean {
-  if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path))) {
+function isPublicAsset(pathname: string): boolean {
+  if (
+    pathname.startsWith("/_next/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/manifest.json"
+  ) {
     return true;
   }
-  if (PUBLIC_EXTENSIONS.some((ext) => pathname.endsWith(ext))) {
-    return true;
+
+  return PUBLIC_FILE_REGEX.test(pathname);
+}
+
+function isPublicApiRoute(pathname: string): boolean {
+  for (const route of PUBLIC_API_ROUTES) {
+    if (pathname === route || pathname.startsWith(`${route}/`)) {
+      return true;
+    }
   }
   return false;
 }
 
-function isAuthenticated(request: NextRequest): { authenticated: boolean; reason?: string; debug?: string } {
-  const ip = getClientIp(request.headers);
-  const userAgent = getClientUserAgent(request.headers);
-  const sessionCookie = request.cookies.get("session")?.value;
-
-  // Enhanced mobile detection and logging
-  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-  const mobilePrefix = isMobile ? "[MOBILE] " : "";
-  
-  // Get all cookies for debugging
-  const allCookies = request.cookies.getAll();
-
-  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Checking auth for ${request.nextUrl.pathname}`);
-  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}IP: ${ip}, UA: ${userAgent?.substring(0, 50)}`);
-  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}All cookies count: ${allCookies.length}`);
-  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Cookie names: ${allCookies.map(c => c.name).join(", ")}`);
-  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session cookie exists: ${!!sessionCookie}`);
-
-  if (!sessionCookie) {
-    console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}No session cookie found`);
-    return { 
-      authenticated: false, 
-      reason: "no-cookie", 
-      debug: `Session cookie is missing. Available cookies: ${allCookies.map(c => c.name).join(", ")}` 
-    };
-  }
-
-  const session = getSessionFromRequest(userAgent, ip, sessionCookie);
-  
-  if (!session) {
-    console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session cookie exists but failed to parse/validate`);
-    // Try to get more details about why parsing failed
-    try {
-      const [encodedPayload] = sessionCookie.split(".");
-      if (encodedPayload) {
-        const decoded = Buffer.from(encodedPayload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
-        const payload = JSON.parse(decoded);
-        console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session payload version: ${payload.version}, ts: ${payload.ts}`);
-        console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session age: ${Date.now() - payload.ts}ms`);
-      }
-    } catch (e) {
-      console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Could not decode session for debugging: ${e}`);
-    }
-    return { 
-      authenticated: false, 
-      reason: "invalid-session", 
-      debug: "Session cookie exists but is invalid or fingerprint mismatch" 
-    };
-  }
-
-  if (!validateSession(session)) {
-    const age = Date.now() - session.ts;
-    const maxAge = 8 * 60 * 60 * 1000; // 8 hours
-    console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session validation failed. Age: ${age}ms, Max: ${maxAge}ms`);
-    return { 
-      authenticated: false, 
-      reason: "expired-session", 
-      debug: `Session expired or invalid. Age: ${age}ms` 
-    };
-  }
-
-  console.log(`[MIDDLEWARE_AUTH] ${mobilePrefix}Session valid for user: ${session.username}`);
-  return { authenticated: true };
+function getSafeRedirectPath(path: string | null): string | null {
+  if (!path) return null;
+  if (!path.startsWith("/") || path.startsWith("//")) return null;
+  if (path === "/login" || path.startsWith("/login?")) return null;
+  return path;
 }
 
+function isAuthenticated(request: NextRequest): boolean {
+  const sessionCookie = request.cookies.get("session")?.value;
+  if (!sessionCookie) return false;
+
+  try {
+    const ip = getClientIp(request.headers);
+    const userAgent = getClientUserAgent(request.headers);
+    const session = getSessionFromRequest(userAgent, ip, sessionCookie);
+    return Boolean(session && validateSession(session));
+  } catch {
+    return false;
+  }
+}
+
+function redirectToLogin(request: NextRequest): NextResponse {
+  const loginUrl = new URL("/login", request.url);
+  const requestedPath = getSafeRedirectPath(
+    `${request.nextUrl.pathname}${request.nextUrl.search}`
+  );
+
+  if (requestedPath) {
+    loginUrl.searchParams.set("redirect", requestedPath);
+  }
+
+  return NextResponse.redirect(loginUrl);
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public routes
-  if (isPublicPath(pathname)) {
+  // Skip static/public assets early.
+  if (isPublicAsset(pathname)) {
     return NextResponse.next();
   }
 
-  // Always allow auth check and debug endpoints
-  if (pathname === "/api/auth/me" || pathname === "/api/auth/debug") {
+  // Allow CORS preflight to reach route handlers.
+  if (request.method === "OPTIONS") {
     return NextResponse.next();
   }
 
+  const authenticated = isAuthenticated(request);
 
-  const auth = isAuthenticated(request);
-
-  if (!auth.authenticated) {
-    console.log(`[MIDDLEWARE] Blocked: ${pathname}, reason: ${auth.reason}, debug: ${auth.debug}`);
-
-    // For API requests, return 401
-    if (pathname.startsWith("/api/")) {
-      const response = NextResponse.json(
-        { ok: false, error: "Unauthorized", reason: auth.reason, debug: auth.debug },
-        { status: 401 }
-      );
-      // Add debug headers to help troubleshoot
-      response.headers.set("X-Auth-Debug", auth.reason || "unknown");
-      response.headers.set("X-Auth-Debug-Info", JSON.stringify({
-        cookiePresent: !!request.cookies.get("session")?.value,
-        userAgent: request.headers.get("user-agent")?.substring(0, 50),
-      }));
-      return response;
+  // API routes: return JSON 401 instead of page redirects.
+  if (pathname.startsWith("/api/")) {
+    if (isPublicApiRoute(pathname)) {
+      return NextResponse.next();
     }
 
-    // Redirect to login
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+    if (!authenticated) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized" },
+        { status: 401, headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    return NextResponse.next();
   }
 
+  // Login page is public, but authenticated users should not stay on it.
+  if (PUBLIC_PAGE_ROUTES.has(pathname)) {
+    if (!authenticated) return NextResponse.next();
 
-  // User is authenticated, allow access
+    const redirectParam = getSafeRedirectPath(
+      request.nextUrl.searchParams.get("redirect")
+    );
+    return NextResponse.redirect(new URL(redirectParam || "/dashboard", request.url));
+  }
+
+  // All other app routes are protected.
+  if (!authenticated) {
+    return redirectToLogin(request);
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.json|.*\\.(?:svg|png|jpe?g|gif|ico|webp|avif|css|js|map|txt|xml|woff2?|ttf)$).*)",
+  ],
 };
