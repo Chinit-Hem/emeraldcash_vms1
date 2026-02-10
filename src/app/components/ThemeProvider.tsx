@@ -82,7 +82,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     const stored = getStoredTheme();
     const initialTheme = stored ?? getSystemTheme();
-    setTheme(initialTheme);
+    queueMicrotask(() => {
+      setTheme(initialTheme);
+    });
     applyTheme(initialTheme);
 
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
@@ -92,7 +94,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     const onChange = (event: MediaQueryListEvent) => {
       if (getStoredTheme()) return;
       const nextTheme = event.matches ? "dark" : "light";
-      setTheme(nextTheme);
+      queueMicrotask(() => {
+        setTheme(nextTheme);
+      });
       applyTheme(nextTheme);
     };
 
@@ -112,7 +116,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         return;
       }
       const nextTheme = getStoredTheme() ?? getSystemTheme();
-      setTheme(nextTheme);
+      queueMicrotask(() => {
+        setTheme(nextTheme);
+      });
       applyTheme(nextTheme);
     };
 

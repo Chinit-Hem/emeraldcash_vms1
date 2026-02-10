@@ -68,10 +68,14 @@ export function ConfirmDeleteModal({
   }, [isOpen, handleKeyDown]);
 
   // Reset state when modal closes
+  const wasOpenRef = useRef(isOpen);
   useEffect(() => {
-    if (!isOpen) {
-      setConfirmText("");
+    if (wasOpenRef.current && !isOpen) {
+      queueMicrotask(() => {
+        setConfirmText("");
+      });
     }
+    wasOpenRef.current = isOpen;
   }, [isOpen]);
 
   if (!isOpen) return null;

@@ -24,95 +24,140 @@ function AppShellContent({ children }: AppShellProps) {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasChecked = useRef(false);
   const hasRedirected = useRef(false);
 
   useEffect(() => {
-    // Prevent double-check on React StrictMode
-    if (hasChecked.current) return;
-    hasChecked.current = true;
+    let isActive = true;
 
     console.log("[APPSHELL] Starting auth check...");
 
+    // IMMEDIATE: Check cached user first to show something quickly
+    const cached = getCachedUser();
+    if (cached) {
+      console.log("[APPSHELL] Using cached user immediately:", cached.username);
+      queueMicrotask(() => {
+        if (!isActive) return;
+        setUser(cached);
+        setLoading(false);
+      });
+    }
+
+    // Safety timeout - always clear loading after max 5 seconds
+    const safetyTimeoutId = setTimeout(() => {
+      if (!isActive) return;
+      console.error("[APPSHELL] Safety timeout triggered - forcing loading complete");
+      setLoading(false);
+      if (!cached) {
+        // No user at all, redirect to login
+        if (!hasRedirected.current) {
+          hasRedirected.current = true;
+          router.replace("/login");
+        }
+      }
+    }, 5000);
+
     async function checkAuth() {
-      let retries = 3;
+      let retries = 2;
       
       while (retries > 0) {
+        if (!isActive) {
+          clearTimeout(safetyTimeoutId);
+          return;
+        }
+        
         try {
-          // Check cached user first for immediate display
-          const cached = getCachedUser();
-          console.log("[APPSHELL] Cached user:", cached ? "found" : "none");
+          console.log("[APPSHELL] Fetching /api/auth/me... (retries left:", retries, ")");
           
-          if (cached && retries === 3) {
-            console.log("[APPSHELL] Using cached user for immediate display");
-            setUser(cached);
-            setLoading(false);
-          }
-
-          // Verify with server - add timeout to prevent hanging
-          console.log("[APPSHELL] Fetching /api/auth/me...");
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-          
-          const res = await fetch("/api/auth/me", { 
+          // Use Promise.race to add timeout
+          const fetchPromise = fetch("/api/auth/me", { 
             credentials: "include",
             cache: "no-store",
-            signal: controller.signal,
           });
-          clearTimeout(timeoutId);
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Fetch timeout")), 3000)
+          );
+          
+          const res = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+          
+          if (!isActive) {
+            clearTimeout(safetyTimeoutId);
+            return;
+          }
           
           console.log("[APPSHELL] Auth response status:", res.status);
           const data = await res.json();
-          console.log("[APPSHELL] Auth response data:", data);
+          console.log("[APPSHELL] Auth response:", data);
 
           if (!res.ok || !data?.ok || !data?.user) {
-            console.log("[APPSHELL] Auth failed:", data?.error || "unknown error");
+            console.log("[APPSHELL] Auth failed:", data?.error || "no user");
             clearCachedUser();
-            setLoading(false); // Ensure loading is cleared
-            if (!cached && !hasRedirected.current) {
-              // Only redirect if we don't have cached data
+            
+            // If we had cached user, clear it and redirect
+            if (cached) {
+              setUser(null);
+            }
+            
+            if (!hasRedirected.current) {
               hasRedirected.current = true;
               router.replace("/login");
             }
+            setLoading(false);
+            clearTimeout(safetyTimeoutId);
             return;
           }
 
-          // Update with fresh data
-          console.log("[APPSHELL] Auth successful, user:", data.user.username);
+          // Success - update with fresh data
+          console.log("[APPSHELL] Auth success:", data.user.username);
           setCachedUser(data.user as User);
           setUser(data.user as User);
-          setLoading(false); // Ensure loading is cleared on success
-          return; // Success, exit retry loop
+          setLoading(false);
+          clearTimeout(safetyTimeoutId);
+          return;
+          
         } catch (err) {
-          console.error(`[APPSHELL] Auth check failed (retries left: ${retries - 1}):`, err);
+          console.error(`[APPSHELL] Auth error (retries left: ${retries - 1}):`, err);
           retries--;
           
           if (retries === 0) {
-            // Don't redirect on error, show error state instead
-            setError("Connection error. Please refresh the page.");
-            setLoading(false);
+            if (!isActive) {
+              clearTimeout(safetyTimeoutId);
+              return;
+            }
+            
+            // Final failure - if we have cached user, keep it but show warning
+            if (cached) {
+              console.log("[APPSHELL] Keeping cached user despite error");
+              setLoading(false);
+            } else {
+              // No cached user, show error and redirect
+              setError("Connection failed. Please check your network and try again.");
+              setLoading(false);
+              setTimeout(() => {
+                if (!hasRedirected.current) {
+                  hasRedirected.current = true;
+                  router.replace("/login");
+                }
+              }, 2000);
+            }
+            clearTimeout(safetyTimeoutId);
             return;
           }
           
           // Wait before retry
-          await new Promise(r => setTimeout(r, 500));
+          await new Promise(r => setTimeout(r, 800));
         }
       }
     }
 
-    // Add overall timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      if (loading) {
-        console.error("[APPSHELL] Auth check timed out after 15 seconds");
-        setError("Connection timeout. Please check your network and refresh.");
-        setLoading(false);
-      }
-    }, 15000);
-
-    checkAuth().finally(() => {
-      clearTimeout(timeoutId);
-    });
-  }, [router, loading]);
+    // Always run server check, even if we have cached user
+    checkAuth();
+    
+    return () => {
+      isActive = false;
+      clearTimeout(safetyTimeoutId);
+    };
+  }, [router]);
 
   // Close sidebar when pathname changes (using layout effect to avoid setState in render warning)
   useEffect(() => {
@@ -199,7 +244,7 @@ function AppShellContent({ children }: AppShellProps) {
 
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Mobile header - Liquid Glass White */}
-          <header className="lg:hidden sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-white/60 dark:border-white/10">
+          <header className="lg:hidden sticky top-0 z-40 ec-glassPanel border-b border-white/40 dark:border-white/10">
             <div className="h-14 px-4 flex items-center justify-between">
               <button
                 onClick={() => setIsSidebarOpen(true)}
