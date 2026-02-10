@@ -190,11 +190,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Detect if we're on HTTPS (production) or HTTP (local development)
-  // Vercel sets x-forwarded-proto, but also check NODE_ENV for production
-  const protocol = req.headers.get("x-forwarded-proto") || "http";
-  const isHttps = protocol === "https" || process.env.NODE_ENV === "production";
-
+  // Determine if cookie should be secure.
+  // Use host-based localhost detection to avoid proxy/header inconsistencies.
+  const protocol =
+    req.headers.get("x-forwarded-proto") ||
+    (process.env.NODE_ENV === "production" ? "https" : "http");
+  
   // Get host for domain setting (important for mobile browsers)
   const host = req.headers.get("host") || "";
   const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("::1");
@@ -208,25 +209,20 @@ export async function POST(req: NextRequest) {
     message: "Login successful"
   });
 
-  // Cookie options optimized for mobile Safari/Chrome and local development
-  // IMPORTANT: Do NOT set domain - let browser use default (current domain)
-  // Setting domain incorrectly can cause cookies to not be sent to API routes
-  // For localhost development: secure must be false (HTTP), sameSite must be "lax"
-  // For production: secure must be true (HTTPS required for cookies to work properly)
+  // Cookie options compatible with Safari/Chrome on mobile and desktop.
+  // Do not use `Partitioned` for session cookie because Safari may reject it.
   const cookieOptions: {
     httpOnly: boolean;
     sameSite: "lax" | "none" | "strict";
     secure: boolean;
     path: string;
     maxAge: number;
-    partitioned?: boolean;
   } = {
     httpOnly: true,
-    sameSite: "lax" as const, // "lax" works better for mobile than "strict"
-    secure: isHttps, // Secure based on HTTPS detection, not localhost
+    sameSite: "lax" as const,
+    secure: !isLocalhost,
     path: "/",
     maxAge: 60 * 60 * 8, // 8 hours
-    partitioned: true, // Add partitioned for CHIPS support on mobile
   };
   
   res.cookies.set("session", sessionCookie, cookieOptions);
@@ -238,10 +234,11 @@ export async function POST(req: NextRequest) {
     secure: cookieOptions.secure,
     path: cookieOptions.path,
     maxAge: cookieOptions.maxAge,
-    // Don't log the actual cookie value for security
     valueLength: sessionCookie.length,
   });
-  console.log(`[LOGIN_API] Host: ${host}, Protocol: ${protocol}, isHttps: ${isHttps}, isLocalhost: ${isLocalhost}, isMobile: ${isMobile}`);
+  console.log(
+    `[LOGIN_API] Host: ${host}, Protocol: ${protocol}, isLocalhost: ${isLocalhost}, isMobile: ${isMobile}`
+  );
 
   return res;
 }
