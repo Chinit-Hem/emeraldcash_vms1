@@ -192,11 +192,11 @@ export function VehicleDetailsCard({
                   {vehicle.Brand} {vehicle.Model}
                 </h2>
                 <div className="flex flex-wrap items-center gap-3 text-lg">
-                  <span className="font-mono text-gray-600 dark:text-gray-400 uppercase">
+                  <span className="font-mono text-gray-600 dark:text-gray-300 uppercase">
                     {vehicle.Plate || "No Plate"}
                   </span>
                   <span className="text-gray-300">|</span>
-                  <span className="text-gray-500 dark:text-gray-400 text-sm">
+                  <span className="text-gray-500 dark:text-gray-300 text-sm">
                     {vehicle.Year || "N/A"}
                   </span>
                 </div>
@@ -212,9 +212,9 @@ export function VehicleDetailsCard({
                 {infoItems.map((item) => (
                   <div
                     key={item.label}
-                    className="p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50"
+                    className="p-3 rounded-xl bg-gray-50/50 dark:bg-slate-900/70 border border-gray-100 dark:border-white/10"
                   >
-                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    <p className="text-xs text-gray-500 dark:text-gray-300 uppercase tracking-wide">
                       {item.label}
                     </p>
                     <p
@@ -225,7 +225,7 @@ export function VehicleDetailsCard({
                       {item.value || "—"}
                     </p>
                     {item.description && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">
                         {item.description}
                       </p>
                     )}
@@ -240,7 +240,7 @@ export function VehicleDetailsCard({
                 variant="elevated"
                 className="p-4 text-center bg-gradient-to-br from-emerald-50/50 to-transparent dark:from-emerald-900/20"
               >
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <p className="text-xs text-gray-500 dark:text-gray-300 uppercase tracking-wide">
                   Market Price
                 </p>
                 <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1">
@@ -252,7 +252,7 @@ export function VehicleDetailsCard({
                 variant="elevated"
                 className="p-4 text-center bg-gradient-to-br from-blue-50/50 to-transparent dark:from-blue-900/20"
               >
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <p className="text-xs text-gray-500 dark:text-gray-300 uppercase tracking-wide">
                   DOC 40%
                 </p>
                 <p className="text-lg font-bold text-blue-600 dark:text-blue-400 mt-1">
@@ -264,7 +264,7 @@ export function VehicleDetailsCard({
                 variant="elevated"
                 className="p-4 text-center bg-gradient-to-br from-purple-50/50 to-transparent dark:from-purple-900/20"
               >
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <p className="text-xs text-gray-500 dark:text-gray-300 uppercase tracking-wide">
                   Vehicles 70%
                 </p>
                 <p className="text-lg font-bold text-purple-600 dark:text-purple-400 mt-1">
@@ -279,7 +279,7 @@ export function VehicleDetailsCard({
               className="p-4 flex items-center justify-between"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
+                <div className="p-2 rounded-lg bg-gray-100 dark:bg-white/10">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
@@ -288,14 +288,14 @@ export function VehicleDetailsCard({
                     strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="h-5 w-5 text-gray-500"
+                    className="h-5 w-5 text-gray-500 dark:text-gray-300"
                   >
                     <circle cx="12" cy="12" r="10" />
                     <polyline points="12 6 12 12 16 14" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  <p className="text-xs text-gray-500 dark:text-gray-300 uppercase tracking-wide">
                     Added Time
                   </p>
                   <p className="text-sm font-mono text-gray-900 dark:text-white">

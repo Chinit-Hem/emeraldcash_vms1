@@ -93,7 +93,7 @@ export default function VehicleCardMobile({
               <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                 {vehicle.Brand} {vehicle.Model}
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-gray-300">
                 {vehicle.Year || "-"} • {vehicle.Category}
               </p>
             </div>
@@ -114,7 +114,7 @@ export default function VehicleCardMobile({
             <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
               {formatPrice(vehicle.PriceNew)}
             </div>
-            <div className="flex items-center text-gray-400">
+            <div className="flex items-center text-gray-400 dark:text-gray-300">
               <span className="text-xs mr-1">{expanded ? "Less" : "More"}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -136,34 +136,34 @@ export default function VehicleCardMobile({
         <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-700">
           <div className="pt-3 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <span className="text-gray-500 dark:text-gray-400">Vehicle ID:</span>
+              <span className="text-gray-500 dark:text-gray-300">Vehicle ID:</span>
               <p className="font-mono text-gray-900 dark:text-white">{vehicle.VehicleId || "-"}</p>
             </div>
             <div>
-              <span className="text-gray-500 dark:text-gray-400">Plate:</span>
+              <span className="text-gray-500 dark:text-gray-300">Plate:</span>
               <p className="font-mono text-gray-900 dark:text-white">{vehicle.Plate || "-"}</p>
             </div>
 
             <div>
-              <span className="text-gray-500 dark:text-gray-400">Tax Type:</span>
+              <span className="text-gray-500 dark:text-gray-300">Tax Type:</span>
               <p className="text-gray-900 dark:text-white">{vehicle.TaxType || "-"}</p>
             </div>
             <div>
-              <span className="text-gray-500 dark:text-gray-400">Body Type:</span>
+              <span className="text-gray-500 dark:text-gray-300">Body Type:</span>
               <p className="text-gray-900 dark:text-white">{vehicle.BodyType || "-"}</p>
             </div>
             <div>
-              <span className="text-gray-500 dark:text-gray-400">Color:</span>
+              <span className="text-gray-500 dark:text-gray-300">Color:</span>
               <p className="text-gray-900 dark:text-white">{vehicle.Color || "-"}</p>
             </div>
             <div>
-              <span className="text-gray-500 dark:text-gray-400">D.O.C. 40%:</span>
+              <span className="text-gray-500 dark:text-gray-300">D.O.C. 40%:</span>
               <p className="font-semibold text-orange-600 dark:text-orange-400">
                 {formatPrice(price40)}
               </p>
             </div>
             <div>
-              <span className="text-gray-500 dark:text-gray-400">Vehicles 70%:</span>
+              <span className="text-gray-500 dark:text-gray-300">Vehicles 70%:</span>
               <p className="font-semibold text-emerald-600 dark:text-emerald-400">
                 {formatPrice(price70)}
               </p>
@@ -174,7 +174,7 @@ export default function VehicleCardMobile({
           <div className="mt-4 flex gap-2">
             <button
               onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium active:scale-[0.98] transition-transform touch-target"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/35 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-500/30 rounded-xl font-medium active:scale-[0.98] transition-transform touch-target"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
