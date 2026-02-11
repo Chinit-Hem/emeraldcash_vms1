@@ -30,7 +30,7 @@ export default function MobileBottomNav() {
       className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/65 bg-white/70 backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/85"
       aria-label="Primary navigation"
     >
-      <div className="mx-auto flex h-16 max-w-2xl items-center justify-around px-2 pb-safe sm:h-[70px]">
+      <div className="mx-auto flex h-16 max-w-2xl items-center justify-around px-2 sm:h-[70px]">
         {navItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
