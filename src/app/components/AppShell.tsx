@@ -203,7 +203,7 @@ function AppShellContent({ children }: AppShellProps) {
               </button>
 
               <div className="flex items-center gap-3">
-                <div className="relative w-9 h-9 rounded-lg bg-white flex items-center justify-center overflow-hidden shadow-lg ring-2 ring-emerald-100">
+                <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden">
                   <Image 
                     src="/logo.png" 
                     alt="Emerald Cash" 

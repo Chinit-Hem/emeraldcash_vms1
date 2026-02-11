@@ -390,8 +390,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
       <div className="relative p-6 border-b border-black/5 dark:border-white/10">
         <div className="flex items-center gap-4">
           <div
-            className="relative w-12 h-12 rounded-xl shadow-lg flex items-center justify-center flex-shrink-0 overflow-hidden ring-2 ring-emerald-100"
-            style={{ backgroundColor: "#ffffff" }}
+            className="relative w-12 h-12 flex items-center justify-center flex-shrink-0 overflow-hidden"
           >
             <Image
               src="/logo.png"

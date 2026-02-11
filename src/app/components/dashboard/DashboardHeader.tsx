@@ -34,12 +34,12 @@ export default function DashboardHeader() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           {/* Logo and Brand */}
           <div className="flex items-center gap-3">
-            <div className="relative h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 rounded-xl bg-white shadow-lg ring-2 ring-emerald-100 overflow-hidden">
+            <div className="relative h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 overflow-hidden">
               <Image
                 src="/logo.png"
                 alt="Emerald Cash"
                 fill
-                className="object-contain p-1"
+                className="object-contain"
                 priority
               />
             </div>

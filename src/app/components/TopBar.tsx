@@ -93,7 +93,7 @@ export default function TopBar({
         <div className="flex items-center gap-2 min-w-0">
           {!title && (
             <>
-              <div className="relative h-8 w-8 rounded-lg bg-white shadow ring-1 ring-emerald-100 overflow-hidden flex items-center justify-center">
+              <div className="relative h-8 w-8 overflow-hidden flex items-center justify-center">
                 <Image
                   src="/logo.png"
                   alt="Emerald Cash"
