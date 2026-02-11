@@ -352,6 +352,9 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const { resolvedTheme, setThemeMode } = useTheme();
 
   const handleLogout = async () => {
+    const confirmed = window.confirm("Are you sure you want to logout?");
+    if (!confirmed) return;
+
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       clearCachedUser();
@@ -359,6 +362,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
       onNavigate?.();
     } catch (error) {
       console.error("Logout failed:", error);
+      window.alert("Logout failed. Please try again.");
     }
   };
 

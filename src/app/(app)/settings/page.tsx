@@ -14,6 +14,9 @@ export default function SettingsPage() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
+    const confirmed = window.confirm("Are you sure you want to logout?");
+    if (!confirmed) return;
+
     setIsLoggingOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -21,6 +24,7 @@ export default function SettingsPage() {
       router.push("/login");
     } catch (error) {
       console.error("Logout failed:", error);
+      window.alert("Logout failed. Please try again.");
     } finally {
       setIsLoggingOut(false);
     }
