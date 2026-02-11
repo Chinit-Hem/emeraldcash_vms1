@@ -165,7 +165,7 @@ function LoginForm() {
             
             {/* Logo */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
-              <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 border border-white/60 dark:border-slate-600/55 shadow-xl flex items-center justify-center p-2">
+              <div className="w-16 h-16 rounded-2xl bg-white border border-white/70 shadow-xl flex items-center justify-center p-2">
                 <img
                   src="/logo.png"
                   alt="Emerald Cash"
