@@ -73,7 +73,7 @@ export function VehicleDetailsCard({
 
   return (
     <>
-      <div className="min-h-screen pb-24 md:pb-8">
+      <div className="min-h-screen pb-[11rem] md:pb-8">
         {/* Header Section */}
         <div className="mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -358,7 +358,7 @@ export function VehicleDetailsCard({
       </div>
 
       {/* Mobile Sticky Bottom Action Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-800 p-4 pb-safe z-40">
+      <div className="md:hidden fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-40 border-t border-gray-200 bg-white/90 p-4 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-900/90">
         <div className="flex gap-2">
           {canEdit && (
             <GlassButton
