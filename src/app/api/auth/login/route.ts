@@ -191,14 +191,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Determine if cookie should be secure.
-  // Use host-based localhost detection to avoid proxy/header inconsistencies.
-  const protocol =
-    req.headers.get("x-forwarded-proto") ||
-    (process.env.NODE_ENV === "production" ? "https" : "http");
-  
-  // Get host for domain setting (important for mobile browsers)
+  // Use request protocol (not host) so LAN HTTP dev (e.g. 192.168.x.x) can set cookies.
+  const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  const isHttps =
+    forwardedProto === "https" ||
+    req.nextUrl.protocol === "https:" ||
+    process.env.NODE_ENV === "production";
+
+  // Get host for debugging.
   const host = req.headers.get("host") || "";
-  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("::1");
 
   // Detect mobile browser for debugging
   const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
@@ -220,7 +221,7 @@ export async function POST(req: NextRequest) {
   } = {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: !isLocalhost,
+    secure: isHttps,
     path: "/",
     maxAge: 60 * 60 * 8, // 8 hours
   };
@@ -237,7 +238,7 @@ export async function POST(req: NextRequest) {
     valueLength: sessionCookie.length,
   });
   console.log(
-    `[LOGIN_API] Host: ${host}, Protocol: ${protocol}, isLocalhost: ${isLocalhost}, isMobile: ${isMobile}`
+    `[LOGIN_API] Host: ${host}, protocol=${forwardedProto || req.nextUrl.protocol}, isHttps: ${isHttps}, isMobile: ${isMobile}`
   );
 
   return res;

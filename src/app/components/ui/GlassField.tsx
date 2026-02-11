@@ -1,6 +1,7 @@
 "use client";
 
 import React, { forwardRef } from "react";
+import { cn, ui } from "@/lib/ui";
 
 interface GlassFieldProps extends React.InputHTMLAttributes<HTMLInputElement | HTMLSelectElement> {
   label: string;
@@ -17,30 +18,13 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
     const errorId = error ? `${fieldId}-error` : undefined;
     const helperId = helperText ? `${fieldId}-helper` : undefined;
 
-    const baseInputStyles = `
-      w-full h-11 px-4
-      bg-white/5 dark:bg-white/5
-      border border-white/20 dark:border-white/20
-      shadow-inner
-      rounded-xl
-      text-gray-900 dark:text-white
-      placeholder:text-gray-400 dark:placeholder:text-gray-500
-      transition-all duration-200
-      focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/60
-      disabled:opacity-50 disabled:cursor-not-allowed
-    `;
-
-    const errorStyles = error
-      ? "border-red-400/60 ring-2 ring-red-400/40 bg-red-500/5 dark:bg-red-500/5"
-      : "";
-
-    const inputStyles = `${baseInputStyles} ${errorStyles} ${className}`;
+    const inputStyles = cn(ui.input.base, error && ui.input.error, className);
 
     return (
       <div className="w-full">
         <label
           htmlFor={fieldId}
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+          className={cn(ui.text.label, "mb-1.5 block")}
         >
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
@@ -79,7 +63,7 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
         )}
 
         {error && (
-          <p id={errorId} className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+          <p id={errorId} className={cn(ui.text.danger, "mt-1.5 flex items-center gap-1")}>
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -88,7 +72,7 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
         )}
 
         {helperText && !error && (
-          <p id={helperId} className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
+          <p id={helperId} className={cn(ui.text.helper, "mt-1.5")}>
             {helperText}
           </p>
         )}

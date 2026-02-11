@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { GlassButton } from "@/app/components/ui/GlassButton";
+import { GlassInput } from "@/app/components/ui/GlassInput";
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -60,96 +62,89 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800">Change Password</h2>
-          <p className="text-sm text-gray-600 mt-1">Update your password for security</p>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+      onClick={handleClose}
+    >
+      <div
+        className="ec-liquid-modal w-full max-w-md overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Change password"
+      >
+        <div className="border-b border-[var(--border)] px-6 py-4">
+          <h2 className="text-xl font-bold text-[var(--text)]">Change Password</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">Update your password for security</p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {success ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/18">
+                <svg className="h-8 w-8 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-green-700 font-semibold">Password changed successfully!</p>
-              <p className="text-gray-600 text-sm mt-2">Closing...</p>
+              <p className="font-semibold text-[var(--text)]">Password changed successfully</p>
+              <p className="mt-2 text-sm text-[var(--muted)]">Closing...</p>
             </div>
           ) : (
             <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Current Password
-                </label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Enter current password"
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
+              <GlassInput
+                type="password"
+                label="Current Password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                autoComplete="current-password"
+                required
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password (min 4 characters)"
-                  autoComplete="new-password"
-                  required
-                />
-              </div>
+              <GlassInput
+                type="password"
+                label="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min 4 characters)"
+                autoComplete="new-password"
+                required
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirm New Password
-                </label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm new password"
-                  autoComplete="new-password"
-                  required
-                />
-              </div>
+              <GlassInput
+                type="password"
+                label="Confirm New Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                autoComplete="new-password"
+                required
+              />
 
               {error ? (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{error}</p>
+                <div className="rounded-xl border border-red-500/35 bg-red-500/12 p-3">
+                  <p className="text-sm text-[var(--ec-danger-text)]">{error}</p>
                 </div>
               ) : null}
 
-              {/* Buttons */}
               <div className="flex gap-3 pt-2">
-                <button
+                <GlassButton
                   type="button"
+                  variant="secondary"
+                  fullWidth
                   onClick={handleClose}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
                   disabled={loading}
                 >
                   Cancel
-                </button>
-                <button
+                </GlassButton>
+                <GlassButton
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading}
+                  variant="primary"
+                  fullWidth
+                  isLoading={loading}
                 >
-                  {loading ? "Changing..." : "Change Password"}
-                </button>
+                  Change Password
+                </GlassButton>
               </div>
             </>
           )}
@@ -158,4 +153,3 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
     </div>
   );
 }
-

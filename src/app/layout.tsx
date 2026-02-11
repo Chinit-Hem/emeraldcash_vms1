@@ -5,6 +5,35 @@ import { ThemeProvider } from "@/app/components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const themeInitScript = `
+  (function () {
+    try {
+      var modeKey = "vms.theme-mode";
+      var legacyKeys = ["theme", "vms.theme"];
+      var mode = localStorage.getItem(modeKey);
+
+      if (mode !== "light" && mode !== "dark" && mode !== "system") {
+        for (var i = 0; i < legacyKeys.length; i++) {
+          var legacy = localStorage.getItem(legacyKeys[i]);
+          if (legacy === "light" || legacy === "dark") {
+            mode = legacy;
+            break;
+          }
+        }
+      }
+
+      if (!mode) mode = "system";
+      var isDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      var resolved = mode === "system" ? (isDark ? "dark" : "light") : mode;
+      var root = document.documentElement;
+      root.classList.remove("light", "dark");
+      root.classList.add(resolved);
+      root.dataset.theme = resolved;
+      root.dataset.themeMode = mode;
+    } catch (_) {}
+  })();
+`;
+
 export const metadata: Metadata = {
   title: "Emerald Cash VMS",
   description: "Vehicle Management System by Emerald Cash",
@@ -22,7 +51,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ecfdf5" },
-    { media: "(prefers-color-scheme: dark)", color: "#070b10" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
   ],
 };
 
@@ -33,6 +62,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         <ThemeProvider>
           {children}

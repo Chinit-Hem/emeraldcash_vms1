@@ -47,6 +47,12 @@ const apiCorsHeaders = [
     : []),
 ];
 
+const authSensitivePageHeaders = [
+  { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, private" },
+  { key: "Pragma", value: "no-cache" },
+  { key: "Vary", value: "Cookie, User-Agent" },
+];
+
 const nextConfig = {
   outputFileTracingRoot: process.cwd(),
 
@@ -62,6 +68,26 @@ const nextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/login",
+        headers: authSensitivePageHeaders,
+      },
+      {
+        source: "/dashboard",
+        headers: authSensitivePageHeaders,
+      },
+      {
+        source: "/",
+        headers: authSensitivePageHeaders,
+      },
+      {
+        source: "/vehicles/:path*",
+        headers: authSensitivePageHeaders,
+      },
+      {
+        source: "/settings/:path*",
+        headers: authSensitivePageHeaders,
       },
     ];
   },

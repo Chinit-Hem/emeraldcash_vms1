@@ -44,7 +44,7 @@ function applyFilter(router: ReturnType<typeof useRouter>, filter: { type: "cate
 
 import { getCambodiaNowString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
-import type { Vehicle } from "@/lib/types";
+import type { Vehicle, VehicleMeta } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -97,6 +97,7 @@ export default function Dashboard() {
   const { isModalOpen, setIsModalOpen } = useUI();
   const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [meta, setMeta] = useState<VehicleMeta | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [vehiclesError, setVehiclesError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<string>("");
@@ -143,12 +144,17 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("Failed to fetch vehicles");
       const data = await res.json();
       const newVehicles = (data.data || []) as Vehicle[];
+      const newMeta = data.meta as VehicleMeta | undefined;
       setVehicles(newVehicles);
+      setMeta(newMeta || null);
       setLastUpdated(getCambodiaNowString());
       setIsLoading(false);
       // Save to localStorage
       try {
         localStorage.setItem("vms-vehicles", JSON.stringify(newVehicles));
+        if (newMeta) {
+          localStorage.setItem("vms-vehicles-meta", JSON.stringify(newMeta));
+        }
       } catch {
         // Ignore storage errors
       }
@@ -253,7 +259,27 @@ export default function Dashboard() {
     setSelectedVehicle(null);
   };
 
+  // Use server-provided meta for counts to ensure consistency with table
   const kpis = useMemo(() => {
+    // If we have meta from server, use it for counts (single source of truth)
+    if (meta) {
+      const stats = marketPriceStats(vehicles);
+      return {
+        total: meta.total ?? vehicles.length,
+        cars: meta.countsByCategory?.Cars ?? 0,
+        motorcycles: meta.countsByCategory?.Motorcycles ?? 0,
+        tukTuk: meta.countsByCategory?.TukTuks ?? 0,
+        newCount: meta.countsByCondition?.New ?? 0,
+        usedCount: meta.countsByCondition?.Used ?? 0,
+        noImagesCount: meta.noImageCount ?? 0,
+        totalMarketValue: stats.sum,
+        avgPrice: stats.avg,
+        medianPrice: stats.median,
+        pricedCount: stats.count,
+      };
+    }
+
+    // Fallback: compute from vehicles array (client-side only)
     const countsByCategory: Record<string, number> = { Cars: 0, Motorcycles: 0, "Tuk Tuk": 0, Other: 0 };
     const countsByCondition: Record<string, number> = { New: 0, Used: 0, Other: 0 };
     let noImagesCount = 0;
@@ -280,7 +306,7 @@ export default function Dashboard() {
       medianPrice: stats.median,
       pricedCount: stats.count,
     };
-  }, [vehicles]);
+  }, [vehicles, meta]);
 
   const byCategory = useMemo(() => buildVehiclesByCategory(vehicles), [vehicles]);
   const byBrand = useMemo(() => buildVehiclesByBrand(vehicles, 12), [vehicles]);
@@ -303,10 +329,10 @@ export default function Dashboard() {
               Dashboard
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Welcome, <span className="font-semibold text-slate-800 dark:text-white">{user.username}</span>
+              Welcome, <span className="font-semibold text-slate-800 dark:text-white">{user?.username || "Guest"}</span>
               <span className="mx-2 text-slate-400">•</span>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                {user.role}
+                {user?.role || "User"}
               </span>
             </p>
             {lastUpdated && (
@@ -392,14 +418,14 @@ export default function Dashboard() {
           label="Cars" 
           value={kpis.cars.toLocaleString()} 
           sublabel="vehicles"
-          accent="blue" 
+          accent="green" 
           onClick={() => applyFilter(router, { type: "category", value: "Car" })} 
         />
         <KpiCard
           label="Motorcycles"
           value={kpis.motorcycles.toLocaleString()}
           sublabel="vehicles"
-          accent="orange"
+          accent="gray"
           onClick={() => applyFilter(router, { type: "category", value: "Motorcycle" })}
         />
         <KpiCard 
@@ -420,7 +446,7 @@ export default function Dashboard() {
           label="Used" 
           value={kpis.usedCount.toLocaleString()} 
           sublabel="condition"
-          accent="orange" 
+          accent="red" 
           onClick={() => applyFilter(router, { type: "condition", value: "Used" })} 
         />
         <KpiCard 
@@ -456,14 +482,14 @@ export default function Dashboard() {
           title="Market Price Distribution"
           subtitle={`Histogram of MARKET PRICE (priced vehicles: ${kpis.pricedCount.toLocaleString()})`}
           right={
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium text-right space-y-0.5">
+            <div className="space-y-0.5 text-right text-xs font-medium text-[var(--muted)]">
               <div>
-                Total: <span className="font-mono text-slate-700 dark:text-slate-300">{formatMoney(kpis.totalMarketValue)}</span>
+                Total: <span className="font-mono text-[var(--text)]">{formatMoney(kpis.totalMarketValue)}</span>
               </div>
               <div>
-                Avg: <span className="font-mono text-slate-700 dark:text-slate-300">{formatMoney(kpis.avgPrice)}</span>
-                <span className="mx-1 text-slate-400">•</span>
-                Median: <span className="font-mono text-slate-700 dark:text-slate-300">{formatMoney(kpis.medianPrice)}</span>
+                Avg: <span className="font-mono text-[var(--text)]">{formatMoney(kpis.avgPrice)}</span>
+                <span className="mx-1 text-[var(--muted)]/70">•</span>
+                Median: <span className="font-mono text-[var(--text)]">{formatMoney(kpis.medianPrice)}</span>
               </div>
             </div>
           }

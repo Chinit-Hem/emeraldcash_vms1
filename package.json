@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack --port 3000",
-    "dev:stable": "FAST_REFRESH=false next dev --webpack --port 3000",
+    "dev": "npm run dev:reset",
+    "dev:stable": "npm run dev:reset:stable",
     "dev:reset": "node scripts/dev-reset.mjs && next dev --webpack --port 3000",
     "dev:reset:stable": "node scripts/dev-reset.mjs && FAST_REFRESH=false next dev --webpack --port 3000",
     "build": "next build --webpack",
@@ -15,6 +15,8 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "bcryptjs": "^3.0.3",
+    "d3-time-format": "^4.1.0",
+    "lucide-react": "^0.563.0",
     "next": "^16.1.6",
     "react": "18.3.1",
     "react-dom": "18.3.1",

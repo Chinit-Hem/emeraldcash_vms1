@@ -143,29 +143,29 @@ function LoginForm() {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 relative">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       {/* Theme Toggle in top right */}
       <div className="absolute top-4 right-4 z-20">
         <ThemeToggle />
       </div>
 
       {/* Animated Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-gradient-to-br from-emerald-400/20 via-emerald-500/10 to-transparent rounded-full blur-3xl animate-float-slow" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-gradient-to-tl from-red-400/15 via-red-500/10 to-transparent rounded-full blur-3xl animate-float-slow-reverse" />
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute left-0 top-0 h-[520px] w-[520px] rounded-full bg-gradient-to-br from-emerald-400/12 via-emerald-500/6 to-transparent blur-3xl dark:from-emerald-500/10 dark:via-transparent animate-float-slow" />
+        <div className="absolute bottom-0 right-0 h-[460px] w-[460px] rounded-full bg-gradient-to-tl from-red-400/12 via-red-500/8 to-transparent blur-3xl dark:from-red-500/10 dark:via-transparent animate-float-slow-reverse" />
       </div>
 
       <div className="w-full max-w-[400px] relative z-10">
         {/* Card */}
-        <div className="relative overflow-hidden rounded-3xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-white/50 dark:border-white/10 shadow-2xl">
+        <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--card)]/95 shadow-[0_16px_36px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:bg-slate-900/82 dark:border-slate-600/35 dark:shadow-[0_20px_40px_rgba(2,6,23,0.56)]">
           
           {/* Header */}
           <div className="relative h-32 bg-gradient-to-r from-emerald-600 to-emerald-500 overflow-visible">
-            <div className="absolute inset-0 bg-gradient-to-t from-white/90 dark:from-gray-800/90 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-white/90 dark:from-slate-900/90 to-transparent" />
             
             {/* Logo */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
-              <div className="w-16 h-16 rounded-2xl bg-white dark:bg-gray-700 shadow-xl flex items-center justify-center p-2">
+              <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 border border-white/60 dark:border-slate-600/55 shadow-xl flex items-center justify-center p-2">
                 <img
                   src="/logo.png"
                   alt="Emerald Cash"
@@ -200,7 +200,7 @@ function LoginForm() {
                   autoComplete="username"
                   required
                   disabled={loading}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+                  className="h-11 w-full rounded-xl border border-[var(--border)] bg-white/95 px-4 text-[var(--text)] shadow-inner shadow-slate-900/5 transition-all duration-200 placeholder:text-[var(--muted)] focus:border-emerald-400/40 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 disabled:opacity-60 dark:bg-slate-800/80 dark:border-slate-500/45 dark:text-slate-100 dark:placeholder:text-slate-400"
                 />
               </div>
 
@@ -218,12 +218,12 @@ function LoginForm() {
                     autoComplete="current-password"
                     required
                     disabled={loading}
-                    className="w-full px-4 py-3 pr-12 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+                    className="h-11 w-full rounded-xl border border-[var(--border)] bg-white/95 px-4 pr-12 text-[var(--text)] shadow-inner shadow-slate-900/5 transition-all duration-200 placeholder:text-[var(--muted)] focus:border-emerald-400/40 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 disabled:opacity-60 dark:bg-slate-800/80 dark:border-slate-500/45 dark:text-slate-100 dark:placeholder:text-slate-400"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--muted)] transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 dark:hover:bg-slate-700/55 dark:hover:text-emerald-300"
                     tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
@@ -271,9 +271,9 @@ function LoginForm() {
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   disabled={loading}
-                  className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 dark:border-slate-500 dark:bg-slate-800"
                 />
-                <span className="text-sm text-gray-600 dark:text-gray-400">Remember me</span>
+                <span className="text-sm text-[var(--muted)]">Remember me</span>
               </label>
 
               {/* Success message */}
@@ -294,10 +294,10 @@ function LoginForm() {
               {debugInfo && (
                 <div className="mt-4">
                   <details className="text-xs">
-                    <summary className="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                    <summary className="cursor-pointer text-[var(--muted)] hover:text-[var(--text)]">
                       Debug Info (tap to expand)
                     </summary>
-                    <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded overflow-x-auto text-gray-600 dark:text-gray-400">
+                    <pre className="mt-2 overflow-x-auto rounded border border-[var(--border)] bg-slate-100/80 p-2 text-[var(--muted)] dark:bg-slate-900/80">
                       {debugInfo}
                     </pre>
                     <button
@@ -331,9 +331,8 @@ function LoginForm() {
             </form>
 
             {/* Footer */}
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <p className="text-xs text-gray-500">© 2024 Emerald Cash</p>
-              <ThemeToggle />
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700/80 flex items-center justify-center">
+              <p className="text-xs text-[var(--muted)]">© 2024 Emerald Cash</p>
             </div>
           </div>
         </div>
@@ -358,9 +357,9 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
         <div className="w-full max-w-[400px]">
-          <div className="relative overflow-hidden rounded-3xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-white/50 dark:border-white/10 shadow-2xl p-8">
+          <div className="relative overflow-hidden rounded-3xl bg-white/90 dark:bg-slate-900/82 backdrop-blur-xl border border-white/50 dark:border-slate-600/35 shadow-2xl p-8">
             <div className="flex flex-col items-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
               <p className="text-gray-600 dark:text-gray-400">Loading...</p>

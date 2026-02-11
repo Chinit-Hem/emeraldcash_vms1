@@ -2,6 +2,7 @@
 
 import React from "react";
 import { GlassCard } from "./GlassCard";
+import { cn, ui } from "@/lib/ui";
 
 interface SectionCardProps {
   title: string;
@@ -28,11 +29,11 @@ export function SectionCard({
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             {icon && (
-              <div className="p-2 rounded-xl bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+              <div className="rounded-xl bg-emerald-100/60 p-2 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
                 {icon}
               </div>
             )}
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 className={cn(ui.text.title, "text-lg")}>
               {title}
             </h3>
           </div>

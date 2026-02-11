@@ -2,7 +2,7 @@
 
 import { GlassButton } from "@/app/components/ui/GlassButton";
 import { GlassInput } from "@/app/components/ui/GlassInput";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Vehicle } from "@/lib/types";
 import { COLOR_OPTIONS } from "@/lib/types";
 
@@ -88,6 +88,27 @@ export default function FiltersBar({
       filters.dateTo ||
       filters.withoutImage;
 
+  const hasAdvancedFilters =
+    filters.category !== "All" ||
+    filters.brand !== "All" ||
+    filters.yearMin ||
+    filters.yearMax ||
+    filters.priceMin ||
+    filters.priceMax ||
+    filters.condition !== "All" ||
+    filters.color !== "All" ||
+    filters.dateFrom ||
+    filters.dateTo ||
+    filters.withoutImage;
+
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(hasAdvancedFilters);
+
+  useEffect(() => {
+    if (hasAdvancedFilters) {
+      setShowAdvancedFilters(true);
+    }
+  }, [hasAdvancedFilters]);
+
 
   // Active filter chips
   const activeFilters = useMemo(() => {
@@ -161,6 +182,13 @@ export default function FiltersBar({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <GlassButton
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowAdvancedFilters((prev) => !prev)}
+          >
+            {showAdvancedFilters ? "Hide Filters" : "More Filters"}
+          </GlassButton>
           <GlassButton variant="outline" size="sm">
             Apply Filters
           </GlassButton>
@@ -220,36 +248,38 @@ export default function FiltersBar({
         </div>
       )}
 
-      {/* Filter Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
-        {/* Search */}
-        <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Search
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Brand, Model, or Plate..."
-              value={filters.search}
-              onChange={(e) => handleChange("search", e.target.value)}
-              className="w-full px-4 py-2.5 pl-10 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            />
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-          </div>
+      {/* Search */}
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Search
+        </label>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Brand, Model, or Plate..."
+            value={filters.search}
+            onChange={(e) => handleChange("search", e.target.value)}
+            className="w-full px-4 py-2.5 pl-10 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+          />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
         </div>
+      </div>
+
+      {/* Advanced Filter Grid */}
+      {showAdvancedFilters && (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
 
         {/* Category */}
         <div>
@@ -391,6 +421,7 @@ export default function FiltersBar({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

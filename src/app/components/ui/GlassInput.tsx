@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { GlassButton } from "./GlassButton";
+import { cn, ui } from "@/lib/ui";
 
 interface GlassInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -20,7 +21,6 @@ export function GlassInput({
   ...props
 }: GlassInputProps) {
   const [showPassword, setShowPassword] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
 
   const isPassword = type === "password";
   const inputType = isPassword ? (showPassword ? "text" : "password") : type;
@@ -28,49 +28,26 @@ export function GlassInput({
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className={cn(ui.text.label, "mb-1.5 block")}>
           {label}
         </label>
       )}
-      <div
-        className={`
-          relative flex items-center
-          bg-white dark:bg-gray-800
-          border-2 rounded-xl
-          transition-all duration-200
-          ${isFocused 
-            ? "border-emerald-500 shadow-[0_0_0_3px_rgba(5,150,105,0.15)]" 
-            : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
-          }
-          ${error ? "border-red-500 shadow-[0_0_0_3px_rgba(220,38,38,0.15)]" : ""}
-        `}
-      >
+      <div className="relative flex items-center">
 
         {icon && (
-          <div className="absolute left-4 text-gray-400 pointer-events-none">
+          <div className="pointer-events-none absolute left-3.5 text-[var(--muted)]">
             {icon}
           </div>
         )}
         <input
           type={inputType}
-          className={`
-            w-full bg-transparent text-gray-900 dark:text-white
-            placeholder:text-gray-400 dark:placeholder:text-gray-500
-            focus:outline-none
-            text-base
-            ${icon ? "pl-12" : "pl-4"}
-            ${isPassword || rightElement ? "pr-12" : "pr-4"}
-            py-3.5
-            ${className}
-          `}
-          onFocus={(e) => {
-            setIsFocused(true);
-            props.onFocus?.(e);
-          }}
-          onBlur={(e) => {
-            setIsFocused(false);
-            props.onBlur?.(e);
-          }}
+          className={cn(
+            ui.input.base,
+            icon && ui.input.withIcon,
+            (isPassword || rightElement) && ui.input.withRightElement,
+            error && ui.input.error,
+            className
+          )}
           {...props}
         />
         {isPassword && (
@@ -78,7 +55,7 @@ export function GlassInput({
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             variant="ghost"
-            className="absolute right-4 !p-1 !w-auto !h-auto"
+            className="absolute right-2 !h-8 !w-8 !rounded-lg !p-0"
             tabIndex={-1}
           >
             {showPassword ? (
@@ -94,11 +71,11 @@ export function GlassInput({
           </GlassButton>
         )}
         {!isPassword && rightElement && (
-          <div className="absolute right-4">{rightElement}</div>
+          <div className="absolute right-3">{rightElement}</div>
         )}
       </div>
       {error && (
-        <p className="mt-1.5 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+        <p className={cn(ui.text.danger, "mt-1.5 flex items-center gap-1")}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>

@@ -7,33 +7,13 @@ import { useState } from "react";
 
 import { clearCachedUser } from "@/app/components/authCache";
 import ChangePasswordModal from "@/app/components/ChangePasswordModal";
+import { useTheme } from "@/app/components/ThemeProvider";
 
 function normalizeCategory(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
 
 // Icon Components with consistent styling
-function IconDashboard({ active }: { active: boolean }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="ec-sidebar-icon"
-      aria-hidden="true"
-    >
-      <rect width="7" height="9" x="3" y="3" rx="1" />
-      <rect width="7" height="5" x="14" y="3" rx="1" />
-      <rect width="7" height="9" x="14" y="12" rx="1" />
-      <rect width="7" height="5" x="3" y="16" rx="1" />
-    </svg>
-  );
-}
-
 function IconVehicles({ active }: { active: boolean }) {
   return (
     <svg
@@ -51,6 +31,27 @@ function IconVehicles({ active }: { active: boolean }) {
       <circle cx="7" cy="17" r="2" />
       <path d="M9 17h6" />
       <circle cx="17" cy="17" r="2" />
+    </svg>
+  );
+}
+
+function IconDashboard({ active }: { active: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="ec-sidebar-icon"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="8" height="8" rx="1.5" />
+      <rect x="13" y="3" width="8" height="5" rx="1.5" />
+      <rect x="13" y="10" width="8" height="11" rx="1.5" />
+      <rect x="3" y="13" width="8" height="8" rx="1.5" />
     </svg>
   );
 }
@@ -158,6 +159,24 @@ function IconSettings({ active }: { active: boolean }) {
   );
 }
 
+function IconMoon({ active }: { active: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="ec-sidebar-icon"
+      aria-hidden="true"
+    >
+      <path d="M12 3a7 7 0 1 0 9 9 9 9 0 1 1-9-9z" />
+    </svg>
+  );
+}
+
 function IconLock({ className }: { className?: string }) {
   return (
     <svg
@@ -220,6 +239,23 @@ interface SidebarProps {
   user: User;
   onNavigate?: () => void;
 }
+
+const SIDEBAR_LABELS = {
+  brand: "Emerald Cash",
+  badge: "VMS PRO",
+  sectionOverview: "OVERVIEW",
+  dashboard: "Dashboard",
+  sectionFilters: "QUICK FILTERS",
+  vehicleFilters: "Vehicle Filters",
+  allVehicles: "All Vehicles",
+  cars: "Cars",
+  motorcycles: "Motorcycles",
+  tukTuks: "TukTuks",
+  addVehicle: "Add Vehicle",
+  darkMode: "Dark Mode",
+  sectionAccount: "ACCOUNT",
+  accountActions: "Account Actions",
+} as const;
 
 // Navigation Item Component - Premium glass pill
 function NavItem({
@@ -313,6 +349,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const { resolvedTheme, setThemeMode } = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -330,7 +367,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const activeCategory = pathname === "/vehicles" ? searchParams?.get("category") || "" : "";
 
   // Route active states
-  const isDashboardActive = pathname === "/";
+  const isDashboardActive = pathname === "/" || pathname === "/dashboard";
   const isVehiclesSectionActive = pathname.startsWith("/vehicles");
   const isAllVehiclesActive = pathname === "/vehicles" && !activeCategory;
   const isCarsActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "cars";
@@ -352,7 +389,10 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
       {/* Header - Premium brand lockup */}
       <div className="relative p-6 border-b border-black/5 dark:border-white/10">
         <div className="flex items-center gap-4">
-          <div className="relative w-12 h-12 rounded-xl bg-white shadow-lg flex items-center justify-center flex-shrink-0 overflow-hidden ring-2 ring-emerald-100">
+          <div
+            className="relative w-12 h-12 rounded-xl shadow-lg flex items-center justify-center flex-shrink-0 overflow-hidden ring-2 ring-emerald-100"
+            style={{ backgroundColor: "#ffffff" }}
+          >
             <Image
               src="/logo.png"
               alt="Emerald Cash"
@@ -364,10 +404,10 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           </div>
           <div className="min-w-0 flex flex-col">
             <h1 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight leading-tight">
-              Emerald Cash
+              {SIDEBAR_LABELS.brand}
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="ec-sidebar-badge">VMS PRO</span>
+              <span className="ec-sidebar-badge">{SIDEBAR_LABELS.badge}</span>
             </div>
           </div>
         </div>
@@ -375,20 +415,20 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="relative flex-1 p-4 space-y-1" aria-label="Main navigation">
-        {/* Overview Section */}
-        <SectionHeader title="Overview" />
+        {/* Main */}
+        <SectionHeader title={SIDEBAR_LABELS.sectionOverview} />
         <NavItem
           href="/"
           icon={IconDashboard}
-          label="Dashboard"
+          label={SIDEBAR_LABELS.dashboard}
           active={isDashboardActive}
           onClick={() => handleNavigate("/")}
         />
 
-        {/* Vehicles Section */}
-        <SectionHeader title="Vehicles" />
+        {/* Quick filters and deep links */}
+        <SectionHeader title={SIDEBAR_LABELS.sectionFilters} />
         <CollapsibleSection
-          title="All Vehicles"
+          title={SIDEBAR_LABELS.vehicleFilters}
           icon={IconVehicles}
           defaultOpen={isVehiclesSectionActive}
           active={isAllVehiclesActive}
@@ -396,7 +436,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           <NavItem
             href="/vehicles"
             icon={IconVehicles}
-            label="All Vehicles"
+            label={SIDEBAR_LABELS.allVehicles}
             active={isAllVehiclesActive}
             onClick={() => handleNavigate("/vehicles")}
             subItem
@@ -404,7 +444,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           <NavItem
             href="/vehicles?category=Cars"
             icon={IconCar}
-            label="Cars"
+            label={SIDEBAR_LABELS.cars}
             active={isCarsActive}
             onClick={() => handleNavigate("/vehicles?category=Cars")}
             subItem
@@ -412,7 +452,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           <NavItem
             href="/vehicles?category=Motorcycles"
             icon={IconMotorcycle}
-            label="Motorcycles"
+            label={SIDEBAR_LABELS.motorcycles}
             active={isMotorcyclesActive}
             onClick={() => handleNavigate("/vehicles?category=Motorcycles")}
             subItem
@@ -420,7 +460,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           <NavItem
             href="/vehicles?category=Tuk+Tuk"
             icon={IconTukTuk}
-            label="TukTuks"
+            label={SIDEBAR_LABELS.tukTuks}
             active={isTukTuksActive}
             onClick={() => handleNavigate("/vehicles?category=Tuk+Tuk")}
             subItem
@@ -429,18 +469,29 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
             <NavItem
               href="/vehicles/add"
               icon={IconAdd}
-              label="Add Vehicle"
+              label={SIDEBAR_LABELS.addVehicle}
               active={isAddActive}
               onClick={() => handleNavigate("/vehicles/add")}
               subItem
             />
           )}
         </CollapsibleSection>
+        <button
+          onClick={() => setThemeMode(resolvedTheme === "dark" ? "light" : "dark")}
+          className={`ec-sidebar-item mt-1 ${resolvedTheme === "dark" ? "ec-sidebar-item-active" : ""}`}
+          aria-label="Toggle dark mode"
+        >
+          <IconMoon active={resolvedTheme === "dark"} />
+          <span className="truncate flex-1 text-left">{SIDEBAR_LABELS.darkMode}</span>
+          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-black/5 dark:bg-white/10">
+            {resolvedTheme === "dark" ? "On" : "Off"}
+          </span>
+        </button>
 
-        {/* Admin Section */}
-        <SectionHeader title="Admin" />
+        {/* Account tools */}
+        <SectionHeader title={SIDEBAR_LABELS.sectionAccount} />
         <CollapsibleSection
-          title="Settings"
+          title={SIDEBAR_LABELS.accountActions}
           icon={IconSettings}
           defaultOpen={isSettingsActive}
           active={isSettingsActive}

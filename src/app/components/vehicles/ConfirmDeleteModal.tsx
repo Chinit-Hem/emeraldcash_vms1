@@ -239,16 +239,12 @@ export function ConfirmDeleteModal({
                 onChange={(e) => setConfirmText(e.target.value)}
                 placeholder={`Type ${expectedText} to confirm`}
                 className={`
-                  w-full h-11 px-4
-                  bg-white/5 dark:bg-white/5
-                  border rounded-xl
-                  text-gray-900 dark:text-white text-center font-mono uppercase
-                  placeholder:text-gray-400 dark:placeholder:text-gray-500
+                  ec-liquid-input w-full h-11 px-4
+                  rounded-xl text-center font-mono uppercase
                   transition-all duration-200
-                  focus:outline-none focus:ring-2
                   ${isConfirmed
-                    ? "border-emerald-400/60 ring-2 ring-emerald-400/40 bg-emerald-500/5"
-                    : "border-red-400/60 ring-2 ring-red-400/40 bg-red-500/5"
+                    ? "border-emerald-400/60 bg-emerald-500/5"
+                    : "border-red-400/60 bg-red-500/5"
                   }
                 `}
                 aria-invalid={!isConfirmed}

@@ -86,16 +86,16 @@ export async function POST(req: NextRequest) {
 
   // Set a test cookie with same options as session (matching login route)
   // IMPORTANT: Do NOT set domain - let browser use default (current domain)
-  const protocol = req.headers.get("x-forwarded-proto") || "http";
-  const isHttps = protocol === "https" || process.env.NODE_ENV === "production";
-  
-  const host = req.headers.get("host") || "";
-  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("::1");
+  const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  const isHttps =
+    forwardedProto === "https" ||
+    req.nextUrl.protocol === "https:" ||
+    process.env.NODE_ENV === "production";
 
   const cookieOptions = {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: !isLocalhost, // Match login route logic
+    secure: isHttps,
     path: "/",
     maxAge: 60 * 5, // 5 minutes for test
   };
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
   console.log("[AUTH_DEBUG] Test cookie set:", {
     ...cookieOptions,
     value: testValue,
-    isLocalhost,
+    protocol: forwardedProto || req.nextUrl.protocol,
     isHttps,
   });
 

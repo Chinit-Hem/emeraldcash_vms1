@@ -7,6 +7,7 @@ import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
 import MobileBottomNav from "@/app/components/MobileBottomNav";
+import ThemeToggle from "@/app/components/ThemeToggle";
 import { AuthUserProvider } from "@/app/components/AuthContext";
 import { UIProvider, useUI } from "@/app/components/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/app/components/authCache";
@@ -190,7 +191,7 @@ function AppShellContent({ children }: AppShellProps) {
 
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Mobile header - Liquid Glass White */}
-          <header className="lg:hidden sticky top-0 z-40 ec-glassPanel border-b border-white/40 dark:border-white/10">
+          <header className="lg:hidden sticky top-0 z-40 ec-glassPanel ec-theme-overlay-host border-b border-white/40 dark:border-white/10">
             <div className="h-14 px-4 flex items-center justify-between">
               <button
                 onClick={() => setIsSidebarOpen(true)}
@@ -218,19 +219,19 @@ function AppShellContent({ children }: AppShellProps) {
                 </div>
               </div>
 
-              <div className="w-10" /> {/* Spacer for balance */}
+              <ThemeToggle className="shrink-0" />
             </div>
           </header>
 
 
           {/* Main content */}
-          <main className="flex-1 overflow-auto pb-20 lg:pb-0">
+          <main className="flex-1 overflow-auto pb-24 lg:pb-24">
             {children}
           </main>
 
-          {/* Mobile nav - Hide when modal is open */}
+          {/* Bottom nav - shared across mobile and desktop */}
           {!isModalOpen && (
-            <MobileBottomNav onSettingsClick={() => setIsSidebarOpen(true)} />
+            <MobileBottomNav />
           )}
         </div>
       </AuthUserProvider>

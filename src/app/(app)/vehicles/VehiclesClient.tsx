@@ -532,10 +532,10 @@ export default function VehiclesClient() {
 
         {/* Data Status Bar - Enterprise Grade */}
         {!loading && !error && (
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-gradient-to-r from-white/90 to-white/70 dark:from-gray-800/90 dark:to-gray-800/70 backdrop-blur-md rounded-xl border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
+          <div className="ec-status-bar flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-gradient-to-r from-white/90 to-white/70 dark:from-gray-800/90 dark:to-gray-800/70 backdrop-blur-md rounded-xl border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
             <div className="flex items-center gap-6 text-sm">
               {/* Last Sync */}
-              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
@@ -548,7 +548,7 @@ export default function VehiclesClient() {
                   <polyline points="12,6 12,12 16,14" />
                 </svg>
                 <span>
-                  Last sync: <span className="font-medium text-gray-900 dark:text-gray-200">{lastSyncTime ? lastSyncTime.toLocaleString() : "Never"}</span>
+                  Last sync: <span className="font-medium text-gray-900 dark:text-gray-100">{lastSyncTime ? lastSyncTime.toLocaleString() : "Never"}</span>
                 </span>
               </div>
 
@@ -572,13 +572,13 @@ export default function VehiclesClient() {
               )}
 
               {/* View Mode Toggle */}
-              <div className="flex items-center gap-2 bg-gray-100/80 dark:bg-gray-700/50 rounded-lg p-1">
+              <div className="ec-status-toggle flex items-center gap-2 bg-gray-100/80 dark:bg-gray-700/50 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode("all-time")}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  className={`ec-status-btn px-3 py-1 rounded-md text-xs font-medium transition-all ${
                     viewMode === "all-time"
-                      ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                      ? "ec-status-btn-active bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm"
+                      : "ec-status-btn-inactive text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
                   }`}
                 >
                   All-time Totals
@@ -586,10 +586,10 @@ export default function VehiclesClient() {
                 <button
                   onClick={() => setViewMode("filtered")}
                   disabled={!isFiltered}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  className={`ec-status-btn px-3 py-1 rounded-md text-xs font-medium transition-all ${
                     viewMode === "filtered"
-                      ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                      ? "ec-status-btn-active bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm"
+                      : "ec-status-btn-inactive text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
                   }`}
                 >
                   Filtered Results

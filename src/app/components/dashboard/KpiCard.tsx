@@ -25,19 +25,19 @@ export default function KpiCard({ label, value, sublabel, subtitle, accent = "gr
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
-      <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
         {label}
       </div>
-      <div className="mt-2 text-3xl font-bold text-slate-800 dark:text-white tabular-nums tracking-tight">
+      <div className="mt-2 text-3xl font-bold text-[var(--text)] tabular-nums tracking-tight">
         {value}
       </div>
       {sublabel ? (
-        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
+        <div className="mt-1 text-xs font-medium text-[var(--muted)]">
           {sublabel}
         </div>
       ) : null}
       {subtitle ? (
-        <div className="mt-1 text-xs text-slate-400 dark:text-slate-500 italic">
+        <div className="mt-1 text-xs italic text-[var(--muted)]/80">
           {subtitle}
         </div>
       ) : null}

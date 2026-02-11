@@ -3,6 +3,7 @@
 import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
+import { cn, ui } from "@/lib/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -35,13 +36,16 @@ const SortHeader = ({ field, children, sortField, sortDirection, onSort }: SortH
   return (
     <th
       onClick={() => onSort(field)}
-      className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors select-none sticky top-0 z-20"
+      className={cn(
+        ui.table.th,
+        "sticky top-0 z-20 cursor-pointer select-none transition-colors hover:bg-slate-100 dark:hover:bg-white/10"
+      )}
     >
       <div className="flex items-center gap-1">
         {children}
         <span className="inline-flex flex-col">
           <svg
-            className={`h-3 w-3 ${isActive && sortDirection === "asc" ? "text-emerald-600" : "text-gray-300"}`}
+            className={`h-3 w-3 ${isActive && sortDirection === "asc" ? "text-emerald-600 dark:text-emerald-300" : "text-slate-300 dark:text-slate-600"}`}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -50,7 +54,7 @@ const SortHeader = ({ field, children, sortField, sortDirection, onSort }: SortH
             <path d="m18 15-6-6-6 6" />
           </svg>
           <svg
-            className={`h-3 w-3 -mt-1 ${isActive && sortDirection === "desc" ? "text-emerald-600" : "text-gray-300"}`}
+            className={`-mt-1 h-3 w-3 ${isActive && sortDirection === "desc" ? "text-emerald-600 dark:text-emerald-300" : "text-slate-300 dark:text-slate-600"}`}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -121,7 +125,12 @@ export default function VehicleTable({
         <div className="relative">
           <button
             onClick={() => setShowColumnMenu(!showColumnMenu)}
-            className="px-3 py-2 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+            className={cn(
+              ui.button.base,
+              ui.button.size.sm,
+              ui.button.secondary,
+              "px-3 text-sm"
+            )}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -140,20 +149,20 @@ export default function VehicleTable({
             Columns
           </button>
           {showColumnMenu && (
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-30">
+            <div className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--card)] p-1 shadow-[0_14px_28px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-900/95 dark:backdrop-blur-xl">
               <div className="p-2">
-                <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
                   Visible Columns
                 </div>
                 {COLUMNS.map((column) => (
-                  <label key={column.key} className="flex items-center gap-2 py-1 px-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                  <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10">
                     <input
                       type="checkbox"
                       checked={visibleColumns.includes(column.key)}
                       onChange={() => toggleColumn(column.key)}
-                      className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-slate-600"
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{column.label}</span>
+                    <span className="text-sm text-[var(--text)]">{column.label}</span>
                   </label>
                 ))}
               </div>
@@ -162,15 +171,15 @@ export default function VehicleTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg max-h-[70vh]">
-        <table className="w-full min-w-[1000px]">
-          <thead className="sticky top-0 z-20">
-            <tr className="bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <div className={cn(ui.table.wrapper, "max-h-[70vh]")}>
+        <table className={ui.table.table}>
+          <thead className={ui.table.head}>
+            <tr className={ui.table.headRow}>
 
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+              <th className={ui.table.th}>
                 ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-16">
+              <th className={cn(ui.table.th, "w-16")}>
                 Image
               </th>
               <SortHeader field="Category" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Category</SortHeader>
@@ -178,31 +187,31 @@ export default function VehicleTable({
               <SortHeader field="Model" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Model</SortHeader>
               <SortHeader field="Year" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Year</SortHeader>
               <SortHeader field="Plate" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Plate</SortHeader>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+              <th className={cn(ui.table.th, "text-right")}>
                 Market Price
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+              <th className={cn(ui.table.th, "text-right")}>
                 D.O.C. 40%
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+              <th className={cn(ui.table.th, "text-right")}>
                 Vehicles 70%
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+              <th className={ui.table.th}>
                 Tax Type
               </th>
               <SortHeader field="Condition" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Condition</SortHeader>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+              <th className={ui.table.th}>
                 Body Type
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+              <th className={ui.table.th}>
                 Color
               </th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-32">
+              <th className={cn(ui.table.th, "w-32 text-center")}>
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody>
             {vehicles.map((vehicle, index) => {
               const derived = derivePrices(vehicle.PriceNew);
               const price40 = vehicle.Price40 ?? derived.Price40;
@@ -216,11 +225,11 @@ export default function VehicleTable({
               return (
               <tr
                 key={vehicleId || `row-${index}`}
-                className={`${
-                  index % 2 === 0 
-                    ? "bg-white dark:bg-gray-900/40" 
-                    : "bg-gray-50/80 dark:bg-gray-800/40"
-                } hover:bg-emerald-50/80 dark:hover:bg-emerald-900/30 transition-colors duration-150 border-b border-gray-100 dark:border-gray-800/50 last:border-b-0`}
+                className={cn(
+                  ui.table.tr,
+                  "transition-colors duration-150",
+                  index % 2 !== 0 && "bg-slate-50/70 dark:bg-white/[0.01]"
+                )}
               >
 
                   {/* Vehicle ID */}
@@ -282,12 +291,12 @@ export default function VehicleTable({
                   </td>
 
                   {/* Market Price */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-blue-600 dark:text-blue-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                     {formatPrice(vehicle.PriceNew)}
                   </td>
 
                   {/* D.O.C. 40% */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-orange-600 dark:text-orange-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-red-700 dark:text-red-300">
                     {formatPrice(price40)}
                   </td>
 
@@ -308,7 +317,7 @@ export default function VehicleTable({
                         vehicle.Condition === "New"
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
                           : vehicle.Condition === "Used"
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                          ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
                           : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
                       }`}
                     >
@@ -350,7 +359,7 @@ export default function VehicleTable({
                         <>
                       <button
                         onClick={() => onEdit ? onEdit(vehicle) : router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`)}
-                        className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors touch-target"
+                        className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/30 transition-colors touch-target"
                         title="Edit"
                       >
 

@@ -112,10 +112,10 @@ export function buildVehiclesByCategory(vehicles: Vehicle[]): PieDatum[] {
   for (const v of vehicles) counts[normalizeCategoryLabel(v.Category)] += 1;
 
   const colors: Record<CategoryLabel, string> = {
-    Cars: "#2563eb",
-    Motorcycles: "#f59e0b",
-    "Tuk Tuk": "#10b981",
-    Other: "#94a3b8",
+    Cars: "var(--ec-chart-emerald)",
+    Motorcycles: "var(--ec-chart-emerald-soft)",
+    "Tuk Tuk": "var(--ec-chart-red-soft)",
+    Other: "var(--ec-chart-neutral)",
   };
 
   return (Object.keys(counts) as CategoryLabel[])
@@ -146,9 +146,9 @@ export function buildNewVsUsed(vehicles: Vehicle[]): PieDatum[] {
   for (const v of vehicles) counts[normalizeConditionLabel(v.Condition)] += 1;
 
   const colors: Record<ConditionLabel, string> = {
-    New: "#16a34a",
-    Used: "#f59e0b",
-    Other: "#94a3b8",
+    New: "var(--ec-chart-emerald)",
+    Used: "var(--ec-chart-red)",
+    Other: "var(--ec-chart-neutral)",
   };
 
   return (Object.keys(counts) as ConditionLabel[])
@@ -223,4 +223,3 @@ export function buildMonthlyAdded(vehicles: Vehicle[]): BarDatum[] {
   const range = monthRange(keys[0], keys[keys.length - 1]);
   return range.map((month) => ({ name: month, value: monthCounts.get(month) ?? 0 }));
 }
-

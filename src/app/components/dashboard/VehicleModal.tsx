@@ -205,16 +205,21 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      {/* Liquid Glass Modal Container */}
-      <div className="ec-glassCard w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden bg-gradient-to-br from-white/70 via-emerald-100/20 via-red-50/10 via-emerald-50/15 to-white/70 dark:from-white/8 dark:via-emerald-500/15 dark:via-red-900/8 dark:via-emerald-900/12 dark:to-white/8">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+      {/* Liquid Glass Modal Container - Mobile Optimized */}
+      <div 
+        className="ec-glassCard w-full max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col rounded-none sm:rounded-2xl overflow-hidden bg-gradient-to-br from-white/70 via-emerald-100/20 via-red-50/10 via-emerald-50/15 to-white/70 dark:from-white/8 dark:via-emerald-500/15 dark:via-red-900/8 dark:via-emerald-900/12 dark:to-white/8"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
         {/* Header with Liquid Glass */}
-        <div className="relative flex items-center justify-between px-6 py-5 border-b border-white/20 bg-gradient-to-r from-emerald-600/90 to-emerald-500/90">
+        <div className="relative flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 border-b border-white/20 bg-gradient-to-r from-emerald-600/90 to-emerald-500/90 flex-shrink-0">
           <div className="relative z-10">
-            <h2 className="text-xl font-bold text-white drop-shadow-sm">
+            <h2 className="text-lg sm:text-xl font-bold text-white drop-shadow-sm">
               {isEditing ? "Edit Vehicle" : "Add New Vehicle"}
             </h2>
-            <p className="text-sm text-emerald-50/90 mt-0.5">
+            <p className="text-xs sm:text-sm text-emerald-50/90 mt-0.5 hidden sm:block">
               Enter the vehicle details below. Required fields are marked with an asterisk (*).
             </p>
           </div>
@@ -240,15 +245,15 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-white/5 to-transparent">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 bg-gradient-to-b from-white/5 to-transparent">
             
             {/* Basic Information Section */}
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Basic Information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {/* Category */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-1">
@@ -326,7 +331,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                 </div>
 
                 {/* Year */}
-                <div className="space-y-1.5 md:col-span-2">
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
                     Year
                   </label>
@@ -343,12 +348,12 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
             </div>
 
             {/* Specifications Section */}
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Specifications
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {/* Color */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -435,12 +440,12 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
             </div>
 
             {/* Pricing Section */}
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Pricing
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 {/* Market Price */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -512,7 +517,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
             </div>
 
             {/* Vehicle Images Section */}
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Vehicle Images
@@ -524,7 +529,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => document.getElementById('vehicle-image')?.click()}
-                className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 overflow-hidden cursor-pointer ${
+                className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center transition-all duration-300 overflow-hidden cursor-pointer ${
                   isDragging
                     ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/20 scale-[1.02]"
                     : "border-gray-300 dark:border-gray-600 hover:border-emerald-400 dark:hover:border-emerald-500 bg-white/30 dark:bg-gray-800/30"
@@ -539,7 +544,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                     <img
                       src={imagePreview}
                       alt="Preview"
-                      className="h-40 w-auto rounded-xl object-cover shadow-lg ring-2 ring-white dark:ring-gray-700"
+                      className="h-32 sm:h-40 w-auto rounded-xl object-cover shadow-lg ring-2 ring-white dark:ring-gray-700"
                     />
                     <button
                       type="button"
@@ -553,9 +558,9 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                   </div>
                 ) : (
                   <div className="relative space-y-3">
-                    <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-800/20 flex items-center justify-center shadow-inner">
+                    <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-800/20 flex items-center justify-center shadow-inner">
                       <svg
-                        className="w-8 h-8 text-emerald-500 dark:text-emerald-400"
+                        className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-500 dark:text-emerald-400"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -587,7 +592,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                 />
                 <label
                   htmlFor="vehicle-image"
-                  className="relative mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-white/80 dark:bg-gray-700/80 hover:bg-white dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600 text-sm font-medium backdrop-blur-sm pointer-events-auto"
+                  className="relative mt-4 inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-white/80 dark:bg-gray-700/80 hover:bg-white dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600 text-sm font-medium backdrop-blur-sm pointer-events-auto"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <svg className="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -630,20 +635,20 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
             </div>
           </div>
 
-          {/* Actions - Sticky Footer */}
-          <div className="sticky bottom-0 flex flex-col sm:flex-row justify-end gap-3 px-6 py-5 border-t border-white/20 bg-gradient-to-r from-gray-50/80 to-gray-100/50 dark:from-gray-800/80 dark:to-gray-900/50 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
+          {/* Actions - Fixed Sticky Footer Always Visible */}
+          <div className="flex-shrink-0 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 px-4 sm:px-6 py-4 sm:py-5 border-t border-white/20 bg-gradient-to-r from-gray-50/90 to-gray-100/70 dark:from-gray-800/90 dark:to-gray-900/70 backdrop-blur-xl">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white/70 dark:bg-gray-700/70 hover:bg-white dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 backdrop-blur-sm"
+              className="w-full sm:w-auto px-5 py-3 sm:py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white/80 dark:bg-gray-700/80 hover:bg-white dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 backdrop-blur-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full sm:w-auto ec-glassBtnPrimary relative px-6 py-2.5 text-sm font-medium rounded-xl overflow-hidden active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full sm:w-auto ec-glassBtnPrimary relative px-6 py-3 sm:py-2.5 text-sm font-medium rounded-xl overflow-hidden active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
