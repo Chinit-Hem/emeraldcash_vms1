@@ -7,7 +7,6 @@ import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
 import MobileBottomNav from "@/app/components/MobileBottomNav";
-import ThemeToggle from "@/app/components/ThemeToggle";
 import { AuthUserProvider } from "@/app/components/AuthContext";
 import { UIProvider, useUI } from "@/app/components/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/app/components/authCache";
@@ -219,7 +218,7 @@ function AppShellContent({ children }: AppShellProps) {
                 </div>
               </div>
 
-              <ThemeToggle className="shrink-0" />
+              <div className="w-9" aria-hidden="true" />
             </div>
           </header>
 

@@ -478,7 +478,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
         </CollapsibleSection>
         <button
           onClick={() => setThemeMode(resolvedTheme === "dark" ? "light" : "dark")}
-          className={`ec-sidebar-item mt-1 ${resolvedTheme === "dark" ? "ec-sidebar-item-active" : ""}`}
+          className={`ec-sidebar-item mt-1 hidden lg:flex ${resolvedTheme === "dark" ? "ec-sidebar-item-active" : ""}`}
           aria-label="Toggle dark mode"
         >
           <IconMoon active={resolvedTheme === "dark"} />
@@ -489,58 +489,60 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
         </button>
 
         {/* Account tools */}
-        <SectionHeader title={SIDEBAR_LABELS.sectionAccount} />
-        <CollapsibleSection
-          title={SIDEBAR_LABELS.accountActions}
-          icon={IconSettings}
-          defaultOpen={isSettingsActive}
-          active={isSettingsActive}
-        >
-          <div className="ec-sidebar-sub-item space-y-3 py-2">
-            {/* User Card - Premium glass with status */}
-            <div className="ec-sidebar-user-card">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="relative">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
-                    {user.username.charAt(0).toUpperCase()}
+        <div className="hidden lg:block">
+          <SectionHeader title={SIDEBAR_LABELS.sectionAccount} />
+          <CollapsibleSection
+            title={SIDEBAR_LABELS.accountActions}
+            icon={IconSettings}
+            defaultOpen={isSettingsActive}
+            active={isSettingsActive}
+          >
+            <div className="ec-sidebar-sub-item space-y-3 py-2">
+              {/* User Card - Premium glass with status */}
+              <div className="ec-sidebar-user-card">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                      {user.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="ec-status-dot absolute -bottom-0.5 -right-0.5" />
                   </div>
-                  <div className="ec-status-dot absolute -bottom-0.5 -right-0.5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
-                    {user.username}
-                  </p>
-                  <span
-                    className={`ec-sidebar-role-badge ${
-                      isAdmin ? "ec-sidebar-role-badge-admin" : "ec-sidebar-role-badge-user"
-                    }`}
-                  >
-                    {user.role}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
+                      {user.username}
+                    </p>
+                    <span
+                      className={`ec-sidebar-role-badge ${
+                        isAdmin ? "ec-sidebar-role-badge-admin" : "ec-sidebar-role-badge-user"
+                      }`}
+                    >
+                      {user.role}
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* Actions - Premium glass buttons */}
+              <button
+                onClick={() => setChangePasswordOpen(true)}
+                className="ec-sidebar-action-secondary touch-target"
+                aria-label="Change password"
+              >
+                <IconLock className="w-4 h-4" />
+                <span>Change Password</span>
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="ec-sidebar-action-danger touch-target"
+                aria-label="Logout"
+              >
+                <IconLogout className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
             </div>
-
-            {/* Actions - Premium glass buttons */}
-            <button
-              onClick={() => setChangePasswordOpen(true)}
-              className="ec-sidebar-action-secondary touch-target"
-              aria-label="Change password"
-            >
-              <IconLock className="w-4 h-4" />
-              <span>Change Password</span>
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="ec-sidebar-action-danger touch-target"
-              aria-label="Logout"
-            >
-              <IconLogout className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </CollapsibleSection>
+          </CollapsibleSection>
+        </div>
       </nav>
 
       {/* Footer - Subtle copyright */}

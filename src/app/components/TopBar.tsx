@@ -93,14 +93,16 @@ export default function TopBar({
         <div className="flex items-center gap-2 min-w-0">
           {!title && (
             <>
-              <Image
-                src="/logo.png"
-                alt="Emerald Cash"
-                width={28}
-                height={28}
-                className="h-7 w-7 object-contain"
-                priority
-              />
+              <div className="relative h-8 w-8 rounded-lg bg-white shadow ring-1 ring-emerald-100 overflow-hidden flex items-center justify-center">
+                <Image
+                  src="/logo.png"
+                  alt="Emerald Cash"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 object-contain"
+                  priority
+                />
+              </div>
               <div className="min-w-0 hidden sm:block">
                 <div className="text-sm font-extrabold text-gray-900 dark:text-white truncate">
                   Emerald Cash
@@ -115,7 +117,7 @@ export default function TopBar({
           <div className="hidden md:block text-xs text-gray-600 dark:text-gray-400 truncate max-w-[150px]">
             {user.role}: {user.username}
           </div>
-          <ThemeToggle className="p-2 touch-target" />
+          <ThemeToggle className="hidden sm:inline-flex p-2 touch-target" />
         </div>
       </div>
     </header>

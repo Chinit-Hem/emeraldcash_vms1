@@ -54,7 +54,7 @@ export default function DashboardHeader() {
           </div>
 
           {/* User Info, Theme Toggle and Logout */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="hidden sm:flex items-center gap-3 sm:gap-4">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 {user.username}
