@@ -3,7 +3,7 @@ import {
   getClientIp,
   getClientUserAgent,
 } from "@/lib/auth";
-import type { Role } from "@/lib/types";
+import { authenticateUser } from "@/lib/userStore";
 import { NextRequest, NextResponse } from "next/server";
 
 // ============ Rate Limiting ============
@@ -55,64 +55,12 @@ function recordSuccessfulAttempt(key: string): void {
   loginAttempts.delete(key);
 }
 
-// ============ Credentials ============
-interface UserConfig {
-  passwordHash: string;
-  role: Role;
-}
-
-function getUserConfig(username: string): UserConfig | null {
-  const normalizedUsername = username.toLowerCase();
-
-  // Check environment variables first
-  const envUsername = process.env[`${normalizedUsername.toUpperCase()}_USERNAME`];
-  const envPasswordHash = process.env[`${normalizedUsername.toUpperCase()}_PASSWORD_HASH`];
-
-  if (envUsername && envPasswordHash) {
-    return {
-      passwordHash: envPasswordHash,
-      role: normalizedUsername.includes("admin") ? "Admin" : "Staff",
-    };
-  }
-
-  // Fallback demo users
-  const DEMO_USERS: Record<string, { passwordHash: string; role: Role }> = {
-    admin: {
-      passwordHash: "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy", // password: 1234
-      role: "Admin",
-    },
-    staff: {
-      passwordHash: "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy", // password: 1234
-      role: "Staff",
-    },
-  };
-
-  const entry = DEMO_USERS[normalizedUsername];
-  if (!entry) return null;
-
-  return {
-    passwordHash: entry.passwordHash,
-    role: entry.role,
-  };
-}
-
 // ============ Password Validation ============
 function validatePasswordStrength(password: string): { valid: boolean; message?: string } {
   if (password.length < 4) {
     return { valid: false, message: "Password must be at least 4 characters" };
   }
   return { valid: true };
-}
-
-// ============ BCrypt Comparison ============
-async function comparePassword(password: string, hash: string): Promise<boolean> {
-  try {
-    const bcrypt = await import("bcryptjs");
-    return bcrypt.compare(password, hash);
-  } catch {
-    // Fallback for demo
-    return password === "1234" && hash === "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy";
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -155,17 +103,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const userConfig = getUserConfig(username);
-  if (!userConfig) {
-    recordFailedAttempt(rateLimitKey);
-    return NextResponse.json(
-      { ok: false, error: "Invalid username/password" },
-      { status: 401 }
-    );
-  }
-
-  const passwordValid = await comparePassword(password, userConfig.passwordHash);
-  if (!passwordValid) {
+  const authenticatedUser = await authenticateUser(username, password);
+  if (!authenticatedUser) {
     recordFailedAttempt(rateLimitKey);
     return NextResponse.json(
       { ok: false, error: "Invalid username/password" },
@@ -176,7 +115,7 @@ export async function POST(req: NextRequest) {
   // Successful login
   recordSuccessfulAttempt(rateLimitKey);
 
-  const user = { username, role: userConfig.role };
+  const user = { username: authenticatedUser.username, role: authenticatedUser.role };
   let sessionCookie = "";
 
   try {

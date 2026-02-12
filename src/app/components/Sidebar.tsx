@@ -5,10 +5,6 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { clearCachedUser } from "@/app/components/authCache";
-import ChangePasswordModal from "@/app/components/ChangePasswordModal";
-import { useTheme } from "@/app/components/ThemeProvider";
-
 function normalizeCategory(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
@@ -159,63 +155,6 @@ function IconSettings({ active }: { active: boolean }) {
   );
 }
 
-function IconMoon({ active }: { active: boolean }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="ec-sidebar-icon"
-      aria-hidden="true"
-    >
-      <path d="M12 3a7 7 0 1 0 9 9 9 9 0 1 1-9-9z" />
-    </svg>
-  );
-}
-
-function IconLock({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className || "w-4 h-4"}
-      aria-hidden="true"
-    >
-      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-
-function IconLogout({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className || "w-4 h-4"}
-      aria-hidden="true"
-    >
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" x2="9" y1="12" y2="12" />
-    </svg>
-  );
-}
-
 function IconChevron({ open }: { open: boolean }) {
 
   return (
@@ -252,9 +191,7 @@ const SIDEBAR_LABELS = {
   motorcycles: "Motorcycles",
   tukTuks: "TukTuks",
   addVehicle: "Add Vehicle",
-  darkMode: "Dark Mode",
-  sectionAccount: "ACCOUNT",
-  accountActions: "Account Actions",
+  settings: "Settings",
 } as const;
 
 // Navigation Item Component - Premium glass pill
@@ -348,23 +285,6 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const { resolvedTheme, setThemeMode } = useTheme();
-
-  const handleLogout = async () => {
-    const confirmed = window.confirm("Are you sure you want to logout?");
-    if (!confirmed) return;
-
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      clearCachedUser();
-      router.push("/login");
-      onNavigate?.();
-    } catch (error) {
-      console.error("Logout failed:", error);
-      window.alert("Logout failed. Please try again.");
-    }
-  };
 
   const isAdmin = user.role === "Admin";
 
@@ -479,73 +399,13 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
             />
           )}
         </CollapsibleSection>
-        <button
-          onClick={() => setThemeMode(resolvedTheme === "dark" ? "light" : "dark")}
-          className={`ec-sidebar-item mt-1 hidden lg:flex ${resolvedTheme === "dark" ? "ec-sidebar-item-active" : ""}`}
-          aria-label="Toggle dark mode"
-        >
-          <IconMoon active={resolvedTheme === "dark"} />
-          <span className="truncate flex-1 text-left">{SIDEBAR_LABELS.darkMode}</span>
-          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-black/5 dark:bg-white/10">
-            {resolvedTheme === "dark" ? "On" : "Off"}
-          </span>
-        </button>
-
-        {/* Account tools */}
-        <div className="hidden lg:block">
-          <SectionHeader title={SIDEBAR_LABELS.sectionAccount} />
-          <CollapsibleSection
-            title={SIDEBAR_LABELS.accountActions}
-            icon={IconSettings}
-            defaultOpen={isSettingsActive}
-            active={isSettingsActive}
-          >
-            <div className="ec-sidebar-sub-item space-y-3 py-2">
-              {/* User Card - Premium glass with status */}
-              <div className="ec-sidebar-user-card">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="relative">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
-                      {user.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="ec-status-dot absolute -bottom-0.5 -right-0.5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
-                      {user.username}
-                    </p>
-                    <span
-                      className={`ec-sidebar-role-badge ${
-                        isAdmin ? "ec-sidebar-role-badge-admin" : "ec-sidebar-role-badge-user"
-                      }`}
-                    >
-                      {user.role}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions - Premium glass buttons */}
-              <button
-                onClick={() => setChangePasswordOpen(true)}
-                className="ec-sidebar-action-secondary touch-target"
-                aria-label="Change password"
-              >
-                <IconLock className="w-4 h-4" />
-                <span>Change Password</span>
-              </button>
-
-              <button
-                onClick={handleLogout}
-                className="ec-sidebar-action-danger touch-target"
-                aria-label="Logout"
-              >
-                <IconLogout className="w-4 h-4" />
-                <span>Logout</span>
-              </button>
-            </div>
-          </CollapsibleSection>
-        </div>
+        <NavItem
+          href="/settings"
+          icon={IconSettings}
+          label={SIDEBAR_LABELS.settings}
+          active={isSettingsActive}
+          onClick={() => handleNavigate("/settings")}
+        />
       </nav>
 
       {/* Footer - Subtle copyright */}
@@ -555,8 +415,6 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
         </p>
       </div>
 
-      {/* Change Password Modal */}
-      <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
     </aside>
   );
 }

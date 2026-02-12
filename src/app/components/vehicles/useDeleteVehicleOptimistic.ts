@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { extractDriveFileId } from "@/lib/drive";
+import { refreshVehicleCache } from "@/lib/vehicleCache";
 import type { Vehicle } from "@/lib/types";
 
 interface UseDeleteVehicleOptimisticOptions {
@@ -47,6 +48,9 @@ export function useDeleteVehicleOptimistic(
         if (!result.ok) {
           throw new Error(result.error || "Failed to delete vehicle");
         }
+
+        // Refresh shared client cache so list/search views immediately reflect deletion.
+        await refreshVehicleCache();
 
         // Call success callback
         onSuccess?.(vehicle);

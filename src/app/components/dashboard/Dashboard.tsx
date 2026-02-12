@@ -11,6 +11,7 @@ import PriceDistributionChart from "@/app/components/dashboard/charts/PriceDistr
 import VehiclesByBrandChart from "@/app/components/dashboard/charts/VehiclesByBrandChart";
 import VehiclesByCategoryChart from "@/app/components/dashboard/charts/VehiclesByCategoryChart";
 import VehicleModal from "@/app/components/dashboard/VehicleModal";
+import { GlassToast, useToast } from "@/app/components/ui/GlassToast";
 import {
   buildMonthlyAdded,
   buildNewVsUsed,
@@ -45,6 +46,7 @@ function applyFilter(router: ReturnType<typeof useRouter>, filter: { type: "cate
 import { getCambodiaNowString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle, VehicleMeta } from "@/lib/types";
+import { writeVehicleCache } from "@/lib/vehicleCache";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -95,6 +97,12 @@ function IconAlert({ className = "h-5 w-5" }: { className?: string }) {
 export default function Dashboard() {
   const user = useAuthUser();
   const { isModalOpen, setIsModalOpen } = useUI();
+  const {
+    toasts,
+    removeToast,
+    success: showSuccessToast,
+    error: showErrorToast,
+  } = useToast();
   const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [meta, setMeta] = useState<VehicleMeta | null>(null);
@@ -136,7 +144,10 @@ export default function Dashboard() {
     setIsRefreshing(true);
     setVehiclesError("");
     try {
-      const res = await fetch("/api/vehicles", { cache: "no-store", signal: controller.signal });
+      const res = await fetch("/api/vehicles?noCache=1", {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       if (res.status === 401) {
         router.push("/login");
         return;
@@ -151,7 +162,7 @@ export default function Dashboard() {
       setIsLoading(false);
       // Save to localStorage
       try {
-        localStorage.setItem("vms-vehicles", JSON.stringify(newVehicles));
+        writeVehicleCache(newVehicles);
         if (newMeta) {
           localStorage.setItem("vms-vehicles-meta", JSON.stringify(newMeta));
         }
@@ -243,8 +254,11 @@ export default function Dashboard() {
 
       // Refresh vehicles list after successful save
       await fetchVehicles();
+      showSuccessToast("Vehicle added successfully.", 3000);
     } catch (error) {
       console.error("Failed to save vehicle:", error);
+      const message = error instanceof Error ? error.message : "Failed to save vehicle";
+      showErrorToast(message, 4500);
       throw error;
     }
   };
@@ -320,6 +334,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 min-h-screen pb-20 lg:pb-8">
+      <GlassToast toasts={toasts} onRemove={removeToast} />
       {/* Glass Hero Header */}
       <div className="ec-dashboard-hero rounded-2xl p-5 sm:p-6 mb-6">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

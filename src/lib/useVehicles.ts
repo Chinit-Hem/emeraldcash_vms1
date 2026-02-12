@@ -16,7 +16,7 @@ interface UseVehiclesReturn {
 }
 
 
-export function useVehicles(noCache = false): UseVehiclesReturn {
+export function useVehicles(noCache = true): UseVehiclesReturn {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [meta, setMeta] = useState<VehicleMeta | null>(null);
   const [loading, setLoading] = useState(true);

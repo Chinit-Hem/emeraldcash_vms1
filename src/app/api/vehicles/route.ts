@@ -7,7 +7,7 @@ import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodi
 import type { Vehicle, VehicleMeta } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 
-import { clearCachedVehicles, getCachedVehicles, setCachedVehicles } from "./_cache";
+import { clearCachedVehicles } from "./_cache";
 import {
   appsScriptUrl,
   driveFolderIdForCategory,
@@ -18,8 +18,6 @@ import {
   toAppsScriptPayload,
   toVehicle,
 } from "./_shared";
-
-const TEN_MINUTES_SECONDS = 60 * 10;
 
 function buildCorsHeaders(req: NextRequest) {
   const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim();
@@ -52,9 +50,11 @@ export async function OPTIONS(req: NextRequest) {
   });
 }
 
-function cacheHeaders() {
+function noStoreHeaders() {
   return {
-    "Cache-Control": `public, max-age=0, s-maxage=${TEN_MINUTES_SECONDS}, stale-while-revalidate=${TEN_MINUTES_SECONDS}`,
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, private",
+    "Pragma": "no-cache",
+    "Expires": "0",
   };
 }
 
@@ -81,18 +81,13 @@ function createErrorResponse(message: string, status: number): NextResponse {
   const safeMessage = typeof message === "string" ? message : String(message);
   return NextResponse.json(
     { ok: false, error: safeMessage },
-    { status, headers: { "Content-Type": "application/json" } }
+    { status, headers: { "Content-Type": "application/json", ...noStoreHeaders() } }
   );
 }
 
 export async function GET(req: NextRequest) {
-  const bypassCache = req.nextUrl.searchParams.get("noCache") === "1";
-  if (!bypassCache) {
-    const cached = getCachedVehicles();
-    if (cached) {
-      return NextResponse.json({ ok: true, data: cached }, { headers: cacheHeaders() });
-    }
-  }
+  // Keep `noCache` query support for backwards compatibility with old clients.
+  void req.nextUrl.searchParams.get("noCache");
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) {
@@ -118,8 +113,8 @@ export async function GET(req: NextRequest) {
       url.searchParams.set("offset", String(offset));
 
       const res = await fetch(url.toString(), {
-        cache: bypassCache ? "no-store" : "force-cache",
-        next: { revalidate: bypassCache ? 0 : TEN_MINUTES_SECONDS },
+        cache: "no-store",
+        next: { revalidate: 0 },
       });
 
       if (!res.ok) {
@@ -245,18 +240,7 @@ export async function GET(req: NextRequest) {
       },
     };
 
-    // Only update server cache if not bypassing (i.e., normal fetch)
-    if (!bypassCache) {
-      setCachedVehicles(vehicles);
-    }
-    const headers = bypassCache 
-      ? { 
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          "Pragma": "no-cache",
-          "Expires": "0"
-        } 
-      : cacheHeaders();
-    return NextResponse.json({ ok: true, data: vehicles, meta }, { headers });
+    return NextResponse.json({ ok: true, data: vehicles, meta }, { headers: noStoreHeaders() });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Fetch failed";
     return createErrorResponse(message, 500);
@@ -429,7 +413,7 @@ export async function POST(req: NextRequest) {
     }
 
     clearCachedVehicles();
-    return NextResponse.json({ ok: true, data: data.data ?? null });
+    return NextResponse.json({ ok: true, data: data.data ?? null }, { headers: noStoreHeaders() });
   } catch (e: unknown) {
     const message =
       e instanceof Error && e.name === "AbortError"

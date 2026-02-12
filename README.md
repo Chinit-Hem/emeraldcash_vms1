@@ -28,6 +28,15 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 - `admin / 1234` (Admin)
 - `staff / 1234` (Staff)
 
+### Admin user management
+
+- Admin can create employee accounts in `Settings`.
+- Roles supported: `Admin`, `Staff`.
+- You can also pre-seed users via env vars:
+  - `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`
+  - `STAFF_USERNAME`, `STAFF_PASSWORD_HASH`
+  - `AUTH_USERS_JSON` (array of users with bcrypt hashes)
+
 ### Apps Script actions expected
 
 - `getVehicles` (GET via query param `?action=getVehicles`)

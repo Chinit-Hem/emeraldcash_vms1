@@ -2,6 +2,7 @@
 
 import { useAuthUser } from "@/app/components/AuthContext";
 import ImageZoom from "@/app/components/ImageZoom";
+import { GlassToast, useToast } from "@/app/components/ui/GlassToast";
 import { getCambodiaNowString } from "@/lib/cambodiaTime";
 import { compressImage, formatFileSize } from "@/lib/compressImage";
 import { derivePrices } from "@/lib/pricing";
@@ -374,6 +375,13 @@ function AddVehicleInner() {
   const router = useRouter();
   const user = useAuthUser();
   const isAdmin = user.role === "Admin";
+  const {
+    toasts,
+    removeToast,
+    success: showSuccessToast,
+    error: showErrorToast,
+    warning: showWarningToast,
+  } = useToast();
 
   // Form state
   const [formData, setFormData] = useState<Partial<Vehicle>>({
@@ -640,7 +648,7 @@ function AddVehicleInner() {
         // ignore
       }
 
-      setSuccessMessage("Vehicle added successfully!");
+      showSuccessToast("Vehicle added successfully.", 3000);
       setFormData({
         Brand: "",
         Model: "",
@@ -660,16 +668,24 @@ function AddVehicleInner() {
       setTouched({});
       setErrors({});
 
-      refreshVehicleCache();
+      const refreshedVehicles = await refreshVehicleCache();
+      if (refreshedVehicles) {
+        setSuccessMessage("Vehicle added successfully. Search data updated.");
+      } else {
+        setSuccessMessage("Vehicle added successfully. Search update may take a few seconds.");
+        showWarningToast("Saved, but search sync is delayed. Please refresh vehicle search.", 4500);
+      }
       
       // Trigger Next.js router refresh to update all components with fresh data
       router.refresh();
 
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to add vehicle. Please try again.";
+      showErrorToast(message, 4500);
 
       setErrors((prev) => ({
         ...prev,
-        submit: err instanceof Error ? err.message : "Failed to add vehicle. Please try again.",
+        submit: message,
       }));
     } finally {
       setIsSubmitting(false);
@@ -684,39 +700,44 @@ function AddVehicleInner() {
   // Non-admin view
   if (!isAdmin) {
     return (
-      <div className="min-h-screen p-4 sm:p-6 lg:p-8 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="max-w-md w-full p-8 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl">
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Only administrators can add vehicles to the system.</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={() => router.back()}
-                className="flex-1 px-6 py-3 rounded-xl bg-white/70 dark:bg-slate-800/70 border border-white/30 dark:border-white/10 text-gray-700 dark:text-gray-300 font-medium hover:bg-white/90 dark:hover:bg-slate-700/90 transition-all"
-              >
-                Go Back
-              </button>
-              <button
-                onClick={() => router.push("/vehicles")}
-                className="flex-1 px-6 py-3 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
-              >
-                View Vehicles
-              </button>
+      <>
+        <GlassToast toasts={toasts} onRemove={removeToast} />
+        <div className="min-h-screen p-4 sm:p-6 lg:p-8 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800">
+          <div className="max-w-md w-full p-8 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">Only administrators can add vehicles to the system.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => router.back()}
+                  className="flex-1 px-6 py-3 rounded-xl bg-white/70 dark:bg-slate-800/70 border border-white/30 dark:border-white/10 text-gray-700 dark:text-gray-300 font-medium hover:bg-white/90 dark:hover:bg-slate-700/90 transition-all"
+                >
+                  Go Back
+                </button>
+                <button
+                  onClick={() => router.push("/vehicles")}
+                  className="flex-1 px-6 py-3 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
+                >
+                  View Vehicles
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 lg:p-8 pb-32 sm:pb-8 bg-gradient-to-br from-gray-50/50 to-gray-100/50 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-5xl mx-auto">
+    <>
+      <GlassToast toasts={toasts} onRemove={removeToast} />
+      <div className="min-h-screen p-4 sm:p-6 lg:p-8 pb-32 sm:pb-8 bg-gradient-to-br from-gray-50/50 to-gray-100/50 dark:from-slate-900 dark:to-slate-800">
+        <div className="max-w-5xl mx-auto">
         {/* Premium Liquid Glass Card */}
         <div className="relative rounded-2xl bg-gradient-to-br from-white/70 via-emerald-100/20 via-red-50/10 via-emerald-50/15 to-white/70 dark:from-white/8 dark:via-emerald-500/15 dark:via-red-900/8 dark:via-emerald-900/12 dark:to-white/8 backdrop-blur-xl border border-white/15 dark:border-white/15 shadow-2xl overflow-hidden">
 
@@ -1127,5 +1148,6 @@ function AddVehicleInner() {
         </div>
       </div>
     </div>
+    </>
   );
 }
