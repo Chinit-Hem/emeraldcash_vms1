@@ -47,6 +47,7 @@ import { getCambodiaNowString } from "@/lib/cambodiaTime";
 import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle, VehicleMeta } from "@/lib/types";
 import { writeVehicleCache } from "@/lib/vehicleCache";
+import { isIOSSafariBrowser } from "@/lib/platform";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -111,18 +112,37 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [cambodiaNow, setCambodiaNow] = useState(() => getCambodiaNowString());
   const [isLoading, setIsLoading] = useState(true);
+  const [isIOSSafari, setIsIOSSafari] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
 
   // Modal state - now using global UI state
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
   useEffect(() => {
+    setIsIOSSafari(isIOSSafariBrowser());
+  }, []);
+
+  useEffect(() => {
+    if (isIOSSafari) return;
     const interval = window.setInterval(() => setCambodiaNow(getCambodiaNowString()), 1000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [isIOSSafari]);
 
   // Load from cache immediately on mount
   useEffect(() => {
+    if (isIOSSafari) {
+      try {
+        const cached = localStorage.getItem("vms-vehicles");
+        if (cached && cached.length > 250_000) {
+          localStorage.removeItem("vms-vehicles");
+          localStorage.removeItem("vms-vehicles-meta");
+        }
+      } catch {
+        // ignore storage errors
+      }
+      return;
+    }
+
     try {
       const cached = localStorage.getItem("vms-vehicles");
       if (cached) {
@@ -134,7 +154,7 @@ export default function Dashboard() {
     } catch {
       // Ignore cache errors
     }
-  }, []);
+  }, [isIOSSafari]);
 
   const fetchVehicles = async () => {
     fetchAbortRef.current?.abort();
@@ -144,7 +164,8 @@ export default function Dashboard() {
     setIsRefreshing(true);
     setVehiclesError("");
     try {
-      const res = await fetch("/api/vehicles?noCache=1", {
+      const endpoint = isIOSSafari ? "/api/vehicles?noCache=1&lite=1&maxRows=200" : "/api/vehicles?noCache=1";
+      const res = await fetch(endpoint, {
         cache: "no-store",
         signal: controller.signal,
       });
@@ -161,13 +182,15 @@ export default function Dashboard() {
       setLastUpdated(getCambodiaNowString());
       setIsLoading(false);
       // Save to localStorage
-      try {
-        writeVehicleCache(newVehicles);
-        if (newMeta) {
-          localStorage.setItem("vms-vehicles-meta", JSON.stringify(newMeta));
+      if (!isIOSSafari) {
+        try {
+          writeVehicleCache(newVehicles);
+          if (newMeta) {
+            localStorage.setItem("vms-vehicles-meta", JSON.stringify(newMeta));
+          }
+        } catch {
+          // Ignore storage errors
         }
-      } catch {
-        // Ignore storage errors
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -186,7 +209,7 @@ export default function Dashboard() {
       fetchAbortRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, isIOSSafari]);
 
   // Safe error message extraction to prevent circular reference issues
   const getSafeErrorMessage = (errorData: unknown): string => {
@@ -322,14 +345,75 @@ export default function Dashboard() {
     };
   }, [vehicles, meta]);
 
-  const byCategory = useMemo(() => buildVehiclesByCategory(vehicles), [vehicles]);
-  const byBrand = useMemo(() => buildVehiclesByBrand(vehicles, 12), [vehicles]);
-  const priceDistribution = useMemo(() => buildPriceDistribution(vehicles), [vehicles]);
-  const newVsUsed = useMemo(() => buildNewVsUsed(vehicles), [vehicles]);
-  const monthlyAdded = useMemo(() => buildMonthlyAdded(vehicles), [vehicles]);
+  const chartVehicles = useMemo(() => (isIOSSafari ? [] : vehicles), [isIOSSafari, vehicles]);
+  const byCategory = useMemo(() => buildVehiclesByCategory(chartVehicles), [chartVehicles]);
+  const byBrand = useMemo(() => buildVehiclesByBrand(chartVehicles, 12), [chartVehicles]);
+  const priceDistribution = useMemo(() => buildPriceDistribution(chartVehicles), [chartVehicles]);
+  const newVsUsed = useMemo(() => buildNewVsUsed(chartVehicles), [chartVehicles]);
+  const monthlyAdded = useMemo(() => buildMonthlyAdded(chartVehicles), [chartVehicles]);
 
   if (isLoading && vehicles.length === 0) {
+    if (isIOSSafari) {
+      return (
+        <div className="p-4 sm:p-6">
+          <div className="rounded-xl border border-slate-200/70 bg-white p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            Loading dashboard...
+          </div>
+        </div>
+      );
+    }
     return <SkeletonDashboard />;
+  }
+
+  if (isIOSSafari) {
+    return (
+      <div className="p-4 sm:p-6 min-h-screen pb-20">
+        <GlassToast toasts={toasts} onRemove={removeToast} />
+
+        <div className="mb-4 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-200">
+          iPhone Safari compatibility mode is active.
+        </div>
+
+        {vehiclesError ? (
+          <div className="mb-4 rounded-xl border border-red-300/70 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-200">
+            <p className="mb-3">{vehiclesError}</p>
+            <button
+              onClick={() => fetchVehicles()}
+              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <KpiCard label="Total" value={kpis.total.toLocaleString()} accent="green" />
+          <KpiCard label="Cars" value={kpis.cars.toLocaleString()} accent="green" />
+          <KpiCard label="Motorcycles" value={kpis.motorcycles.toLocaleString()} accent="gray" />
+          <KpiCard label="Tuk Tuk" value={kpis.tukTuk.toLocaleString()} accent="green" />
+        </div>
+
+        <div className="rounded-xl border border-slate-200/70 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fetchVehicles()}
+              disabled={isRefreshing}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200"
+            >
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/vehicles")}
+              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white"
+            >
+              Open Vehicles
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

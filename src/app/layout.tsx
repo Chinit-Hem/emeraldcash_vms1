@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { ThemeProvider } from "@/app/components/ThemeProvider";
 
@@ -53,6 +54,13 @@ const iosSafariGuardScript = `
   })();
 `;
 
+function isIOSSafariUserAgent(userAgent: string): boolean {
+  const ua = userAgent || "";
+  const isIOSDevice = /iP(hone|ad|od)/i.test(ua);
+  const isWebKitSafari = /WebKit/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser/i.test(ua);
+  return isIOSDevice && isWebKitSafari;
+}
+
 export const metadata: Metadata = {
   title: "Emerald Cash VMS",
   description: "Vehicle Management System by Emerald Cash",
@@ -74,13 +82,17 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headersList = await headers();
+  const userAgent = headersList.get("user-agent") ?? "";
+  const iosSafariClassName = isIOSSafariUserAgent(userAgent) ? "ios-safari" : "";
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={iosSafariClassName} suppressHydrationWarning>
       <head>
         <script id="ios-safari-guard" dangerouslySetInnerHTML={{ __html: iosSafariGuardScript }} />
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
