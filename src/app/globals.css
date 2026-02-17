@@ -4910,6 +4910,19 @@ body {
   background-attachment: scroll !important;
 }
 
+.ios-safari:not(.dark):not([data-theme="dark"]) body,
+.ios-safari.light body,
+.ios-safari[data-theme="light"] body {
+  background: #f3f6fb !important;
+  color: #0f172a !important;
+}
+
+.ios-safari.dark body,
+.ios-safari[data-theme="dark"] body {
+  background: #0b1220 !important;
+  color: #f8fafc !important;
+}
+
 .ios-safari :where(
     .ec-sidebar,
     .ec-glassPanel,
@@ -4933,6 +4946,63 @@ body {
 }
 
 .ios-safari :where(
+    .ec-sidebar,
+    .ec-glassPanel,
+    .ec-glassPanelSoft,
+    .ec-dashboard-hero,
+    .ec-metric-card,
+    .ec-chart-card,
+    .ec-liquid-card,
+    .ec-liquid-card-soft,
+    .ec-liquid-modal,
+    .ec-glassCard,
+    .ec-liquid-table-wrap,
+    .ec-time-pill,
+    .ec-mobileNav,
+    .ec-sidebar-user-card
+  ) {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(148, 163, 184, 0.36) !important;
+  box-shadow: none !important;
+}
+
+.ios-safari.dark :where(
+    .ec-sidebar,
+    .ec-glassPanel,
+    .ec-glassPanelSoft,
+    .ec-dashboard-hero,
+    .ec-metric-card,
+    .ec-chart-card,
+    .ec-liquid-card,
+    .ec-liquid-card-soft,
+    .ec-liquid-modal,
+    .ec-glassCard,
+    .ec-liquid-table-wrap,
+    .ec-time-pill,
+    .ec-mobileNav,
+    .ec-sidebar-user-card
+  ),
+.ios-safari[data-theme="dark"] :where(
+    .ec-sidebar,
+    .ec-glassPanel,
+    .ec-glassPanelSoft,
+    .ec-dashboard-hero,
+    .ec-metric-card,
+    .ec-chart-card,
+    .ec-liquid-card,
+    .ec-liquid-card-soft,
+    .ec-liquid-modal,
+    .ec-glassCard,
+    .ec-liquid-table-wrap,
+    .ec-time-pill,
+    .ec-mobileNav,
+    .ec-sidebar-user-card
+  ) {
+  background: rgba(15, 23, 42, 0.9) !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
+}
+
+.ios-safari :where(
     .animate-float-slow,
     .animate-float-slow-reverse,
     .animate-pulse-slow,
@@ -4944,42 +5014,58 @@ body {
 
 /* iOS WebKit fallback: apply stability guard even if UA class detection misses */
 @supports (-webkit-touch-callout: none) {
-  body {
-    background-attachment: scroll !important;
-  }
+  @media (hover: none) and (pointer: coarse) {
+    body {
+      background-attachment: scroll !important;
+    }
 
-  :where(
-      .ec-sidebar,
-      .ec-glassPanel,
-      .ec-glassPanelSoft,
-      .ec-dashboard-hero,
-      .ec-metric-card,
-      .ec-chart-card,
-      .ec-liquid-card,
-      .ec-liquid-card-soft,
-      .ec-liquid-modal,
-      .ec-glassCard,
-      .ec-liquid-table-wrap,
-      .ec-time-pill,
-      .ec-mobileNav,
-      .ec-sidebar-user-card,
-      .ec-sidebar-drawer-backdrop,
-      [class*="backdrop-blur"],
-      [class*="backdrop-filter"]
-    ) {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    filter: none !important;
-    box-shadow: none !important;
-  }
+    :root:not(.dark):not([data-theme="dark"]) body,
+    :root.light body,
+    :root[data-theme="light"] body {
+      background: #f3f6fb !important;
+      color: #0f172a !important;
+    }
 
-  :where(
-      .animate-float-slow,
-      .animate-float-slow-reverse,
-      .animate-pulse-slow,
-      .animate-shimmer
-    ) {
-    animation: none !important;
-    will-change: auto !important;
+    :root.dark body,
+    .dark body,
+    :root[data-theme="dark"] body {
+      background: #0b1220 !important;
+      color: #f8fafc !important;
+    }
+
+    :where(
+        .ec-sidebar,
+        .ec-glassPanel,
+        .ec-glassPanelSoft,
+        .ec-dashboard-hero,
+        .ec-metric-card,
+        .ec-chart-card,
+        .ec-liquid-card,
+        .ec-liquid-card-soft,
+        .ec-liquid-modal,
+        .ec-glassCard,
+        .ec-liquid-table-wrap,
+        .ec-time-pill,
+        .ec-mobileNav,
+        .ec-sidebar-user-card,
+        .ec-sidebar-drawer-backdrop,
+        [class*="backdrop-blur"],
+        [class*="backdrop-filter"]
+      ) {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      filter: none !important;
+      box-shadow: none !important;
+    }
+
+    :where(
+        .animate-float-slow,
+        .animate-float-slow-reverse,
+        .animate-pulse-slow,
+        .animate-shimmer
+      ) {
+      animation: none !important;
+      will-change: auto !important;
+    }
   }
 }

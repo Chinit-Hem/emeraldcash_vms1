@@ -46,7 +46,7 @@ const iosSafariGuardScript = `
         /iP(hone|ad|od)/.test(ua) ||
         (platform === "MacIntel" && maxTouchPoints > 1);
 
-      var isWebKitEngine = /WebKit/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser/i.test(ua);
+      var isWebKitEngine = /AppleWebKit|WebKit/i.test(ua);
       if (!isIOSDevice || !isWebKitEngine) return;
 
       document.documentElement.classList.add("ios-safari");
@@ -56,9 +56,11 @@ const iosSafariGuardScript = `
 
 function isIOSSafariUserAgent(userAgent: string): boolean {
   const ua = userAgent || "";
-  const isIOSDevice = /iP(hone|ad|od)/i.test(ua);
-  const isWebKitSafari = /WebKit/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser/i.test(ua);
-  return isIOSDevice && isWebKitSafari;
+  const isIOSDevice =
+    /iP(hone|ad|od)/i.test(ua) ||
+    (/Macintosh/i.test(ua) && /Mobile/i.test(ua));
+  const isIOSWebKit = /AppleWebKit|WebKit/i.test(ua);
+  return isIOSDevice && isIOSWebKit;
 }
 
 export const metadata: Metadata = {

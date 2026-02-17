@@ -12,8 +12,9 @@ export function isIOSSafariBrowser(): boolean {
     /iP(hone|ad|od)/i.test(ua) ||
     (platform === "MacIntel" && maxTouchPoints > 1);
 
-  const isWebKitSafari =
-    /WebKit/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser/i.test(ua);
+  // iOS browsers share WebKit under the hood, and all of them need the same
+  // rendering safeguards to prevent tab crashes on heavy UI.
+  const isIOSWebKit = /AppleWebKit|WebKit/i.test(ua);
 
-  return isIOSDevice && isWebKitSafari;
+  return isIOSDevice && isIOSWebKit;
 }

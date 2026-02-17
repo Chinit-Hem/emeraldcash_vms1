@@ -1,7 +1,6 @@
 "use client";
 
 import { GlassButton } from "@/app/components/ui/GlassButton";
-import { GlassInput } from "@/app/components/ui/GlassInput";
 import { useEffect, useMemo, useState } from "react";
 import type { Vehicle } from "@/lib/types";
 import { COLOR_OPTIONS } from "@/lib/types";
@@ -105,7 +104,10 @@ export default function FiltersBar({
 
   useEffect(() => {
     if (hasAdvancedFilters) {
-      setShowAdvancedFilters(true);
+      const rafId = requestAnimationFrame(() => {
+        setShowAdvancedFilters(true);
+      });
+      return () => cancelAnimationFrame(rafId);
     }
   }, [hasAdvancedFilters]);
 
