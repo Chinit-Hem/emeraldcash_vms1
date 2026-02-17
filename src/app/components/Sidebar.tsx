@@ -155,6 +155,28 @@ function IconSettings({ active }: { active: boolean }) {
   );
 }
 
+function IconLms({ active }: { active: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="ec-sidebar-icon"
+      aria-hidden="true"
+    >
+      <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z" />
+      <path d="M8 4v16" />
+      <path d="M12 8h6" />
+      <path d="M12 12h6" />
+      <path d="M12 16h4" />
+    </svg>
+  );
+}
+
 function IconChevron({ open }: { open: boolean }) {
 
   return (
@@ -191,6 +213,8 @@ const SIDEBAR_LABELS = {
   motorcycles: "Motorcycles",
   tukTuks: "TukTuks",
   addVehicle: "Add Vehicle",
+  lms: "LMS",
+  adminLms: "Admin LMS",
   settings: "Settings",
 } as const;
 
@@ -224,7 +248,7 @@ function NavItem({
       <Icon active={active} />
       <span className="truncate flex-1 text-left">{label}</span>
       {count !== undefined && count > 0 && (
-        <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+        <span className="ml-auto rounded-full border border-[var(--glass-border-strong)] bg-[var(--accent-green-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent-green)]">
           {count}
         </span>
       )}
@@ -298,6 +322,8 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const isMotorcyclesActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "motorcycles";
   const isTukTuksActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "tuk tuk";
   const isAddActive = pathname === "/vehicles/add";
+  const isLmsActive = pathname.startsWith("/lms");
+  const isAdminLmsActive = pathname.startsWith("/admin/lms");
   const isSettingsActive = pathname === "/settings";
 
   const handleNavigate = (href: string) => {
@@ -311,7 +337,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true" />
 
       {/* Header - Premium brand lockup */}
-      <div className="relative p-6 border-b border-black/5 dark:border-white/10">
+      <div className="relative border-b border-[var(--glass-border)] p-6">
         <div className="flex items-center gap-4">
           <div
             className="relative w-12 h-12 flex items-center justify-center flex-shrink-0 overflow-hidden"
@@ -326,7 +352,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
             />
           </div>
           <div className="min-w-0 flex flex-col">
-            <h1 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight leading-tight">
+            <h1 className="text-lg font-bold tracking-tight leading-tight text-[var(--text-primary)]">
               {SIDEBAR_LABELS.brand}
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
@@ -347,6 +373,22 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           active={isDashboardActive}
           onClick={() => handleNavigate("/")}
         />
+        <NavItem
+          href="/lms"
+          icon={IconLms}
+          label={SIDEBAR_LABELS.lms}
+          active={isLmsActive}
+          onClick={() => handleNavigate("/lms")}
+        />
+        {isAdmin && (
+          <NavItem
+            href="/admin/lms"
+            icon={IconLms}
+            label={SIDEBAR_LABELS.adminLms}
+            active={isAdminLmsActive}
+            onClick={() => handleNavigate("/admin/lms")}
+          />
+        )}
 
         {/* Quick filters and deep links */}
         <SectionHeader title={SIDEBAR_LABELS.sectionFilters} />
@@ -409,8 +451,8 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
       </nav>
 
       {/* Footer - Subtle copyright */}
-      <div className="relative p-4 border-t border-black/5 dark:border-white/10">
-        <p className="text-xs text-slate-400 dark:text-slate-500 text-center font-medium">
+      <div className="relative border-t border-[var(--glass-border)] p-4">
+        <p className="text-center text-xs font-medium text-[var(--text-secondary)]">
           © 2025 Emerald Cash
         </p>
       </div>

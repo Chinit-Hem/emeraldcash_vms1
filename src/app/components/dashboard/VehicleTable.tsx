@@ -39,14 +39,18 @@ const SortHeader = ({ field, children, sortField, sortDirection, onSort }: SortH
       onClick={() => onSort(field)}
       className={cn(
         ui.table.th,
-        "sticky top-0 z-20 cursor-pointer select-none transition-colors hover:bg-slate-100 dark:hover:bg-white/10"
+        "sticky top-0 z-20 cursor-pointer select-none transition-colors hover:bg-[var(--glass-bg-soft)]"
       )}
     >
       <div className="flex items-center gap-1">
         {children}
         <span className="inline-flex flex-col">
           <svg
-            className={`h-3 w-3 ${isActive && sortDirection === "asc" ? "text-emerald-600 dark:text-emerald-300" : "text-slate-300 dark:text-slate-600"}`}
+            className={`h-3 w-3 ${
+              isActive && sortDirection === "asc"
+                ? "text-[var(--accent-green)]"
+                : "text-[var(--text-secondary)]/45"
+            }`}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -55,7 +59,11 @@ const SortHeader = ({ field, children, sortField, sortDirection, onSort }: SortH
             <path d="m18 15-6-6-6 6" />
           </svg>
           <svg
-            className={`-mt-1 h-3 w-3 ${isActive && sortDirection === "desc" ? "text-emerald-600 dark:text-emerald-300" : "text-slate-300 dark:text-slate-600"}`}
+            className={`-mt-1 h-3 w-3 ${
+              isActive && sortDirection === "desc"
+                ? "text-[var(--accent-green)]"
+                : "text-[var(--text-secondary)]/45"
+            }`}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -151,20 +159,20 @@ export default function VehicleTable({
             Columns
           </button>
           {showColumnMenu && (
-            <div className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--card)] p-1 shadow-[0_14px_28px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-900/95 dark:backdrop-blur-xl">
+            <div className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-[var(--glass-border)] bg-[var(--bg-elevated)] p-1 shadow-[var(--shadow-elevated)] backdrop-blur-xl">
               <div className="p-2">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
                   Visible Columns
                 </div>
                 {COLUMNS.map((column) => (
-                  <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10">
+                  <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--glass-bg-soft)]">
                     <input
                       type="checkbox"
                       checked={visibleColumns.includes(column.key)}
                       onChange={() => toggleColumn(column.key)}
-                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-slate-600"
+                      className="rounded border-[var(--glass-border)] bg-[var(--bg-surface)] text-[var(--accent-green)] focus:ring-[var(--accent-green)]"
                     />
-                    <span className="text-sm text-[var(--text)]">{column.label}</span>
+                    <span className="text-sm text-[var(--text-primary)]">{column.label}</span>
                   </label>
                 ))}
               </div>
@@ -230,12 +238,12 @@ export default function VehicleTable({
                 className={cn(
                   ui.table.tr,
                   "transition-colors duration-150",
-                  index % 2 !== 0 && "bg-slate-50/70 dark:bg-white/[0.01]"
+                  index % 2 !== 0 && "bg-[var(--table-row-alt)]"
                 )}
               >
 
                   {/* Vehicle ID */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-[var(--text-secondary)]">
                     {vehicle.VehicleId || "-"}
                   </td>
 
@@ -246,18 +254,18 @@ export default function VehicleTable({
                       <img
                         src={thumbUrl}
                         alt={`${vehicle.Brand} ${vehicle.Model}`}
-                        className="h-12 w-12 rounded-lg object-cover ring-1 ring-black/10 bg-white"
+                        className="h-12 w-12 rounded-lg border border-[var(--glass-border)] bg-[var(--bg-elevated)] object-cover"
                         onError={() => handleImageError(vehicleId)}
                       />
                     ) : (
-                      <div className="h-12 w-12 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg-soft)]">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
                           strokeWidth={1.5}
-                          className="h-5 w-5 text-gray-400"
+                          className="h-5 w-5 text-[var(--text-secondary)]"
                         >
                           <rect width="18" height="18" x="3" y="3" rx="2" />
                           <circle cx="9" cy="9" r="2" />
@@ -268,47 +276,47 @@ export default function VehicleTable({
                   </td>
 
                   {/* Category */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     {vehicle.Category || "-"}
                   </td>
 
                   {/* Brand */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">
                     {vehicle.Brand || "-"}
                   </td>
 
                   {/* Model */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     {vehicle.Model || "-"}
                   </td>
 
                   {/* Year */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     {vehicle.Year || "-"}
                   </td>
 
                   {/* Plate */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-[var(--text-secondary)]">
                     {vehicle.Plate || "-"}
                   </td>
 
                   {/* Market Price */}
-                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-[var(--accent-green)]">
                     {formatPrice(vehicle.PriceNew)}
                   </td>
 
                   {/* D.O.C. 40% */}
-                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-red-700 dark:text-red-300">
+                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-[var(--accent-red)]">
                     {formatPrice(price40)}
                   </td>
 
                   {/* Vehicles 70% */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-[var(--accent-green)]">
                     {formatPrice(price70)}
                   </td>
 
                   {/* Tax Type */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     {vehicle.TaxType || "-"}
                   </td>
 
@@ -317,10 +325,10 @@ export default function VehicleTable({
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         vehicle.Condition === "New"
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          ? "border border-[var(--glass-border-strong)] bg-[var(--accent-green-soft)] text-[var(--accent-green)]"
                           : vehicle.Condition === "Used"
-                          ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-                          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                          ? "border border-[var(--accent-red)] bg-[var(--accent-red-soft)] text-[var(--accent-red)]"
+                          : "border border-[var(--glass-border)] bg-[var(--glass-bg-soft)] text-[var(--text-secondary)]"
                       }`}
                     >
                       {vehicle.Condition || "Unknown"}
@@ -328,12 +336,12 @@ export default function VehicleTable({
                   </td>
 
                   {/* Body Type */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     {vehicle.BodyType || "-"}
                   </td>
 
                   {/* Color */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     {vehicle.Color || "-"}
                   </td>
 
@@ -342,7 +350,7 @@ export default function VehicleTable({
                     <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`)}
-                        className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors touch-target"
+                        className="touch-target rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--glass-bg-soft)] hover:text-[var(--text-primary)]"
                         title="View"
                       >
                         <svg
@@ -361,7 +369,7 @@ export default function VehicleTable({
                         <>
                       <button
                         onClick={() => onEdit ? onEdit(vehicle) : router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`)}
-                        className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/30 transition-colors touch-target"
+                        className="touch-target rounded-lg p-2 text-[var(--accent-green)] transition-colors hover:bg-[var(--accent-green-soft)]"
                         title="Edit"
                       >
 
@@ -378,7 +386,7 @@ export default function VehicleTable({
                           </button>
                           <button
                             onClick={() => onDelete(vehicle)}
-                            className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors touch-target"
+                            className="touch-target rounded-lg p-2 text-[var(--accent-red)] transition-colors hover:bg-[var(--accent-red-soft)]"
                             title="Delete"
                           >
                             <svg

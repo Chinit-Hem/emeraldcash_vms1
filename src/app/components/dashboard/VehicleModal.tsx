@@ -205,27 +205,27 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--overlay-bg)] p-0 backdrop-blur-sm sm:items-center sm:p-4">
       {/* Liquid Glass Modal Container - Mobile Optimized */}
       <div 
-        className="ec-glassCard w-full max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col rounded-none sm:rounded-2xl overflow-hidden bg-gradient-to-br from-white/70 via-emerald-100/20 via-red-50/10 via-emerald-50/15 to-white/70 dark:from-white/8 dark:via-emerald-500/15 dark:via-red-900/8 dark:via-emerald-900/12 dark:to-white/8"
+        className="ec-glassCard flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-2xl"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
         {/* Header with Liquid Glass */}
-        <div className="relative flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 border-b border-white/20 bg-gradient-to-r from-emerald-600/90 to-emerald-500/90 flex-shrink-0">
+        <div className="relative flex flex-shrink-0 items-center justify-between border-b border-[var(--glass-border)] bg-[linear-gradient(90deg,var(--accent-green),var(--accent-green-hover))] px-4 py-4 sm:px-6 sm:py-5">
           <div className="relative z-10">
-            <h2 className="text-lg sm:text-xl font-bold text-white drop-shadow-sm">
+            <h2 className="text-lg sm:text-xl font-bold text-[var(--text-on-accent)] drop-shadow-sm">
               {isEditing ? "Edit Vehicle" : "Add New Vehicle"}
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-50/90 mt-0.5 hidden sm:block">
+            <p className="mt-0.5 hidden text-xs text-[var(--text-on-accent-soft)] sm:block sm:text-sm">
               Enter the vehicle details below. Required fields are marked with an asterisk (*).
             </p>
           </div>
           <button
             onClick={onClose}
-            className="relative z-10 p-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition-all duration-200 group"
+            className="group relative z-10 rounded-xl border border-[var(--glass-on-accent-border)] bg-[var(--glass-on-accent)] p-2 transition-all duration-300 ease-in-out hover:bg-[var(--glass-on-accent-border)]"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -233,50 +233,50 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
-              className="h-5 w-5 text-white group-hover:scale-110 transition-transform"
+              className="h-5 w-5 text-[var(--text-on-accent)] transition-transform group-hover:scale-110"
             >
               <path d="M18 6 6 18" />
               <path d="m6 6 12 12" />
             </svg>
           </button>
           {/* Shimmer effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer pointer-events-none" />
+          <div className="pointer-events-none absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-[var(--glass-on-accent)] to-transparent" />
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 bg-gradient-to-b from-white/5 to-transparent">
+          <div className="flex-1 space-y-4 overflow-y-auto bg-transparent p-4 sm:space-y-6 sm:p-6">
             
             {/* Basic Information Section */}
             <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--accent-green)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-green)]" />
                 Basic Information
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {/* Category */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-1">
-                    Category <span className="text-red-500">*</span>
+                  <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
+                    Category <span className="text-[var(--accent-red)]">*</span>
                   </label>
                   <div className="ec-glassInput rounded-xl overflow-hidden">
                     <select
                       value={formData.Category || ""}
                       onChange={(e) => handleChange("Category", e.target.value)}
-                      className={`w-full px-4 py-3 bg-transparent text-sm text-gray-900 dark:text-white focus:outline-none cursor-pointer ${
-                        errors.Category ? "text-red-500" : ""
+                      className={`w-full cursor-pointer bg-transparent px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none ${
+                        errors.Category ? "text-[var(--accent-red)]" : ""
                       }`}
                     >
-                      <option value="" className="bg-white dark:bg-gray-800">Select category</option>
+                      <option value="" className="bg-[var(--bg-elevated)]">Select category</option>
                       {CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat} className="bg-white dark:bg-gray-800">
+                        <option key={cat} value={cat} className="bg-[var(--bg-elevated)]">
                           {cat}
                         </option>
                       ))}
                     </select>
                   </div>
                   {errors.Category && (
-                    <p className="text-xs text-red-500 flex items-center gap-1">
+                    <p className="flex items-center gap-1 text-xs text-[var(--accent-red)]">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -287,8 +287,8 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
                 {/* Brand */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-1">
-                    Brand <span className="text-red-500">*</span>
+                  <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
+                    Brand <span className="text-[var(--accent-red)]">*</span>
                   </label>
                   <GlassInput
                     value={formData.Brand || ""}
@@ -301,8 +301,8 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
                 {/* Model */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-1">
-                    Model <span className="text-red-500">*</span>
+                  <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
+                    Model <span className="text-[var(--accent-red)]">*</span>
                   </label>
                   <GlassInput
                     value={formData.Model || ""}
@@ -315,7 +315,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
                 {/* Plate Number */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="text-sm font-medium text-[var(--text-primary)]">
                     Plate Number
                   </label>
                   <GlassInput
@@ -326,13 +326,13 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                     className="ec-glassInput rounded-xl"
                   />
                   {errors.Plate && (
-                    <p className="text-xs text-red-500">Format: 1A-1234</p>
+                    <p className="text-xs text-[var(--accent-red)]">Format: 1A-1234</p>
                   )}
                 </div>
 
                 {/* Year */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="text-sm font-medium text-[var(--text-primary)]">
                     Year
                   </label>
                   <GlassInput
@@ -349,25 +349,25 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
             {/* Specifications Section */}
             <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--accent-green)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-green)]" />
                 Specifications
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {/* Color */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="text-sm font-medium text-[var(--text-primary)]">
                     Color
                   </label>
                   <div className="ec-glassInput rounded-xl overflow-hidden">
                     <select
                       value={formData.Color || ""}
                       onChange={(e) => handleChange("Color", e.target.value)}
-                      className="w-full px-4 py-3 bg-transparent text-sm text-gray-900 dark:text-white focus:outline-none cursor-pointer"
+                      className="w-full cursor-pointer bg-transparent px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none"
                     >
-                      <option value="" className="bg-white dark:bg-gray-800">Select or type a custom color</option>
+                      <option value="" className="bg-[var(--bg-elevated)]">Select or type a custom color</option>
                       {COLOR_OPTIONS.map((color) => (
-                        <option key={color.value} value={color.value} className="bg-white dark:bg-gray-800">
+                        <option key={color.value} value={color.value} className="bg-[var(--bg-elevated)]">
                           {color.value}
                         </option>
                       ))}
@@ -377,17 +377,17 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
                 {/* Condition */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="text-sm font-medium text-[var(--text-primary)]">
                     Condition
                   </label>
                   <div className="ec-glassInput rounded-xl overflow-hidden">
                     <select
                       value={formData.Condition || ""}
                       onChange={(e) => handleChange("Condition", e.target.value)}
-                      className="w-full px-4 py-3 bg-transparent text-sm text-gray-900 dark:text-white focus:outline-none cursor-pointer"
+                      className="w-full cursor-pointer bg-transparent px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none"
                     >
                       {CONDITIONS.map((cond) => (
-                        <option key={cond} value={cond} className="bg-white dark:bg-gray-800">
+                        <option key={cond} value={cond} className="bg-[var(--bg-elevated)]">
                           {cond}
                         </option>
                       ))}
@@ -397,18 +397,18 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
                 {/* Body Type */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="text-sm font-medium text-[var(--text-primary)]">
                     Body Type
                   </label>
                   <div className="ec-glassInput rounded-xl overflow-hidden">
                     <select
                       value={formData.BodyType || ""}
                       onChange={(e) => handleChange("BodyType", e.target.value)}
-                      className="w-full px-4 py-3 bg-transparent text-sm text-gray-900 dark:text-white focus:outline-none cursor-pointer"
+                      className="w-full cursor-pointer bg-transparent px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none"
                     >
-                      <option value="" className="bg-white dark:bg-gray-800">Select or type a custom body type</option>
+                      <option value="" className="bg-[var(--bg-elevated)]">Select or type a custom body type</option>
                       {BODY_TYPES.map((type) => (
-                        <option key={type} value={type} className="bg-white dark:bg-gray-800">
+                        <option key={type} value={type} className="bg-[var(--bg-elevated)]">
                           {type}
                         </option>
                       ))}
@@ -418,18 +418,18 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
                 {/* Tax Type */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="text-sm font-medium text-[var(--text-primary)]">
                     Tax Type
                   </label>
                   <div className="ec-glassInput rounded-xl overflow-hidden">
                     <select
                       value={formData.TaxType || ""}
                       onChange={(e) => handleChange("TaxType", e.target.value)}
-                      className="w-full px-4 py-3 bg-transparent text-sm text-gray-900 dark:text-white focus:outline-none cursor-pointer"
+                      className="w-full cursor-pointer bg-transparent px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none"
                     >
-                      <option value="" className="bg-white dark:bg-gray-800">Select tax type</option>
+                      <option value="" className="bg-[var(--bg-elevated)]">Select tax type</option>
                       {TAX_TYPE_OPTIONS.map((tax) => (
-                        <option key={tax} value={tax} className="bg-white dark:bg-gray-800">
+                        <option key={tax} value={tax} className="bg-[var(--bg-elevated)]">
                           {tax}
                         </option>
                       ))}
@@ -441,14 +441,14 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
             {/* Pricing Section */}
             <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--accent-green)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-green)]" />
                 Pricing
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 {/* Market Price */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="text-sm font-medium text-[var(--text-primary)]">
                     Market Price
                   </label>
                   <GlassInput
@@ -459,14 +459,14 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                     error={errors.PriceNew}
                     className="ec-glassInput rounded-xl"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Enter the market price in USD</p>
+                  <p className="text-xs text-[var(--text-secondary)]">Enter the market price in USD</p>
                 </div>
 
                 {/* D.O.C. 40% - Auto-calculated with Liquid Glass */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-1">
+                  <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
                     D.O.C. 40%
-                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 font-medium">
+                    <span className="rounded-full border border-[var(--glass-border-strong)] bg-[var(--accent-green-soft)] px-1.5 py-0.5 text-xs font-medium text-[var(--accent-green)]">
                       Auto
                     </span>
                   </label>
@@ -475,12 +475,12 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                       type="text"
                       value={formData.Price40 ? formData.Price40.toLocaleString() : ""}
                       disabled
-                      className="w-full px-4 py-3 bg-gradient-to-br from-emerald-50/80 to-emerald-100/50 dark:from-emerald-900/30 dark:to-emerald-800/20 border-2 border-emerald-200/50 dark:border-emerald-700/30 rounded-xl text-sm text-emerald-700 dark:text-emerald-300 cursor-not-allowed backdrop-blur-sm"
+                      className="w-full cursor-not-allowed rounded-xl border border-[var(--glass-border-strong)] bg-[var(--accent-green-soft)] px-4 py-3 text-sm text-[var(--accent-green)]"
                       placeholder="Auto-calculated"
                     />
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-400/0 via-emerald-400/10 to-emerald-400/0 animate-shimmer pointer-events-none" />
+                    <div className="pointer-events-none absolute inset-0 rounded-xl animate-shimmer bg-gradient-to-r from-transparent via-[var(--glass-on-accent)] to-transparent" />
                   </div>
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <p className="flex items-center gap-1 text-xs text-[var(--accent-green)]">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -490,9 +490,9 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
                 {/* Vehicles 70% - Auto-calculated with Liquid Glass */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-1">
+                  <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
                     Vehicles 70%
-                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 font-medium">
+                    <span className="rounded-full border border-[var(--glass-border-strong)] bg-[var(--accent-green-soft)] px-1.5 py-0.5 text-xs font-medium text-[var(--accent-green)]">
                       Auto
                     </span>
                   </label>
@@ -501,12 +501,12 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                       type="text"
                       value={formData.Price70 ? formData.Price70.toLocaleString() : ""}
                       disabled
-                      className="w-full px-4 py-3 bg-gradient-to-br from-emerald-50/80 to-emerald-100/50 dark:from-emerald-900/30 dark:to-emerald-800/20 border-2 border-emerald-200/50 dark:border-emerald-700/30 rounded-xl text-sm text-emerald-700 dark:text-emerald-300 cursor-not-allowed backdrop-blur-sm"
+                      className="w-full cursor-not-allowed rounded-xl border border-[var(--glass-border-strong)] bg-[var(--accent-green-soft)] px-4 py-3 text-sm text-[var(--accent-green)]"
                       placeholder="Auto-calculated"
                     />
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-400/0 via-emerald-400/10 to-emerald-400/0 animate-shimmer pointer-events-none" />
+                    <div className="pointer-events-none absolute inset-0 rounded-xl animate-shimmer bg-gradient-to-r from-transparent via-[var(--glass-on-accent)] to-transparent" />
                   </div>
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <p className="flex items-center gap-1 text-xs text-[var(--accent-green)]">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -518,8 +518,8 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
             {/* Vehicle Images Section */}
             <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--accent-green)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-green)]" />
                 Vehicle Images
               </h3>
               
@@ -531,25 +531,25 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                 onClick={() => document.getElementById('vehicle-image')?.click()}
                 className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center transition-all duration-300 overflow-hidden cursor-pointer ${
                   isDragging
-                    ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/20 scale-[1.02]"
-                    : "border-gray-300 dark:border-gray-600 hover:border-emerald-400 dark:hover:border-emerald-500 bg-white/30 dark:bg-gray-800/30"
+                    ? "scale-[1.02] border-[var(--accent-green)] bg-[var(--accent-green-soft)]"
+                    : "border-[var(--glass-border)] bg-[var(--glass-bg-soft)] hover:border-[var(--glass-border-strong)]"
                 }`}
               >
 
                 {/* Liquid glass background effect */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-emerald-50/20 dark:from-gray-700/20 dark:to-emerald-900/10 pointer-events-none" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[var(--glass-on-accent)] via-transparent to-[var(--accent-green-soft)]" />
                 
                 {imagePreview ? (
                   <div className="relative inline-block">
                     <img
                       src={imagePreview}
                       alt="Preview"
-                      className="h-32 sm:h-40 w-auto rounded-xl object-cover shadow-lg ring-2 ring-white dark:ring-gray-700"
+                      className="h-32 w-auto rounded-xl border border-[var(--glass-border)] object-cover shadow-lg sm:h-40"
                     />
                     <button
                       type="button"
                       onClick={removeImage}
-                      className="absolute -top-3 -right-3 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
+                      className="absolute -right-3 -top-3 rounded-full border border-[var(--accent-red)] bg-[var(--accent-red)] p-2 text-[var(--bg-elevated)] shadow-lg transition-all duration-300 ease-in-out hover:scale-110 hover:bg-[var(--accent-red-hover)] active:scale-95"
                     >
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -558,9 +558,9 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                   </div>
                 ) : (
                   <div className="relative space-y-3">
-                    <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-800/20 flex items-center justify-center shadow-inner">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--glass-border)] bg-[var(--accent-green-soft)] shadow-inner sm:h-16 sm:w-16">
                       <svg
-                        className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-500 dark:text-emerald-400"
+                        className="h-7 w-7 text-[var(--accent-green)] sm:h-8 sm:w-8"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -574,11 +574,11 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                        <span className="text-emerald-600 dark:text-emerald-400">Upload Image</span>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
+                        <span className="text-[var(--accent-green)]">Upload Image</span>
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Drop image here or click to browse</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Supports: JPEG, PNG, WebP • Max 10MB</p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">Drop image here or click to browse</p>
+                      <p className="mt-0.5 text-xs text-[var(--text-secondary)]/85">Supports: JPEG, PNG, WebP • Max 10MB</p>
                     </div>
                   </div>
                 )}
@@ -592,10 +592,10 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                 />
                 <label
                   htmlFor="vehicle-image"
-                  className="relative mt-4 inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-white/80 dark:bg-gray-700/80 hover:bg-white dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600 text-sm font-medium backdrop-blur-sm pointer-events-auto"
+                  className="pointer-events-auto relative mt-4 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] shadow-sm backdrop-blur-sm transition-all duration-300 ease-in-out hover:bg-[var(--glass-bg-soft)] hover:shadow-md sm:px-5 sm:py-2.5"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <svg className="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4 text-[var(--accent-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                   </svg>
                   Choose File
@@ -605,10 +605,10 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
 
               {/* Or enter Image URL with Liquid Glass */}
               <div className="space-y-2">
-                <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                  <span className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                <p className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <span className="h-px flex-1 bg-[var(--glass-border)]" />
                   <span className="text-xs uppercase tracking-wider">Or</span>
-                  <span className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                  <span className="h-px flex-1 bg-[var(--glass-border)]" />
                 </p>
                 <GlassInput
                   value={imageUrl}
@@ -616,7 +616,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
                   placeholder="https://example.com/image.jpg"
                   className="ec-glassInput rounded-xl"
                 />
-                <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                <p className="flex items-center gap-1 text-xs text-[var(--text-secondary)]/85">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
@@ -625,7 +625,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
               </div>
               
               {errors.Image && (
-                <p className="text-sm text-red-500 flex items-center gap-1 animate-shake">
+                <p className="animate-shake flex items-center gap-1 text-sm text-[var(--accent-red)]">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -636,12 +636,12 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
           </div>
 
           {/* Actions - Fixed Sticky Footer Always Visible */}
-          <div className="flex-shrink-0 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 px-4 sm:px-6 py-4 sm:py-5 border-t border-white/20 bg-gradient-to-r from-gray-50/90 to-gray-100/70 dark:from-gray-800/90 dark:to-gray-900/70 backdrop-blur-xl">
+          <div className="flex flex-shrink-0 flex-col justify-end gap-2 border-t border-[var(--glass-border)] bg-[var(--glass-bg-soft)] px-4 py-4 backdrop-blur-xl sm:flex-row sm:gap-3 sm:px-6 sm:py-5">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="w-full sm:w-auto px-5 py-3 sm:py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white/80 dark:bg-gray-700/80 hover:bg-white dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 backdrop-blur-sm"
+              className="w-full rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-5 py-3 text-sm font-medium text-[var(--text-primary)] shadow-sm backdrop-blur-sm transition-all duration-300 ease-in-out hover:bg-[var(--glass-bg-soft)] hover:shadow-md active:scale-95 sm:w-auto sm:py-2.5"
             >
               Cancel
             </button>

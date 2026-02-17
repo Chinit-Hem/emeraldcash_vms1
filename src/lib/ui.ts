@@ -5,58 +5,59 @@ export function cn(...classes: Array<string | false | null | undefined>): string
 export const ui = {
   surface: {
     page:
-      "bg-[var(--bg)] text-[var(--text)]",
+      "bg-[var(--bg-primary)] text-[var(--text-primary)]",
     card:
-      "ec-liquid-card",
+      "rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] shadow-soft backdrop-blur-xl",
     cardSoft:
-      "ec-liquid-card-soft",
+      "rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg-soft)] shadow-soft backdrop-blur-lg",
     modal:
-      "ec-liquid-modal",
+      "rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] shadow-elevated backdrop-blur-2xl",
   },
   text: {
-    title: "text-[var(--text)] font-semibold tracking-tight",
-    subtitle: "text-[var(--muted)]",
-    label: "text-sm font-medium text-[var(--text)]",
-    helper: "text-xs text-[var(--muted)]",
-    danger: "text-sm text-[var(--ec-danger-text)]",
+    title: "text-[var(--text-primary)] font-semibold tracking-tight",
+    subtitle: "text-[var(--text-secondary)]",
+    label: "text-sm font-medium text-[var(--text-primary)]",
+    helper: "text-xs text-[var(--text-secondary)]",
+    danger: "text-sm text-[var(--accent-red-strong)]",
   },
   input: {
     base:
-      "ec-liquid-input h-11 w-full rounded-xl px-4 text-[var(--text)] transition-all duration-300 placeholder:text-[var(--muted)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60",
+      "h-11 w-full rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-4 text-[var(--text-primary)] transition-all duration-300 ease-in-out placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-green)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-green-soft)] disabled:cursor-not-allowed disabled:opacity-60",
     withIcon: "pl-11",
     withRightElement: "pr-11",
-    error: "ec-liquid-input-error",
+    error:
+      "border-[var(--accent-red)] bg-[var(--accent-red-soft)] focus:border-[var(--accent-red)] focus:ring-[var(--accent-red-soft)]",
   },
   button: {
     base:
-      "ec-liquid-btn inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-60 disabled:pointer-events-none active:scale-[0.98]",
+      "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-green)] disabled:cursor-not-allowed disabled:opacity-60 disabled:pointer-events-none active:scale-[0.98]",
     size: {
       sm: "h-9 px-3.5",
       md: "h-11 px-4.5",
       lg: "h-12 px-6",
     },
     primary:
-      "ec-liquid-btn-primary text-white",
+      "border border-[var(--accent-green)] bg-[var(--accent-green)] text-white shadow-glow-green hover:bg-[var(--accent-green-hover)] hover:border-[var(--accent-green-hover)] active:bg-[var(--accent-green-active)] active:border-[var(--accent-green-active)]",
     secondary:
-      "ec-liquid-btn-secondary text-[var(--text)]",
+      "border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-soft)] hover:border-[var(--glass-border-strong)] active:bg-[var(--glass-bg-soft)]",
     ghost:
-      "ec-liquid-btn-ghost text-[var(--text)]",
+      "bg-transparent text-[var(--text-primary)] hover:bg-[var(--glass-bg-soft)]",
     danger:
-      "ec-liquid-btn-danger text-white",
+      "border border-[var(--accent-red)] bg-[var(--accent-red)] text-white shadow-glow-red hover:bg-[var(--accent-red-hover)] hover:border-[var(--accent-red-hover)] active:bg-[var(--accent-red-active)] active:border-[var(--accent-red-active)]",
     outline:
-      "ec-liquid-btn-outline text-[var(--text)]",
+      "border border-[var(--glass-border)] bg-transparent text-[var(--text-primary)] hover:bg-[var(--glass-bg-soft)]",
   },
   table: {
     wrapper:
-      "ec-liquid-table-wrap overflow-x-auto rounded-2xl",
-    table: "ec-liquid-table w-full min-w-[1000px] border-separate border-spacing-0",
+      "overflow-x-auto rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)]",
+    table: "w-full min-w-[1000px] border-separate border-spacing-0",
     head:
-      "ec-liquid-table-head sticky top-0 z-20",
-    headRow: "ec-liquid-table-headRow border-b border-[var(--border)]",
+      "sticky top-0 z-20 bg-[var(--glass-bg-soft)]",
+    headRow: "border-b border-[var(--glass-border)]",
     th:
-      "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--muted)]",
+      "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]",
     tr:
-      "ec-liquid-table-row border-b border-[var(--border)]",
-    td: "px-4 py-3 text-sm text-[var(--text)]",
+      "border-b border-[var(--glass-border)] transition-colors duration-300 hover:bg-[var(--table-row-hover)]",
+    td: "px-4 py-3 text-sm text-[var(--text-primary)]",
   },
 };

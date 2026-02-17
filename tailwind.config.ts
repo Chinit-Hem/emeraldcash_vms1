@@ -1,5 +1,6 @@
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+import type { Config } from "tailwindcss";
+
+const config: Config = {
   darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -35,6 +36,7 @@ module.exports = {
           "red-active": "var(--accent-red-active)",
           "red-soft": "var(--accent-red-soft)",
         },
+        /* Backward compatibility aliases */
         card: "var(--bg-elevated)",
         border: "var(--glass-border)",
         muted: "var(--text-secondary)",
@@ -57,3 +59,5 @@ module.exports = {
   },
   plugins: [],
 };
+
+export default config;

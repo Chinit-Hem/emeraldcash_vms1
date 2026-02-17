@@ -35,7 +35,7 @@ export function GlassInput({
       <div className="relative flex items-center">
 
         {icon && (
-          <div className="pointer-events-none absolute left-3.5 text-[var(--muted)]">
+          <div className="pointer-events-none absolute left-3.5 text-[var(--text-secondary)]">
             {icon}
           </div>
         )}

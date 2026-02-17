@@ -2,6 +2,7 @@
 
 import { GlassButton } from "@/app/components/ui/GlassButton";
 import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/ui";
 import type { Vehicle } from "@/lib/types";
 import { COLOR_OPTIONS } from "@/lib/types";
 
@@ -33,6 +34,8 @@ interface FiltersBarProps {
 
 const CATEGORIES = ["All", "Cars", "Motorcycles", "Tuk Tuk"];
 const CONDITIONS = ["All", "New", "Used"];
+const FIELD_CLASS =
+  "w-full rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-[var(--text-primary)] transition-all duration-300 ease-in-out placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-green)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-green-soft)]";
 
 export default function FiltersBar({
   filters,
@@ -176,10 +179,10 @@ export default function FiltersBar({
       {/* Header with result count */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             Filters
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-[var(--text-secondary)]">
             Showing {resultCount} of {totalCount} vehicles
           </p>
         </div>
@@ -226,12 +229,12 @@ export default function FiltersBar({
           {activeFilters.map((chip) => (
             <div
               key={chip.key}
-              className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-sm"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--glass-border-strong)] bg-[var(--accent-green-soft)] px-3 py-1 text-sm text-[var(--accent-green)]"
             >
               <span>{chip.label}</span>
               <button
                 onClick={() => removeFilter(chip.key)}
-                className="ml-1 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 rounded-full p-0.5"
+                className="ml-1 rounded-full p-0.5 transition-colors duration-300 hover:bg-[var(--glass-bg-soft)]"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -252,7 +255,7 @@ export default function FiltersBar({
 
       {/* Search */}
       <div className="mb-3">
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
           Search
         </label>
         <div className="relative">
@@ -261,7 +264,7 @@ export default function FiltersBar({
             placeholder="Brand, Model, or Plate..."
             value={filters.search}
             onChange={(e) => handleChange("search", e.target.value)}
-            className="w-full px-4 py-2.5 pl-10 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className={cn(FIELD_CLASS, "pl-10")}
           />
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -271,7 +274,7 @@ export default function FiltersBar({
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]"
           >
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
@@ -285,13 +288,13 @@ export default function FiltersBar({
 
         {/* Category */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Category
           </label>
           <select
             value={filters.category}
             onChange={(e) => handleChange("category", e.target.value)}
-            className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className={FIELD_CLASS}
           >
             {CATEGORIES.map((cat) => (
               <option key={cat} value={cat}>
@@ -303,13 +306,13 @@ export default function FiltersBar({
 
         {/* Brand */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Brand
           </label>
           <select
             value={filters.brand}
             onChange={(e) => handleChange("brand", e.target.value)}
-            className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className={FIELD_CLASS}
           >
             {brands.map((brand) => (
               <option key={brand} value={brand}>
@@ -321,13 +324,13 @@ export default function FiltersBar({
 
         {/* Condition */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Condition
           </label>
           <select
             value={filters.condition}
             onChange={(e) => handleChange("condition", e.target.value)}
-            className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className={FIELD_CLASS}
           >
             {CONDITIONS.map((cond) => (
               <option key={cond} value={cond}>
@@ -339,7 +342,7 @@ export default function FiltersBar({
 
         {/* Year Range */}
         <div className="sm:col-span-2 lg:col-span-1">
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Year Range
           </label>
           <div className="flex gap-2">
@@ -348,21 +351,21 @@ export default function FiltersBar({
               placeholder="Min"
               value={filters.yearMin}
               onChange={(e) => handleChange("yearMin", e.target.value)}
-              className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className={FIELD_CLASS}
             />
             <input
               type="number"
               placeholder="Max"
               value={filters.yearMax}
               onChange={(e) => handleChange("yearMax", e.target.value)}
-              className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className={FIELD_CLASS}
             />
           </div>
         </div>
 
         {/* Price Range */}
         <div className="sm:col-span-2 lg:col-span-1">
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Price Range ($)
           </label>
           <div className="flex gap-2">
@@ -371,27 +374,27 @@ export default function FiltersBar({
               placeholder="Min"
               value={filters.priceMin}
               onChange={(e) => handleChange("priceMin", e.target.value)}
-              className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className={FIELD_CLASS}
             />
             <input
               type="number"
               placeholder="Max"
               value={filters.priceMax}
               onChange={(e) => handleChange("priceMax", e.target.value)}
-              className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className={FIELD_CLASS}
             />
           </div>
         </div>
 
         {/* Color */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Color
           </label>
           <select
             value={filters.color}
             onChange={(e) => handleChange("color", e.target.value)}
-            className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className={FIELD_CLASS}
           >
             <option value="All">All Colors</option>
             {COLOR_OPTIONS.map((color) => (
@@ -404,7 +407,7 @@ export default function FiltersBar({
 
         {/* Date Range */}
         <div className="sm:col-span-2 lg:col-span-1">
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Date Range
           </label>
           <div className="flex gap-2">
@@ -412,13 +415,13 @@ export default function FiltersBar({
               type="date"
               value={filters.dateFrom}
               onChange={(e) => handleChange("dateFrom", e.target.value)}
-              className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className={FIELD_CLASS}
             />
             <input
               type="date"
               value={filters.dateTo}
               onChange={(e) => handleChange("dateTo", e.target.value)}
-              className="w-full px-3 py-2.5 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className={FIELD_CLASS}
             />
           </div>
         </div>

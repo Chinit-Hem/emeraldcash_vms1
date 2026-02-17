@@ -29,7 +29,7 @@ export function SectionCard({
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             {icon && (
-              <div className="rounded-xl bg-emerald-100/60 p-2 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--accent-green-soft)] p-2 text-[var(--accent-green)]">
                 {icon}
               </div>
             )}

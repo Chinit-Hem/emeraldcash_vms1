@@ -44,10 +44,10 @@ export default function DashboardHeader() {
               />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">
                 Emerald Cash
               </h1>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                 Vehicle Management System
               </p>
             </div>
@@ -56,10 +56,10 @@ export default function DashboardHeader() {
           {/* User Info, Theme Toggle and Logout */}
           <div className="hidden sm:flex items-center gap-3 sm:gap-4">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
                 {user.username}
               </p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">
+              <p className="text-xs text-[var(--text-secondary)] capitalize">
                 {user.role}
               </p>
             </div>
@@ -90,19 +90,19 @@ export default function DashboardHeader() {
         </div>
 
         {/* Mobile User Info */}
-        <div className="sm:hidden mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Logged in as <span className="font-semibold text-gray-900 dark:text-white">{user.username}</span> ({user.role})
+        <div className="sm:hidden mt-3 pt-3 border-t border-[var(--glass-border)]">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Logged in as <span className="font-semibold text-[var(--text-primary)]">{user.username}</span> ({user.role})
           </p>
         </div>
       </div>
 
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-bg)] p-4 backdrop-blur-sm">
           <div className="ec-glassCard w-full max-w-sm p-6 rounded-2xl">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+              <div className="rounded-full border border-[var(--glass-border)] bg-[var(--accent-red-soft)] p-2">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
@@ -111,18 +111,18 @@ export default function DashboardHeader() {
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-5 w-5 text-amber-600 dark:text-amber-400"
+                  className="h-5 w-5 text-[var(--accent-red)]"
                 >
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                   <line x1="12" y1="9" x2="12" y2="13" />
                   <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                 Confirm Logout
               </h3>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="mb-6 text-sm text-[var(--text-secondary)]">
               Are you sure you want to logout? You will need to login again to access the system.
             </p>
             <div className="flex gap-3 justify-end">

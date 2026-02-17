@@ -1,6 +1,6 @@
 "use client";
 
-import { Car, LayoutDashboard, Settings } from "lucide-react";
+import { BookOpen, Car, LayoutDashboard, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -13,6 +13,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "LMS", href: "/lms", icon: BookOpen },
   { label: "Vehicles", href: "/vehicles", icon: Car },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
@@ -27,7 +28,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/65 bg-white/70 backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/85"
+      className="ec-mobileNav fixed inset-x-0 bottom-0 z-50"
       aria-label="Primary navigation"
     >
       <div className="mx-auto flex h-16 max-w-2xl items-center justify-around px-2 sm:h-[70px]">
@@ -41,8 +42,8 @@ export default function MobileBottomNav() {
               href={item.href}
               className={`flex min-w-[84px] flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 transition-colors duration-200 ${
                 active
-                  ? "bg-emerald-50/85 text-emerald-600 dark:bg-emerald-900/25 dark:text-emerald-400"
-                  : "text-slate-500 hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400"
+                  ? "border border-[var(--glass-border-strong)] bg-[var(--accent-green-soft)] text-[var(--accent-green)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--accent-green)]"
               }`}
               aria-current={active ? "page" : undefined}
             >
