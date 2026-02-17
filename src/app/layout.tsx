@@ -34,6 +34,25 @@ const themeInitScript = `
   })();
 `;
 
+const iosSafariGuardScript = `
+  (function () {
+    try {
+      var ua = navigator.userAgent || "";
+      var platform = navigator.platform || "";
+      var maxTouchPoints = navigator.maxTouchPoints || 0;
+
+      var isIOSDevice =
+        /iP(hone|ad|od)/.test(ua) ||
+        (platform === "MacIntel" && maxTouchPoints > 1);
+
+      var isWebKitEngine = /WebKit/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser/i.test(ua);
+      if (!isIOSDevice || !isWebKitEngine) return;
+
+      document.documentElement.classList.add("ios-safari");
+    } catch (_) {}
+  })();
+`;
+
 export const metadata: Metadata = {
   title: "Emerald Cash VMS",
   description: "Vehicle Management System by Emerald Cash",
@@ -63,6 +82,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script id="ios-safari-guard" dangerouslySetInnerHTML={{ __html: iosSafariGuardScript }} />
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>

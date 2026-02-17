@@ -4897,3 +4897,47 @@ body {
   :where(span, .ec-sidebar-icon, .ec-sidebar-chevron) {
   color: color-mix(in srgb, var(--cc-blue-strong) 90%, #0a3d28 10%) !important;
 }
+
+/* iOS Safari stability guard: reduce heavy compositing to avoid tab crashes */
+.ios-safari body {
+  background:
+    linear-gradient(
+      180deg,
+      var(--cc-bg-top, var(--ec-bg, #f8fafc)) 0%,
+      var(--cc-bg-mid, var(--ec-bg, #f1f5f9)) 56%,
+      var(--cc-bg-bottom, var(--ec-bg, #e2e8f0)) 100%
+    ) !important;
+  background-attachment: scroll !important;
+}
+
+.ios-safari :where(
+    .ec-sidebar,
+    .ec-glassPanel,
+    .ec-glassPanelSoft,
+    .ec-dashboard-hero,
+    .ec-metric-card,
+    .ec-chart-card,
+    .ec-liquid-card,
+    .ec-liquid-card-soft,
+    .ec-liquid-modal,
+    .ec-glassCard,
+    .ec-liquid-table-wrap,
+    .ec-time-pill,
+    .ec-mobileNav,
+    .ec-sidebar-user-card,
+    .ec-sidebar-drawer-backdrop
+  ),
+.ios-safari :where([class*="backdrop-blur"], [class*="backdrop-filter"]) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.ios-safari :where(
+    .animate-float-slow,
+    .animate-float-slow-reverse,
+    .animate-pulse-slow,
+    .animate-shimmer
+  ) {
+  animation: none !important;
+  will-change: auto !important;
+}
