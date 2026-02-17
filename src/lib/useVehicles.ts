@@ -35,7 +35,7 @@ export function useVehicles(noCache = true): UseVehiclesReturn {
         useLiteMode
           ? {
               lite: true,
-              maxRows: 700,
+              maxRows: 250,
             }
           : undefined
       );

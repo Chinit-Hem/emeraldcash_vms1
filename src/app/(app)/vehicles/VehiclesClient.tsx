@@ -96,12 +96,13 @@ export default function VehiclesClient() {
 
   // Listen for cache updates from other components (e.g., after adding a vehicle)
   useEffect(() => {
+    if (isIOSSafari) return;
     const unsubscribe = onVehicleCacheUpdate((updatedVehicles) => {
       // Update local state with fresh data from cache
       setVehicles(updatedVehicles);
     });
     return unsubscribe;
-  }, []);
+  }, [isIOSSafari]);
 
   // View mode: "all-time" shows API meta totals, "filtered" shows filtered totals
 
@@ -135,7 +136,7 @@ export default function VehiclesClient() {
 
   useEffect(() => {
     if (!isIOSSafari) return;
-    setPageSize((prev) => (prev > 8 ? 8 : prev));
+    setPageSize((prev) => (prev > 6 ? 6 : prev));
   }, [isIOSSafari]);
 
   // Modal state
@@ -541,7 +542,109 @@ export default function VehiclesClient() {
   };
 
 
+  if (isIOSSafari) {
+    const safeTotalPages = Math.max(1, totalPages);
+    const safeCurrentPage = Math.min(currentPage, safeTotalPages);
 
+    return (
+      <div className="min-h-screen pb-20 lg:pb-0">
+        <div className="mx-auto max-w-4xl p-4 sm:p-6">
+          <div className="mb-4 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-200">
+            iPhone Safari compatibility mode is active.
+          </div>
+
+          <div className="mb-4 rounded-xl border border-slate-200/70 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+            <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">
+              Search vehicles
+            </label>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(event) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  search: event.target.value,
+                }))
+              }
+              placeholder="Brand, model, or plate"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+            />
+          </div>
+
+          {loading ? (
+            <div className="rounded-xl border border-slate-200/70 bg-white p-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+              Loading vehicles...
+            </div>
+          ) : error ? (
+            <div className="rounded-xl border border-red-300/70 bg-red-50 p-6 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-200">
+              <p className="mb-3 whitespace-pre-line">{error}</p>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
+              >
+                Retry
+              </button>
+            </div>
+          ) : filteredVehicles.length === 0 ? (
+            <div className="rounded-xl border border-slate-200/70 bg-white p-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+              No vehicles found.
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {paginatedVehicles.map((vehicle) => (
+                  <div
+                    key={vehicle.VehicleId}
+                    className="rounded-xl border border-slate-200/70 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                          {vehicle.Brand || "-"} {vehicle.Model || "-"}
+                        </p>
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-300">
+                          ID {vehicle.VehicleId || "-"} • {vehicle.Category || "-"} • {vehicle.Plate || "-"}
+                        </p>
+                      </div>
+                      <a
+                        href={`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`}
+                        className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+                      >
+                        View
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200/70 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safeCurrentPage <= 1}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-slate-600 dark:text-slate-300">
+                  Page {safeCurrentPage} / {safeTotalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(safeTotalPages, prev + 1))}
+                  disabled={safeCurrentPage >= safeTotalPages}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200"
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-20 lg:pb-0">
