@@ -10,6 +10,7 @@ interface VehicleCardMobileProps {
   vehicle: Vehicle;
   index: number;
   isAdmin: boolean;
+  disableImages?: boolean;
   onEdit?: (vehicle: Vehicle) => void;
   onDelete: (vehicle: Vehicle) => void;
   key?: React.Key;
@@ -21,6 +22,7 @@ export default function VehicleCardMobile({
   vehicle,
   index,
   isAdmin,
+  disableImages = false,
   onEdit,
   onDelete,
 }: VehicleCardMobileProps) {
@@ -36,9 +38,10 @@ export default function VehicleCardMobile({
 
   const imageFileId = extractDriveFileId(vehicle.Image);
   const thumbUrl = useMemo(() => {
+    if (disableImages) return null;
     if (!imageFileId || imageError) return null;
     return `${driveThumbnailUrl(imageFileId, "w300-h300")}`;
-  }, [imageFileId, imageError]);
+  }, [disableImages, imageFileId, imageError]);
 
   const formatPrice = (price: number | null) => {
     if (price == null) return "-";

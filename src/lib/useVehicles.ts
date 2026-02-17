@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { vehicleApi, isApiError, isConfigError, isNetworkError, getErrorDetails } from "./api";
 import { onVehicleCacheUpdate } from "./vehicleCache";
 import type { Vehicle, VehicleMeta } from "./types";
+import { isIOSSafariBrowser } from "./platform";
 
 
 
@@ -28,7 +29,16 @@ export function useVehicles(noCache = true): UseVehiclesReturn {
     setError(null);
     
     try {
-      const result = await vehicleApi.getVehicles(noCache);
+      const useLiteMode = isIOSSafariBrowser();
+      const result = await vehicleApi.getVehicles(
+        noCache,
+        useLiteMode
+          ? {
+              lite: true,
+              maxRows: 700,
+            }
+          : undefined
+      );
       
       // Validate that we actually got data
       if (!result.data || !Array.isArray(result.data)) {

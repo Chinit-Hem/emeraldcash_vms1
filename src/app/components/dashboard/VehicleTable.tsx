@@ -10,6 +10,7 @@ import { useState } from "react";
 interface VehicleTableProps {
   vehicles: Vehicle[];
   isAdmin: boolean;
+  disableImages?: boolean;
   onEdit?: (vehicle: Vehicle) => void;
   onDelete: (vehicle: Vehicle) => void;
   sortField: keyof Vehicle | null;
@@ -89,6 +90,7 @@ const COLUMNS = [
 export default function VehicleTable({
   vehicles,
   isAdmin,
+  disableImages = false,
   onEdit,
   onDelete,
   sortField,
@@ -218,7 +220,7 @@ export default function VehicleTable({
               const price70 = vehicle.Price70 ?? derived.Price70;
               const vehicleId = vehicle.VehicleId;
               const imageFileId = extractDriveFileId(vehicle.Image);
-              const thumbUrl = imageFileId && !imageErrors.has(vehicleId)
+              const thumbUrl = !disableImages && imageFileId && !imageErrors.has(vehicleId)
                 ? `${driveThumbnailUrl(imageFileId, "w100-h100")}`
                 : null;
 

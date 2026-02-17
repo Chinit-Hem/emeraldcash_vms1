@@ -15,6 +15,14 @@ interface ConfirmDeleteModalProps {
   onCancel: () => void;
 }
 
+function deferMicrotask(callback: () => void): void {
+  if (typeof queueMicrotask === "function") {
+    queueMicrotask(callback);
+    return;
+  }
+  Promise.resolve().then(callback);
+}
+
 export function ConfirmDeleteModal({
   vehicle,
   isOpen,
@@ -71,7 +79,7 @@ export function ConfirmDeleteModal({
   const wasOpenRef = useRef(isOpen);
   useEffect(() => {
     if (wasOpenRef.current && !isOpen) {
-      queueMicrotask(() => {
+      deferMicrotask(() => {
         setConfirmText("");
       });
     }

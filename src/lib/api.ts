@@ -433,11 +433,23 @@ async function apiRequest<T>(
 
 // Vehicle API functions
 
+type GetVehiclesOptions = {
+  lite?: boolean;
+  maxRows?: number;
+};
+
 export const vehicleApi = {
   // Get all vehicles with robust error handling
-  async getVehicles(noCache = false): Promise<{ data: Vehicle[]; meta?: VehicleMeta }> {
+  async getVehicles(
+    noCache = false,
+    options: GetVehiclesOptions = {}
+  ): Promise<{ data: Vehicle[]; meta?: VehicleMeta }> {
     const params = new URLSearchParams();
     if (noCache) params.set("noCache", "1");
+    if (options.lite) params.set("lite", "1");
+    if (options.maxRows && Number.isFinite(options.maxRows) && options.maxRows > 0) {
+      params.set("maxRows", String(Math.trunc(options.maxRows)));
+    }
 
     const endpoint = `/api/vehicles?${params.toString()}`;
     

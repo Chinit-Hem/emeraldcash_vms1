@@ -75,6 +75,18 @@ function sanitizeNumber(value: unknown): number | null {
   return null;
 }
 
+function sanitizeListImageValue(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const image = value.trim();
+  if (!image) return "";
+
+  // Do not send very large inline image payloads to list clients.
+  if (image.startsWith("data:image/")) return "";
+  if (image.length > 2048) return "";
+
+  return image;
+}
+
 // Safe error response helper to prevent circular references
 function createErrorResponse(message: string, status: number): NextResponse {
   // Ensure message is a simple string, never an object or circular reference
@@ -88,6 +100,16 @@ function createErrorResponse(message: string, status: number): NextResponse {
 export async function GET(req: NextRequest) {
   // Keep `noCache` query support for backwards compatibility with old clients.
   void req.nextUrl.searchParams.get("noCache");
+  const lite = req.nextUrl.searchParams.get("lite") === "1";
+
+  const maxRowsParam = req.nextUrl.searchParams.get("maxRows");
+  let maxRows: number | null = null;
+  if (typeof maxRowsParam === "string" && maxRowsParam.trim()) {
+    const parsed = Number.parseInt(maxRowsParam.trim(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      maxRows = Math.min(parsed, 5000);
+    }
+  }
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) {
@@ -217,30 +239,60 @@ export async function GET(req: NextRequest) {
     const vehicles = allRows
       .map((row) => toVehicle(row))
       .filter((v) => v.VehicleId && String(v.VehicleId).trim() !== "") as Vehicle[];
+
+    const normalizedVehicles = vehicles.map((vehicle) => {
+      const nextImage = sanitizeListImageValue(vehicle.Image);
+      if (nextImage === vehicle.Image) return vehicle;
+      return { ...vehicle, Image: nextImage };
+    });
     
-    console.log(`[DEBUG] Final vehicles count: ${vehicles.length}`);
+    console.log(`[DEBUG] Final vehicles count: ${normalizedVehicles.length}`);
 
     // Compute meta from FULL dataset (all vehicles, not just current page)
     // IMPORTANT: total = actual record count, NOT max(ID) or lastRowIndex
     // This ensures KPI "Total Vehicles" matches the actual data count
     const meta: VehicleMeta = {
-      total: vehicles.length,
+      total: normalizedVehicles.length,
       countsByCategory: {
-        Cars: vehicles.filter(v => v.Category === "Cars").length,
-        Motorcycles: vehicles.filter(v => v.Category === "Motorcycles").length,
-        TukTuks: vehicles.filter(v => v.Category === "Tuk Tuk").length,
+        Cars: normalizedVehicles.filter(v => v.Category === "Cars").length,
+        Motorcycles: normalizedVehicles.filter(v => v.Category === "Motorcycles").length,
+        TukTuks: normalizedVehicles.filter(v => v.Category === "Tuk Tuk").length,
       },
-      avgPrice: vehicles.length > 0
-        ? vehicles.reduce((sum, v) => sum + (v.PriceNew || 0), 0) / vehicles.length
+      avgPrice: normalizedVehicles.length > 0
+        ? normalizedVehicles.reduce((sum, v) => sum + (v.PriceNew || 0), 0) / normalizedVehicles.length
         : 0,
-      noImageCount: vehicles.filter(v => !v.Image || !extractDriveFileId(v.Image)).length,
+      noImageCount: normalizedVehicles.filter(v => !v.Image || !extractDriveFileId(v.Image)).length,
       countsByCondition: {
-        New: vehicles.filter(v => v.Condition === "New").length,
-        Used: vehicles.filter(v => v.Condition === "Used").length,
+        New: normalizedVehicles.filter(v => v.Condition === "New").length,
+        Used: normalizedVehicles.filter(v => v.Condition === "Used").length,
       },
     };
 
-    return NextResponse.json({ ok: true, data: vehicles, meta }, { headers: noStoreHeaders() });
+    const limitedVehicles = maxRows ? normalizedVehicles.slice(0, maxRows) : normalizedVehicles;
+    const responseVehicles = lite
+      ? limitedVehicles.map((vehicle) => {
+          const {
+            MarketPriceLow,
+            MarketPriceMedian,
+            MarketPriceHigh,
+            MarketPriceSource,
+            MarketPriceSamples,
+            MarketPriceUpdatedAt,
+            MarketPriceConfidence,
+            ...rest
+          } = vehicle;
+          void MarketPriceLow;
+          void MarketPriceMedian;
+          void MarketPriceHigh;
+          void MarketPriceSource;
+          void MarketPriceSamples;
+          void MarketPriceUpdatedAt;
+          void MarketPriceConfidence;
+          return rest;
+        })
+      : limitedVehicles;
+
+    return NextResponse.json({ ok: true, data: responseVehicles, meta }, { headers: noStoreHeaders() });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Fetch failed";
     return createErrorResponse(message, 500);

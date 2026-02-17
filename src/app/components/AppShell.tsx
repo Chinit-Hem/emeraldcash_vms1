@@ -29,6 +29,10 @@ function AppShellContent({ children }: AppShellProps) {
   useEffect(() => {
     let isActive = true;
     const controller = new AbortController();
+    const defer =
+      typeof queueMicrotask === "function"
+        ? queueMicrotask
+        : (callback: () => void) => Promise.resolve().then(callback);
 
     console.log("[APPSHELL] Starting auth check...");
 
@@ -36,7 +40,7 @@ function AppShellContent({ children }: AppShellProps) {
     const cached = getCachedUser();
     if (cached) {
       console.log("[APPSHELL] Using cached user immediately:", cached.username);
-      queueMicrotask(() => {
+      defer(() => {
         if (!isActive) return;
         setUser(cached);
         setLoading(false);

@@ -17,6 +17,7 @@ import { normalizeCategoryLabel, normalizeConditionLabel } from "@/lib/analytics
 import { useVehicles } from "@/lib/useVehicles";
 import { isConfigError } from "@/lib/api";
 import type { Vehicle, VehicleMeta } from "@/lib/types";
+import { isIOSSafariBrowser } from "@/lib/platform";
 
 import { useSearchParams } from "next/navigation";
 
@@ -63,10 +64,23 @@ function computeVehicleMeta(vehicles: Vehicle[]): VehicleMeta {
   };
 }
 
+function deferMicrotask(callback: () => void): void {
+  if (typeof queueMicrotask === "function") {
+    queueMicrotask(callback);
+    return;
+  }
+  Promise.resolve().then(callback);
+}
+
 export default function VehiclesClient() {
   const user = useAuthUser();
   const searchParams = useSearchParams();
   const isAdmin = user.role === "Admin";
+  const [isIOSSafari, setIsIOSSafari] = useState(false);
+
+  useEffect(() => {
+    setIsIOSSafari(isIOSSafariBrowser());
+  }, []);
 
 
   // Use the robust vehicles hook
@@ -118,6 +132,11 @@ export default function VehiclesClient() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    if (!isIOSSafari) return;
+    setPageSize((prev) => (prev > 8 ? 8 : prev));
+  }, [isIOSSafari]);
 
   // Modal state
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
@@ -275,7 +294,7 @@ export default function VehiclesClient() {
   // Reset page when filters change - use useLayoutEffect to avoid setState in render warning
   useEffect(() => {
     // Use queueMicrotask to defer state update to after render
-    queueMicrotask(() => {
+    deferMicrotask(() => {
       setCurrentPage(1);
     });
   }, [filters, pageSize]);
@@ -292,7 +311,7 @@ export default function VehiclesClient() {
     const nextWithoutImage = noImageParam === "1";
 
     // Use queueMicrotask to defer state update to after render
-    queueMicrotask(() => {
+    deferMicrotask(() => {
       setFilters((prev) => {
         // Avoid no-op state writes that can cause render loops on some mobile browsers.
         if (
@@ -529,6 +548,12 @@ export default function VehiclesClient() {
       <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto">
         {/* Header */}
         <DashboardHeader />
+
+        {isIOSSafari ? (
+          <div className="mb-4 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-200">
+            iPhone Safari compatibility mode is active to prevent tab crashes on large vehicle lists.
+          </div>
+        ) : null}
 
         {/* Data Status Bar - Enterprise Grade */}
         {!loading && !error && (
@@ -856,25 +881,29 @@ export default function VehiclesClient() {
           {!loading && !error && filteredVehicles.length > 0 && (
             <>
               {/* Desktop Table */}
-              <VehicleTable
-                vehicles={paginatedVehicles}
-                isAdmin={isAdmin}
-                onEdit={handleEditClick}
-                onDelete={handleDeleteClick}
-                sortField={sortField}
-                sortDirection={sortDirection}
-                onSort={handleSort}
-              />
+              {!isIOSSafari ? (
+                <VehicleTable
+                  vehicles={paginatedVehicles}
+                  isAdmin={isAdmin}
+                  disableImages={false}
+                  onEdit={handleEditClick}
+                  onDelete={handleDeleteClick}
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                />
+              ) : null}
 
 
               {/* Mobile Cards */}
-              <div className="lg:hidden space-y-3 p-4">
+              <div className={isIOSSafari ? "space-y-3 p-4" : "lg:hidden space-y-3 p-4"}>
                 {paginatedVehicles.map((vehicle, index) => (
                   <VehicleCardMobile
                     key={vehicle.VehicleId || `mobile-${index}`}
                     vehicle={vehicle}
                     index={index}
                     isAdmin={isAdmin}
+                    disableImages={isIOSSafari}
                     onEdit={handleEditClick}
                     onDelete={handleDeleteClick}
                   />
