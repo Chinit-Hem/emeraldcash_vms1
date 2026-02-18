@@ -49,15 +49,15 @@ export const ui = {
   },
   table: {
     wrapper:
-      "overflow-x-auto rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)]",
+      "overflow-x-auto rounded-2xl border border-[var(--glass-border)] bg-[var(--table-bg-strong)] shadow-soft backdrop-blur-2xl",
     table: "w-full min-w-[1000px] border-separate border-spacing-0",
     head:
-      "sticky top-0 z-20 bg-[var(--glass-bg-soft)]",
+      "sticky top-0 z-20 bg-[var(--table-head-bg-strong)]",
     headRow: "border-b border-[var(--glass-border)]",
     th:
       "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]",
     tr:
-      "border-b border-[var(--glass-border)] transition-colors duration-300 hover:bg-[var(--table-row-hover)]",
+      "border-b border-[var(--glass-border)] bg-[var(--table-row-bg)] transition-colors duration-300 hover:bg-[var(--table-row-hover)]",
     td: "px-4 py-3 text-sm text-[var(--text-primary)]",
   },
 };

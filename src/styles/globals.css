@@ -31,8 +31,11 @@
   --glass-on-accent: rgba(247, 255, 252, 0.14);
   --glass-on-accent-border: rgba(247, 255, 252, 0.28);
   --surface-rgb: 255, 255, 255;
-  --table-row-hover: rgba(16, 135, 95, 0.08);
-  --table-row-alt: rgba(20, 36, 29, 0.02);
+  --table-bg-strong: #f6fcf9;
+  --table-head-bg-strong: #ecf5f0;
+  --table-row-bg: #fbfefd;
+  --table-row-hover: #e7f4ee;
+  --table-row-alt: #f3f9f6;
 
   /* Chart + legacy compatibility tokens */
   --ec-chart-axis: var(--text-secondary);
@@ -102,8 +105,11 @@
   --glass-on-accent: rgba(247, 255, 252, 0.16);
   --glass-on-accent-border: rgba(247, 255, 252, 0.3);
   --surface-rgb: 17, 30, 24;
-  --table-row-hover: rgba(46, 200, 150, 0.14);
-  --table-row-alt: rgba(255, 255, 255, 0.015);
+  --table-bg-strong: #0f211a;
+  --table-head-bg-strong: #163025;
+  --table-row-bg: #12271f;
+  --table-row-hover: #1a3a2d;
+  --table-row-alt: #173126;
 
   /* Chart + legacy compatibility tokens */
   --ec-chart-axis: var(--text-secondary);
@@ -651,18 +657,20 @@ body {
 
 .ec-liquid-table-wrap {
   border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 88%, transparent);
+  background: var(--table-bg-strong);
   box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .ec-liquid-table-head,
 .ec-glassHeader {
-  background: color-mix(in srgb, var(--glass-bg-soft) 92%, transparent);
+  background: var(--table-head-bg-strong);
 }
 
 .ec-liquid-table-row,
 .ec-glassRow {
-  background: color-mix(in srgb, var(--bg-elevated) 90%, transparent);
+  background: var(--table-row-bg);
 }
 
 .ec-glassRowAlt {

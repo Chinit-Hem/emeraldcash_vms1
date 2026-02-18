@@ -39,7 +39,7 @@ const SortHeader = ({ field, children, sortField, sortDirection, onSort }: SortH
       onClick={() => onSort(field)}
       className={cn(
         ui.table.th,
-        "sticky top-0 z-20 cursor-pointer select-none transition-colors hover:bg-[var(--glass-bg-soft)]"
+        "sticky top-0 z-20 cursor-pointer select-none transition-colors hover:bg-[var(--table-row-hover)]"
       )}
     >
       <div className="flex items-center gap-1">
