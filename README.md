@@ -9,10 +9,21 @@ This app uses a Google Sheet as the database via a Google Apps Script web app.
 Create (or edit) `.env.local` in the project root (do **not** commit this file):
 
 ```bash
-NEXT_PUBLIC_API_URL="https://script.google.com/macros/s/<YOUR_SCRIPT_ID>/exec"
-SESSION_SECRET="change-me-please-use-a-long-random-string"
-APPS_SCRIPT_UPLOAD_TOKEN="change-me" # required for image uploads
-APPS_SCRIPT_URL="https://script.google.com/macros/s/<YOUR_SCRIPT_ID>/exec"
+# Existing variables
+NEXT_PUBLIC_API_URL="https://script.google.com/macros/s/AKfycbwlIp823Km3GEcMhWip_cZSlZ9GRlf1HptIucXdvz2qI14vsn_3Zq_Z27QyblOOLdUuMQ/exec"
+SESSION_SECRET="emerald_vms_2026_secure_key_168"
+
+# Add this for image uploads
+APPS_SCRIPT_UPLOAD_TOKEN="ya29.a0AWY7CkkJ0xX1z3bX8KfN5JH3kD3VJ8Y2F1bGxjZWRfX2tleV9oZXJl"
+
+# Drive folder links for reference:
+# Cars: https://drive.google.com/drive/folders/1UKgtZ_sSNSVy3p-8WBwBrploVL9IDxec?usp=sharing
+# Motorcycles: https://drive.google.com/drive/folders/10OcxTtK6ZqQj5cvPMNNIP4VsaVneGiYP?usp=sharing
+# Tuk Tuks: https://drive.google.com/drive/folders/18oDOlZXE9JGE5EDZ7yL6oBRVG6SgVYdP?usp=sharing
+
+# Optional: Additional configuration
+APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbx5SyxFn2NmSeXvh-RAq16upfc4-B0TiGRU7kfldDgXbYQI2WF37ZM-W8RVcVrMFYWcSQ/exec"
+
 ```
 
 ### 2) Run the dev server
@@ -128,3 +139,4 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
