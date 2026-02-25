@@ -16,7 +16,7 @@ interface VehicleDetailsCardProps {
   vehicle: Vehicle;
   userRole: "Admin" | "Staff" | "Viewer";
   onEdit?: () => void;
-  onDelete?: () => void | Promise<void>;
+  onDelete?: () => void;
   isDeleting?: boolean;
 }
 
@@ -49,7 +49,10 @@ export function VehicleDetailsCard({
 
   const handleDelete = async () => {
     if (onDelete) {
-      await onDelete();
+      const result = onDelete();
+      if (result instanceof Promise) {
+        await result;
+      }
     }
     setIsDeleteDialogOpen(false);
   };
