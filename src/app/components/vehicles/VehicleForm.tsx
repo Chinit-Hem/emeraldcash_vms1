@@ -55,7 +55,8 @@ export function VehicleForm({
     setUploadedImageFile(null);
     setErrors({});
     setTouched({});
-  }, [vehicle]);
+  }, [vehicle.VehicleId, vehicle.Image]); // Re-initialize when vehicle ID or image changes
+
 
   // Clear submit error when form changes
   useEffect(() => {

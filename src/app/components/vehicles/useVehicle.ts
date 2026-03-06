@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { onVehicleCacheUpdate } from "@/lib/vehicleCache";
 import type { Vehicle } from "@/lib/types";
+
 
 interface UseVehicleResult {
   vehicle: Vehicle | null;
@@ -120,7 +122,18 @@ export function useVehicle(id: string): UseVehicleResult {
     };
   }, [fetchVehicle]);
 
+  // Listen for cache updates to refresh vehicle data when it changes
+  useEffect(() => {
+    return onVehicleCacheUpdate((vehicles) => {
+      const updatedVehicle = vehicles.find((v) => v.VehicleId === id);
+      if (updatedVehicle) {
+        setVehicle(updatedVehicle);
+      }
+    });
+  }, [id]);
+
   return {
+
     vehicle,
     loading,
     error,

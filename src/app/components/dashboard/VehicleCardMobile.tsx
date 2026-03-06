@@ -36,12 +36,24 @@ export default function VehicleCardMobile({
   const price40 = vehicle.Price40 ?? derived.Price40;
   const price70 = vehicle.Price70 ?? derived.Price70;
 
-  const imageFileId = extractDriveFileId(vehicle.Image);
+  // Check if it's a Cloudinary URL first
+  const isCloudinary = vehicle.Image?.includes('res.cloudinary.com');
+  
+  // Extract Google Drive file ID if not Cloudinary
+  const imageFileId = !isCloudinary ? extractDriveFileId(vehicle.Image) : null;
+  
   const thumbUrl = useMemo(() => {
     if (disableImages) return null;
+    
+    if (isCloudinary) {
+      // Use Cloudinary URL directly
+      return vehicle.Image;
+    }
+    
+    // Try Google Drive
     if (!imageFileId || imageError) return null;
     return `${driveThumbnailUrl(imageFileId, "w300-h300")}`;
-  }, [disableImages, imageFileId, imageError]);
+  }, [disableImages, isCloudinary, vehicle.Image, imageFileId, imageError]);
 
   const formatPrice = (price: number | null) => {
     if (price == null) return "-";

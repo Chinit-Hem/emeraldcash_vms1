@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
@@ -165,8 +165,12 @@ export default function VehicleList({ category }: VehicleListProps) {
   useEffect(() => {
     const cached = readVehicleCache();
     if (cached) setVehicles(cached);
-    return onVehicleCacheUpdate((nextVehicles) => setVehicles(nextVehicles));
+    return onVehicleCacheUpdate((nextVehicles) => {
+      setVehicles(nextVehicles);
+      setIsRefreshing(false);
+    });
   }, []);
+
 
   const searchParams = useSearchParams();
   const refreshToken = searchParams?.get("refresh") || "";
@@ -211,13 +215,14 @@ export default function VehicleList({ category }: VehicleListProps) {
       setIsRefreshing(true);
       await refreshVehicleCache();
       if (mounted) setIsRefreshing(false);
-    }, 15000);
+    }, 5000); // Refresh every 5 seconds for more responsive updates
 
     return () => {
       mounted = false;
       window.clearInterval(interval);
     };
   }, []);
+
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -759,8 +764,18 @@ export default function VehicleList({ category }: VehicleListProps) {
             const rowClass = index % 2 === 0 ? "ec-glassRow" : "ec-glassRowAlt";
             const vehicleId = vehicle.VehicleId;
             const displayNo = vehicleId || String(index + 1);
-            const imageFileId = extractDriveFileId(vehicle.Image);
-            const thumbUrl = imageFileId ? driveThumbnailUrl(imageFileId, "w100-h100") : vehicle.Image;
+                // Check if it's a Cloudinary URL first
+                const isCloudinary = vehicle.Image?.includes('res.cloudinary.com');
+                let thumbUrl: string | null = null;
+                
+                if (isCloudinary) {
+                  // Use Cloudinary URL directly (Next.js Image will handle it)
+                  thumbUrl = vehicle.Image;
+                } else {
+                  // Try Google Drive
+                  const imageFileId = extractDriveFileId(vehicle.Image);
+                  thumbUrl = imageFileId ? driveThumbnailUrl(imageFileId, "w100-h100") : vehicle.Image;
+                }
 
             return (
               <div
@@ -926,8 +941,19 @@ export default function VehicleList({ category }: VehicleListProps) {
                 const rowClass = index % 2 === 0 ? "ec-glassRow" : "ec-glassRowAlt";
                 const vehicleId = vehicle.VehicleId;
                 const displayNo = vehicleId || String(index + 1);
-                const imageFileId = extractDriveFileId(vehicle.Image);
-                const thumbUrl = imageFileId ? `${driveThumbnailUrl(imageFileId, "w100-h100")}?t=${Date.now()}` : vehicle.Image;
+                
+                // Check if it's a Cloudinary URL first
+                const isCloudinaryDesktop = vehicle.Image?.includes('res.cloudinary.com');
+                let thumbUrlDesktop: string | null = null;
+                
+                if (isCloudinaryDesktop) {
+                  // Use Cloudinary URL directly
+                  thumbUrlDesktop = vehicle.Image;
+                } else {
+                  // Try Google Drive
+                  const imageFileId = extractDriveFileId(vehicle.Image);
+                  thumbUrlDesktop = imageFileId ? `${driveThumbnailUrl(imageFileId, "w100-h100")}?t=${Date.now()}` : vehicle.Image;
+                }
 
                 return (
                   <tr
@@ -942,10 +968,10 @@ export default function VehicleList({ category }: VehicleListProps) {
                       {displayNo}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {thumbUrl ? (
+                      {thumbUrlDesktop ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={thumbUrl}
+                          src={thumbUrlDesktop}
                           alt={`${vehicle.Brand} ${vehicle.Model}`}
                           loading="lazy"
                           decoding="async"
@@ -1046,7 +1072,7 @@ export default function VehicleList({ category }: VehicleListProps) {
             {queryTokens.length > 0 ? (
               <div>
                 <p className="font-medium text-gray-800">
-                  No results for &quot;{filters.query.trim()}&quot;
+                  No results for "{filters.query.trim()}"
                 </p>
                 <p className="text-sm text-gray-600 mt-1">Try a different keyword or clear the search.</p>
               </div>

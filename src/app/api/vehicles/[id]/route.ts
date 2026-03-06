@@ -7,6 +7,8 @@ import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getVehicleById, updateVehicle, deleteVehicle, toVehicle as dbToVehicle } from "@/lib/db-schema";
+import { uploadImage, getCloudinaryFolder, deleteImage } from "@/lib/cloudinary";
 
 import { clearCachedVehicles, getCachedVehicles } from "../_cache";
 import {
@@ -15,8 +17,9 @@ import {
   driveThumbnailUrl,
   fetchAppsScript,
   toAppsScriptPayload,
-  toVehicle
+  toVehicle as sharedToVehicle,
 } from "../_shared";
+
 
 
 // Input validation helper
@@ -125,13 +128,6 @@ export async function GET(
   console.log(`[VEHICLE_API] ${mobilePrefix}Session valid for user: ${session.username}`);
 
   const { id } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!baseUrl) {
-    return NextResponse.json(
-      { ok: false, error: "Missing NEXT_PUBLIC_API_URL" },
-      { status: 500 }
-    );
-  }
 
   // Validate ID format
   const safeId = sanitizeString(id, 100);
@@ -140,31 +136,17 @@ export async function GET(
   }
 
   try {
-    // Fast path: try to fetch just one record (if your Apps Script supports getById).
-    try {
-      const byIdUrl = new URL(baseUrl);
-      byIdUrl.searchParams.set("action", "getById");
-      byIdUrl.searchParams.set("id", safeId);
-
-      const byIdRes = await fetch(byIdUrl.toString(), { cache: "no-store" });
-      const byIdJson = byIdRes.ok ? await byIdRes.json().catch(() => ({})) : null;
-
-      if (byIdRes.ok && byIdJson && byIdJson.ok !== false && byIdJson.data && typeof byIdJson.data === "object") {
-        const vehicle: Vehicle = toVehicle(byIdJson.data as Record<string, unknown>);
-        if (!vehicle.VehicleId) vehicle.VehicleId = safeId;
+    // Try to fetch from Neon database first
+    const vehicleId = parseInt(safeId, 10);
+    if (!isNaN(vehicleId)) {
+      const dbVehicle = await getVehicleById(vehicleId);
+      if (dbVehicle) {
+        const vehicle = dbToVehicle(dbVehicle) as Vehicle;
         return NextResponse.json({ ok: true, data: vehicle });
       }
-
-      if (byIdRes.ok && byIdJson && byIdJson.ok === false) {
-        const message = typeof byIdJson.error === "string" ? byIdJson.error : "";
-        if (/not\s*found/i.test(message)) {
-          return NextResponse.json({ ok: false, error: "Vehicle not found" }, { status: 404 });
-        }
-      }
-    } catch {
-      // ignore and fallback to list fetch
     }
 
+    // Fallback: try cached vehicles
     const cachedVehicles = getCachedVehicles();
     if (cachedVehicles) {
       const cached = cachedVehicles.find((vehicle) => vehicle.VehicleId === safeId);
@@ -173,17 +155,17 @@ export async function GET(
       }
     }
 
-    // Fallback: fetch list and search by id (works with older Apps Script versions).
-    const rows = await fetchAllVehicleRows(baseUrl, "no-store");
-    const match = rows.find((row) => String(row.VehicleId ?? row.VehicleID ?? row.Id ?? row.id ?? "") === safeId);
-
-    if (!match) {
-      return NextResponse.json({ ok: false, error: "Vehicle not found" }, { status: 404 });
+    // If not found in database or cache, check if we have Apps Script fallback
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!baseUrl) {
+      return NextResponse.json(
+        { ok: false, error: "Vehicle not found and Apps Script fallback not configured" },
+        { status: 404 }
+      );
     }
 
-    const vehicle: Vehicle = toVehicle(match);
-
-    return NextResponse.json({ ok: true, data: vehicle });
+    // If not found in database or cache, return 404
+    return NextResponse.json({ ok: false, error: "Vehicle not found" }, { status: 404 });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "Unknown error" },
@@ -196,23 +178,22 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("[PUT /api/vehicles/[id]] Handler started");
+  
   const session = requireSession(req);
   if (!session) {
+    console.log("[PUT /api/vehicles/[id]] No session found");
     return NextResponse.json({ ok: false, error: "Invalid or expired session" }, { status: 401 });
   }
+
+  console.log(`[PUT /api/vehicles/[id]] Session valid for user: ${session.username}, role: ${session.role}`);
 
   if (session.role !== "Admin") {
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!baseUrl) {
-    return NextResponse.json(
-      { ok: false, error: "Missing NEXT_PUBLIC_API_URL" },
-      { status: 500 }
-    );
-  }
+  console.log(`[PUT /api/vehicles/[id]] Vehicle ID: ${id}`);
 
   // Validate ID format
   const safeId = sanitizeString(id, 100);
@@ -220,24 +201,51 @@ export async function PUT(
     return NextResponse.json({ ok: false, error: "Invalid vehicle ID" }, { status: 400 });
   }
 
+  const vehicleId = parseInt(safeId, 10);
+  if (isNaN(vehicleId)) {
+    return NextResponse.json({ ok: false, error: "Invalid vehicle ID format" }, { status: 400 });
+  }
+
   try {
     // Handle both FormData (new) and JSON (legacy) requests
     let body: Record<string, unknown>;
     let newImageFile: File | null = null;
+    let imageDataBase64: string | null = null;
 
     const contentType = req.headers.get("content-type") || "";
+    console.log(`[PUT /api/vehicles/${id}] Content-Type: ${contentType}`);
+    
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
       body = {};
       for (const [key, value] of formData.entries()) {
-        if (key === "image" && value instanceof File) {
+        console.log(`[PUT /api/vehicles/${id}] FormData key: ${key}, type: ${typeof value}, isFile: ${value instanceof File}`);
+        if ((key === "image" || key === "imageData") && value instanceof File) {
           newImageFile = value;
+          console.log(`[PUT /api/vehicles/${id}] Found image file: ${value.name}, size: ${value.size}`);
         } else {
           body[key] = value;
         }
       }
     } else {
       body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+      // Check for base64 image data in JSON
+      imageDataBase64 = (body.imageData || body.image_data) as string;
+      if (imageDataBase64) {
+        console.log(`[PUT /api/vehicles/${id}] Found base64 image data in JSON`);
+      }
+    }
+
+    // Validate required fields
+    const category = sanitizeString(body.Category);
+    const brand = sanitizeString(body.Brand);
+    const model = sanitizeString(body.Model);
+
+    if (!category || !brand || !model) {
+      return NextResponse.json(
+        { ok: false, error: "Category, Brand, and Model are required" },
+        { status: 400 }
+      );
     }
 
     // Validate numeric fields
@@ -258,153 +266,86 @@ export async function PUT(
       );
     }
 
-    const payload = toAppsScriptPayload(body, { vehicleId: safeId });
-    const normalizedTime = normalizeCambodiaTimeString(payload.Time);
-    if (normalizedTime) payload.Time = normalizedTime;
-    else delete payload.Time;
+    // Handle image upload if provided
+    let imageId: string | null = null;
+    let imageDataToUpload: string | null = null;
 
-    // Handle image upload/replacement with optimized performance
     if (newImageFile) {
-      const folderId = driveFolderIdForCategory(payload.Category);
-      if (!folderId) {
-        return NextResponse.json(
-          { ok: false, error: "Unknown category. Please select Cars, Motorcycles, or Tuk Tuk." },
-          { status: 400 }
-        );
-      }
-
-      // Validate token early
-      const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
-      if (!uploadToken) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error:
-              "Missing APPS_SCRIPT_UPLOAD_TOKEN. Add it in Vercel env vars to enable image updates.",
-          },
-          { status: 500 }
-        );
-      }
-
-      // Prepare image data (convert to base64 once)
-      const fileName = `vehicle_${safeId}.webp`;
+      // Convert File to base64
       const arrayBuffer = await newImageFile.arrayBuffer();
-      const base64Data = Buffer.from(arrayBuffer).toString('base64');
+      imageDataToUpload = `data:${newImageFile.type};base64,${Buffer.from(arrayBuffer).toString('base64')}`;
+      console.log(`[PUT /api/vehicles/${vehicleId}] Converted file to base64, length: ${imageDataToUpload.length}`);
+    } else if (imageDataBase64 && typeof imageDataBase64 === "string" && imageDataBase64.startsWith("data:image/")) {
+      imageDataToUpload = imageDataBase64;
+      console.log(`[PUT /api/vehicles/${vehicleId}] Using base64 image data from JSON`);
+    }
 
-      // Parallel operations: fetch existing vehicle AND prepare upload payload
-      const [existingVehicleRes] = await Promise.allSettled([
-        // Fetch existing vehicle to check for old image (with shorter timeout)
-        fetchAppsScript(new URL(baseUrl).toString() + `?action=getById&id=${encodeURIComponent(safeId)}`, {
-          cache: "no-store",
-          timeoutMs: 10000
-        }).catch(() => null)
-      ]);
-
-      // Extract existing file ID if available
-      let existingFileId: string | null = null;
-      if (existingVehicleRes.status === 'fulfilled' && existingVehicleRes.value) {
-        try {
-          const byIdJson = await existingVehicleRes.value.json().catch(() => ({}));
-          if (byIdJson?.ok !== false && byIdJson?.data && typeof byIdJson.data === "object") {
-            const vehicle = toVehicle(byIdJson.data as Record<string, unknown>);
-            existingFileId = extractDriveFileId(vehicle.Image);
-          }
-        } catch {
-          // ignore, proceed without deleting existing image
-        }
-      }
-
-      // Prepare upload payload
-      const uploadPayload = {
-        action: "uploadImage",
-        folderId,
-        category: payload.Category,
-        token: uploadToken,
-        mimeType: "image/webp",
-        fileName,
-        data: base64Data,
-        // Optionally replace existing image in one call if Apps Script supports it
-        replaceFileId: existingFileId || undefined,
-      };
-
-      // Upload new image (reduced timeout from 90s to 60s)
-      const uploadRes = await fetchAppsScript(baseUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(uploadPayload),
-        cache: "no-store",
-        timeoutMs: 60000, // Reduced from 90s to 60s
+    if (imageDataToUpload) {
+      const targetFolder = getCloudinaryFolder(category);
+      console.log(`[PUT /api/vehicles/${vehicleId}] Uploading to Cloudinary folder: ${targetFolder}`);
+      
+      const uploadResult = await uploadImage(imageDataToUpload, {
+        folder: targetFolder,
+        publicId: `vehicle_${vehicleId}_${Date.now()}`,
+        tags: [category, brand, model].filter(Boolean),
       });
 
-      const uploadJson = (await uploadRes.json().catch(() => ({}))) as Record<string, unknown>;
-      const uploadOk = uploadRes.ok && (uploadJson?.ok === true || uploadJson?.ok !== false);
-      const hasError = typeof uploadJson?.error === "string" && String(uploadJson.error).trim();
+      console.log(`[PUT /api/vehicles/${vehicleId}] Upload result: success=${uploadResult.success}, url=${uploadResult.url || 'none'}, error=${uploadResult.error || 'none'}`);
 
-      if (!uploadOk || hasError) {
-        const message = hasError
-          ? String(uploadJson.error).trim()
-          : `Image upload failed (${uploadRes.status}).`;
-        return NextResponse.json(
-          {
-            ok: false,
-            error:
-              `${message} ` +
-              `Your Apps Script must support action=uploadImage to save images into Drive folders.`,
-          },
-          { status: 502 }
-        );
-      }
-
-      // Extract uploaded image URL
-      const dataObj = uploadJson?.data && typeof uploadJson.data === "object" ? (uploadJson.data as Record<string, unknown>) : {};
-      const uploadedUrlCandidate =
-        uploadJson?.url ??
-        dataObj?.url ??
-        dataObj?.thumbnailUrl ??
-        uploadJson?.thumbnailUrl ??
-        dataObj?.imageUrl;
-
-      const uploadedFileIdCandidate = uploadJson?.fileId ?? dataObj?.fileId;
-
-      if (typeof uploadedUrlCandidate === "string" && uploadedUrlCandidate.trim()) {
-        payload.Image = uploadedUrlCandidate.trim();
-      } else if (typeof uploadedFileIdCandidate === "string" && uploadedFileIdCandidate.trim()) {
-        payload.Image = driveThumbnailUrl(uploadedFileIdCandidate.trim());
+      if (!uploadResult.success) {
+        // Log warning but don't fail the update - just skip the image
+        console.warn(`[PUT /api/vehicles/${vehicleId}] Image upload failed: ${uploadResult.error}`);
+        // Continue without the image rather than returning 502
       } else {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Image upload succeeded but no image URL was returned by Apps Script.",
-          },
-          { status: 502 }
-        );
+        imageId = uploadResult.url || null;
+        console.log(`✅ [PUT /api/vehicles/${vehicleId}] Image successfully uploaded to Cloudinary folder '${targetFolder}' and Database updated!`);
+        console.log(`[PUT /api/vehicles/${vehicleId}] Image URL: ${imageId}`);
       }
+    } else {
+      console.log(`[PUT /api/vehicles/${vehicleId}] No image data to upload`);
     }
 
-    const res = await fetchAppsScript(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update", id: safeId, data: payload }),
-      cache: "no-store",
-      timeoutMs: 30000,
+    // Prepare update data
+    const updateData: Parameters<typeof updateVehicle>[1] = {
+      category,
+      brand,
+      model,
+      year: year || new Date().getFullYear(),
+      plate: sanitizeString(body.Plate),
+      market_price: priceNew || 0,
+      tax_type: sanitizeString(body.TaxType),
+      condition: sanitizeString(body.Condition) || "New",
+      body_type: sanitizeString(body.BodyType),
+      color: sanitizeString(body.Color),
+    };
+
+    if (imageId) {
+      updateData.image_id = imageId;
+    }
+
+    // Update vehicle in database
+    const updatedVehicle = await updateVehicle(vehicleId, updateData);
+
+    if (!updatedVehicle) {
+      return NextResponse.json({ ok: false, error: "Vehicle not found" }, { status: 404 });
+    }
+
+    // Convert to API format and log the response
+    const responseVehicle = dbToVehicle(updatedVehicle);
+    const imageUrl = typeof responseVehicle.Image === "string" ? responseVehicle.Image : "";
+    console.log(`[PUT /api/vehicles/${vehicleId}] Response:`, {
+      vehicleId: responseVehicle.VehicleId,
+      hasImage: !!imageUrl,
+      imageUrl: imageUrl.substring(0, 100) + "..."
     });
 
-    const data = await res.json().catch(() => ({}));
-
-    if (data.ok === false) {
-      return NextResponse.json({ ok: false, error: data.error }, { status: 400 });
-    }
-
     clearCachedVehicles();
-    return NextResponse.json({ ok: true, data });
+    return NextResponse.json({ ok: true, data: responseVehicle });
   } catch (e: unknown) {
-    const message =
-      e instanceof Error && e.name === "AbortError"
-        ? "Request to Apps Script timed out. Try again or use a smaller image."
-        : e instanceof Error
-          ? e.message
-          : "Unknown error";
-    return NextResponse.json({ ok: false, error: message }, { status: 502 });
+    const message = e instanceof Error ? e.message : "Unknown error";
+    console.error("[PUT /api/vehicles/[id]] Error:", message);
+    console.error("[PUT /api/vehicles/[id]] Stack:", e instanceof Error ? e.stack : "No stack trace");
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
 
@@ -412,8 +353,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("[DELETE /api/vehicles/[id]] Handler started");
+  
   const session = requireSession(req);
   if (!session) {
+    console.log("[DELETE /api/vehicles/[id]] No session found");
     return NextResponse.json({ ok: false, error: "Invalid or expired session" }, { status: 401 });
   }
 
@@ -422,10 +366,7 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!baseUrl) {
-    return NextResponse.json({ ok: false, error: "Missing NEXT_PUBLIC_API_URL" }, { status: 500 });
-  }
+  console.log(`[DELETE /api/vehicles/[id]] Vehicle ID: ${id}`);
 
   // Validate ID format
   const safeId = sanitizeString(id, 100);
@@ -433,96 +374,67 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "Invalid vehicle ID" }, { status: 400 });
   }
 
+  const vehicleId = parseInt(safeId, 10);
+  if (isNaN(vehicleId)) {
+    return NextResponse.json({ ok: false, error: "Invalid vehicle ID format" }, { status: 400 });
+  }
+
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const imageFileIdFromBody =
-      extractDriveFileId(body.imageFileId) ?? extractDriveFileId(body.imageUrl) ?? null;
-
-    let imageFileId = imageFileIdFromBody;
-    if (!imageFileId) {
-      // Fallback: fetch the current vehicle so we can extract its Drive file id.
-      try {
-        // Fast path: use getById if available.
-        const byIdUrl = new URL(baseUrl);
-        byIdUrl.searchParams.set("action", "getById");
-        byIdUrl.searchParams.set("id", safeId);
-        const byIdRes = await fetchAppsScript(byIdUrl.toString(), { cache: "no-store", timeoutMs: 15000 });
-        if (byIdRes.ok) {
-          const byIdJson = await byIdRes.json().catch(() => ({}));
-          if (byIdJson?.ok !== false && byIdJson?.data && typeof byIdJson.data === "object") {
-            const vehicle = toVehicle(byIdJson.data as Record<string, unknown>);
-            imageFileId = extractDriveFileId(vehicle.Image);
-          }
-        }
-      } catch {
-        // ignore and try list fallback below
-      }
-    }
-    if (!imageFileId) {
-      // Fallback: list fetch (older Apps Script versions without getById).
-      try {
-        const rows = await fetchAllVehicleRows(baseUrl, "no-store");
-        const match = rows.find((row) => String(row.VehicleId ?? row.VehicleID ?? row.Id ?? row.id ?? "") === safeId);
-        if (match) {
-          const vehicle = toVehicle(match);
-          imageFileId = extractDriveFileId(vehicle.Image);
-        }
-      } catch {
-        // ignore fallback errors; deletion should still proceed
-      }
+    // First, get the vehicle to check if it has an image to delete from Cloudinary
+    const vehicle = await getVehicleById(vehicleId);
+    
+    if (!vehicle) {
+      console.log(`[DELETE /api/vehicles/${vehicleId}] Vehicle not found`);
+      return NextResponse.json({ ok: false, error: "Vehicle not found" }, { status: 404 });
     }
 
-    const deletePayload: Record<string, unknown> = {
-      action: "delete",
-      VehicleId: safeId,
-      id: safeId,
-      vehicleId: safeId,
-    };
-
-    if (imageFileId) {
-      // Validate token only when deleting an image
-      const uploadToken = process.env.APPS_SCRIPT_UPLOAD_TOKEN;
-      if (!uploadToken) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error:
-              "Missing APPS_SCRIPT_UPLOAD_TOKEN. Add it in Vercel env vars to enable image updates.",
-          },
-          { status: 500 }
-        );
-      }
-      deletePayload.token = uploadToken;
-      deletePayload.imageFileId = imageFileId;
-    }
-
-    const res = await fetchAppsScript(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(deletePayload),
-      cache: "no-store",
-      timeoutMs: 30000,
+    console.log(`[DELETE /api/vehicles/${vehicleId}] Found vehicle:`, {
+      brand: vehicle.brand,
+      model: vehicle.model,
+      hasImage: !!vehicle.image_id
     });
 
-    const data = await res.json().catch(() => ({}));
-    if (data.ok === false) {
-      const message = typeof data.error === "string" ? data.error : "";
-      if (/not\s*found|missing|already\s*deleted/i.test(message)) {
-        clearCachedVehicles();
-        return NextResponse.json({ ok: true, data: null });
+    // If vehicle has a Cloudinary image, delete it
+    if (vehicle.image_id) {
+      // Check if it's a Cloudinary URL (not a Google Drive ID)
+      if (vehicle.image_id.includes('cloudinary.com')) {
+        // Extract public_id from Cloudinary URL
+        // URL format: https://res.cloudinary.com/{cloud}/image/upload/v{version}/{folder}/{public_id}
+        const urlParts = vehicle.image_id.split('/');
+        const publicIdWithExtension = urlParts[urlParts.length - 1];
+        const publicId = publicIdWithExtension.split('.')[0]; // Remove file extension
+        const folder = urlParts[urlParts.length - 2];
+        const fullPublicId = `${folder}/${publicId}`;
+        
+        console.log(`[DELETE /api/vehicles/${vehicleId}] Deleting Cloudinary image: ${fullPublicId}`);
+        
+        const deleteResult = await deleteImage(fullPublicId);
+        if (deleteResult.success) {
+          console.log(`[DELETE /api/vehicles/${vehicleId}] Cloudinary image deleted successfully`);
+        } else {
+          console.warn(`[DELETE /api/vehicles/${vehicleId}] Failed to delete Cloudinary image: ${deleteResult.error}`);
+          // Continue with vehicle deletion even if image deletion fails
+        }
+      } else {
+        console.log(`[DELETE /api/vehicles/${vehicleId}] Image is not a Cloudinary URL, skipping image deletion`);
       }
-      return NextResponse.json({ ok: false, error: data.error }, { status: 400 });
     }
 
+    // Delete vehicle from database
+    const deleted = await deleteVehicle(vehicleId);
+    
+    if (!deleted) {
+      console.log(`[DELETE /api/vehicles/${vehicleId}] Database deletion failed`);
+      return NextResponse.json({ ok: false, error: "Failed to delete vehicle" }, { status: 500 });
+    }
+
+    console.log(`[DELETE /api/vehicles/${vehicleId}] Vehicle deleted successfully`);
     clearCachedVehicles();
-    return NextResponse.json({ ok: true, data: data.data ?? null });
+    return NextResponse.json({ ok: true, data: null });
   } catch (e: unknown) {
-    const message =
-      e instanceof Error && e.name === "AbortError"
-        ? "Request to Apps Script timed out."
-        : e instanceof Error
-          ? e.message
-          : "Unknown error";
-    return NextResponse.json({ ok: false, error: message }, { status: 502 });
+    const message = e instanceof Error ? e.message : "Unknown error";
+    console.error("[DELETE /api/vehicles/[id]] Error:", message);
+    console.error("[DELETE /api/vehicles/[id]] Stack:", e instanceof Error ? e.stack : "No stack trace");
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

@@ -407,6 +407,7 @@ function AddVehicleInner() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+
   // Load draft on mount
   useEffect(() => {
     try {
@@ -648,7 +649,7 @@ function AddVehicleInner() {
         // ignore
       }
 
-      showSuccessToast("Vehicle added successfully.", 3000);
+      // Clear form for next entry
       setFormData({
         Brand: "",
         Model: "",
@@ -667,17 +668,26 @@ function AddVehicleInner() {
       setCompressedImage(null);
       setTouched({});
       setErrors({});
+      
+      // Clear draft
+      try {
+        sessionStorage.removeItem(ADD_DRAFT_KEY);
+      } catch {
+        // ignore
+      }
 
-      const refreshedVehicles = await refreshVehicleCache();
-      if (refreshedVehicles) {
-        setSuccessMessage("Vehicle added successfully. Search data updated.");
+      // Immediately refresh cache to show new vehicle in list
+      const refreshed = await refreshVehicleCache();
+      if (refreshed) {
+        setSuccessMessage("Vehicle added successfully. Ready for next entry.");
       } else {
         setSuccessMessage("Vehicle added successfully. Search update may take a few seconds.");
-        showWarningToast("Saved, but search sync is delayed. Please refresh vehicle search.", 4500);
       }
       
       // Trigger Next.js router refresh to update all components with fresh data
       router.refresh();
+
+
 
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to add vehicle. Please try again.";
@@ -764,7 +774,7 @@ function AddVehicleInner() {
             </div>
           </div>
 
-          {/* Success Message */}
+          {/* Success Message Banner - Form stays open */}
           {successMessage && (
             <div className="mx-6 sm:mx-8 mt-6 p-4 bg-emerald-50/80 dark:bg-emerald-500/10 border border-emerald-200/50 dark:border-emerald-500/20 rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -787,6 +797,7 @@ function AddVehicleInner() {
               </button>
             </div>
           )}
+
 
           {/* Error Message */}
           {errors.submit && (

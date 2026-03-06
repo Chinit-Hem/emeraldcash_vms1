@@ -227,10 +227,24 @@ export default function VehicleTable({
               const price40 = vehicle.Price40 ?? derived.Price40;
               const price70 = vehicle.Price70 ?? derived.Price70;
               const vehicleId = vehicle.VehicleId;
-              const imageFileId = extractDriveFileId(vehicle.Image);
-              const thumbUrl = !disableImages && imageFileId && !imageErrors.has(vehicleId)
-                ? `${driveThumbnailUrl(imageFileId, "w100-h100")}`
-                : null;
+              
+              // Check if it's a Cloudinary URL first
+              const isCloudinary = vehicle.Image?.includes('res.cloudinary.com');
+              
+              let thumbUrl: string | null = null;
+              
+              if (!disableImages && !imageErrors.has(vehicleId)) {
+                if (isCloudinary) {
+                  // Use Cloudinary URL directly
+                  thumbUrl = vehicle.Image;
+                } else {
+                  // Try Google Drive
+                  const imageFileId = extractDriveFileId(vehicle.Image);
+                  if (imageFileId) {
+                    thumbUrl = driveThumbnailUrl(imageFileId, "w100-h100");
+                  }
+                }
+              }
 
               return (
               <tr

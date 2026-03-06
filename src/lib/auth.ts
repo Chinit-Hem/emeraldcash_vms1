@@ -227,12 +227,12 @@ function getSessionSecret_(): string {
   const secret = process.env.SESSION_SECRET?.trim();
   if (secret) return secret;
 
-  if (!ephemeralSessionSecret) {
-    ephemeralSessionSecret = crypto.randomBytes(64).toString("hex");
-    console.warn("[AUTH] Using ephemeral session secret - set SESSION_SECRET env var for production!");
-  }
-
-  return ephemeralSessionSecret;
+  // Use a consistent fallback secret for development
+  // This ensures sessions survive server restarts and HMR in dev mode
+  // In production, SESSION_SECRET must be set!
+  const devSecret = "ec-vms-dev-secret-2024-do-not-use-in-production-ever-64chars-long!!";
+  console.warn("[AUTH] Using development session secret - set SESSION_SECRET env var for production!");
+  return devSecret;
 }
 
 function base64UrlEncode_(input: string): string {

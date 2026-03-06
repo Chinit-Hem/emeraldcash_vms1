@@ -129,13 +129,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Determine if cookie should be secure.
-  // Use request protocol (not host) so LAN HTTP dev (e.g. 192.168.x.x) can set cookies.
+  // Determine if cookie should use secure flag.
+  // secure=true means cookie only sent over HTTPS.
+  // For HTTP environments (localhost, LAN, some proxies), must be false.
   const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
-  const isHttps =
-    forwardedProto === "https" ||
-    req.nextUrl.protocol === "https:" ||
-    process.env.NODE_ENV === "production";
+  const isActuallyHttps = forwardedProto === "https" || req.nextUrl.protocol === "https:";
+  
+  // Allow override via env var for special deployments
+  const forceInsecureCookies = process.env.ALLOW_HTTP_COOKIES === "true";
+  const isSecureEnvironment = isActuallyHttps && !forceInsecureCookies;
 
   // Get host for debugging.
   const host = req.headers.get("host") || "";
@@ -149,8 +151,12 @@ export async function POST(req: NextRequest) {
     message: "Login successful"
   });
 
-  // Cookie options compatible with Safari/Chrome on mobile and desktop.
-  // Do not use `Partitioned` for session cookie because Safari may reject it.
+  // Cookie options for maximum compatibility
+  // - httpOnly: prevents JavaScript access (security)
+  // - sameSite: "lax" allows cookies on same-site requests and top-level navigation
+  // - secure: only send over HTTPS (disabled for HTTP dev environments)
+  // - path: "/" makes cookie available to all routes
+  // - maxAge: 8 hours session duration
   const cookieOptions: {
     httpOnly: boolean;
     sameSite: "lax" | "none" | "strict";
@@ -160,7 +166,7 @@ export async function POST(req: NextRequest) {
   } = {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: isHttps,
+    secure: isSecureEnvironment,
     path: "/",
     maxAge: 60 * 60 * 8, // 8 hours
   };
@@ -177,7 +183,7 @@ export async function POST(req: NextRequest) {
     valueLength: sessionCookie.length,
   });
   console.log(
-    `[LOGIN_API] Host: ${host}, protocol=${forwardedProto || req.nextUrl.protocol}, isHttps: ${isHttps}, isMobile: ${isMobile}`
+    `[LOGIN_API] Host: ${host}, protocol=${forwardedProto || req.nextUrl.protocol}, isSecure: ${isSecureEnvironment}, isMobile: ${isMobile}`
   );
 
   return res;

@@ -57,7 +57,19 @@ const nextConfig = {
   outputFileTracingRoot: process.cwd(),
 
   // Allow LAN device testing in development (mobile Safari/Chrome).
-  allowedDevOrigins: ["localhost", "127.0.0.1", devLanIp].filter(Boolean),
+  // Added 192.168.195.1 for local network access
+  allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.195.1", devLanIp].filter(Boolean),
+
+  // Add Cloudinary image domain for Next.js Image component
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/**',
+      },
+    ],
+  },
 
   async headers() {
     return [

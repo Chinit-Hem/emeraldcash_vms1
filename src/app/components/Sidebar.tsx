@@ -441,6 +441,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
             />
           )}
         </CollapsibleSection>
+
         <NavItem
           href="/settings"
           icon={IconSettings}

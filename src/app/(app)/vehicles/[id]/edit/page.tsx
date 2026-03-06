@@ -38,8 +38,13 @@ function EditVehicleInner() {
   
   const handleUpdateSuccess = useCallback(() => {
     success("Vehicle updated successfully");
-    router.push(`/vehicles/${id}/view`);
-  }, [success, router, id]);
+    // Refresh vehicle data to get the new image URL
+    refetch();
+    // Small delay to allow cache to update, then navigate
+    setTimeout(() => {
+      router.push(`/vehicles/${id}/view`);
+    }, 500);
+  }, [success, router, id, refetch]);
 
   const handleUpdateError = useCallback((err: string) => {
     showError(err);

@@ -10,7 +10,7 @@ import { GlassButton } from "@/app/components/ui/GlassButton";
 import { useToast } from "@/app/components/ui/GlassToast";
 import { CardSkeleton } from "@/app/components/LoadingSkeleton";
 import { extractDriveFileId } from "@/lib/drive";
-import { refreshVehicleCache } from "@/lib/vehicleCache";
+import { refreshVehicleCache, onVehicleCacheUpdate } from "@/lib/vehicleCache";
 import type { Vehicle } from "@/lib/types";
 
 export default function ViewVehiclePage() {
@@ -130,6 +130,29 @@ function ViewVehicleInner() {
     const timeout = window.setTimeout(() => window.print(), 150);
     return () => window.clearTimeout(timeout);
   }, [shouldAutoPrint, vehicle]);
+
+  // Listen for cache updates to refresh vehicle data when it changes
+  useEffect(() => {
+    return onVehicleCacheUpdate((vehicles) => {
+      const updatedVehicle = vehicles.find((v) => v.VehicleId === id);
+      if (updatedVehicle) {
+        console.log("[VIEW_VEHICLE] Cache updated, refreshing vehicle:", updatedVehicle.VehicleId);
+        console.log("[VIEW_VEHICLE] New image URL:", updatedVehicle.Image?.substring(0, 100));
+        setVehicle(updatedVehicle);
+      }
+    });
+  }, [id]);
+
+  // Debug: Log vehicle image changes
+  useEffect(() => {
+    if (vehicle) {
+      console.log("[VIEW_VEHICLE] Vehicle updated:", {
+        id: vehicle.VehicleId,
+        hasImage: !!vehicle.Image,
+        imageUrl: vehicle.Image?.substring(0, 100)
+      });
+    }
+  }, [vehicle?.Image, vehicle?.VehicleId]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {

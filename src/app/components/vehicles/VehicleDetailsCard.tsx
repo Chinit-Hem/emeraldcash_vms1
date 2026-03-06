@@ -9,8 +9,10 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import ImageModal from "../ImageModal";
 import { formatCurrency, formatVehicleTime, formatVehicleId } from "@/lib/format";
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
+import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
 import { TAX_TYPE_METADATA } from "@/lib/types";
+
 
 interface VehicleDetailsCardProps {
   vehicle: Vehicle;
@@ -54,7 +56,32 @@ export function VehicleDetailsCard({
     setIsDeleteDialogOpen(false);
   };
 
+// Helper to get proper image URL (handle Google Drive and Cloudinary URLs)
+  const getImageUrl = (imageUrl: string | undefined): string | null => {
+    if (!imageUrl || !imageUrl.trim()) return null;
+    
+    // Check if it's a Cloudinary URL
+    if (imageUrl.includes('res.cloudinary.com')) {
+      // Return Cloudinary URL as-is for Next.js Image component
+      return imageUrl;
+    }
+    
+    // Check if it's a Google Drive URL
+    const fileId = extractDriveFileId(imageUrl);
+    if (fileId) {
+      // Use larger thumbnail for detail view
+      return driveThumbnailUrl(fileId, "w800-h600");
+    }
+    
+    // Return as-is for other URLs
+    return imageUrl;
+  };
+
+  const displayImageUrl = getImageUrl(vehicle.Image);
+  const isCloudinaryImage = displayImageUrl?.includes('res.cloudinary.com') || false;
+
   const taxTypeMeta = TAX_TYPE_METADATA.find((tt) => tt.value === vehicle.TaxType);
+
 
   // Information grid items
   const infoItems = [
@@ -118,17 +145,20 @@ export function VehicleDetailsCard({
           {/* Left Column - Image */}
           <div>
             <GlassCard variant="elevated" className="overflow-hidden">
-              {vehicle.Image ? (
+            {displayImageUrl ? (
                 <div
                   className="relative aspect-[4/3] cursor-pointer group"
                   onClick={() => setIsImageModalOpen(true)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={vehicle.Image}
+                    key={displayImageUrl || "no-image"}
+                    src={displayImageUrl}
                     alt={`${vehicle.Brand} ${vehicle.Model}`}
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
+
+
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm">
                       Click to enlarge
@@ -164,7 +194,7 @@ export function VehicleDetailsCard({
             </GlassCard>
 
             {/* Thumbnail Gallery - Show main image thumbnail if available */}
-            {vehicle.Image && (
+            {displayImageUrl && (
               <div className="mt-4 grid grid-cols-4 gap-2">
                 <GlassCard
                   variant="outlined"
@@ -173,13 +203,16 @@ export function VehicleDetailsCard({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={vehicle.Image}
+                    key={displayImageUrl || "thumb-no-image"}
+                    src={displayImageUrl}
                     alt="Thumbnail"
                     className="w-full h-full object-cover"
                   />
                 </GlassCard>
+
               </div>
             )}
+
 
           </div>
 
@@ -396,10 +429,11 @@ export function VehicleDetailsCard({
       {/* Image Modal */}
       <ImageModal
         isOpen={isImageModalOpen}
-        imageUrl={vehicle.Image}
+        imageUrl={displayImageUrl || vehicle.Image}
         alt={`${vehicle.Brand} ${vehicle.Model}`}
         onClose={() => setIsImageModalOpen(false)}
       />
+
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

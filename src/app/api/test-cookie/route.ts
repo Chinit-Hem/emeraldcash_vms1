@@ -47,22 +47,25 @@ export async function POST(req: NextRequest) {
     value: testValue,
   });
 
-  // Use same options as login
-  const protocol = req.headers.get("x-forwarded-proto") || "http";
-  const isHttps = protocol === "https" || process.env.NODE_ENV === "production";
+  // Use same secure cookie logic as login
+  const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  const isActuallyHttps = forwardedProto === "https" || req.nextUrl.protocol === "https:";
+  const forceInsecureCookies = process.env.ALLOW_HTTP_COOKIES === "true";
+  const isSecureEnvironment = isActuallyHttps && !forceInsecureCookies;
+  
   const host = req.headers.get("host") || "";
   const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
 
   res.cookies.set("test_cookie", testValue, {
     httpOnly: true,
     sameSite: "lax",
-    secure: isHttps,
+    secure: isSecureEnvironment,
     path: "/",
     maxAge: 60 * 5, // 5 minutes
-    partitioned: true,
   });
 
-  console.log(`[TEST_COOKIE] Set test_cookie for host: ${host}, isLocalhost: ${isLocalhost}`);
+  console.log(`[TEST_COOKIE] Set test_cookie for host: ${host}, isLocalhost: ${isLocalhost}, secure: ${isSecureEnvironment}`);
+
 
   return res;
 }

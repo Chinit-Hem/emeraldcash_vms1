@@ -84,10 +84,14 @@ export function useUpdateVehicle(
           throw new Error(json.error || "Failed to save vehicle");
         }
 
-        // Refresh cache
-        await refreshVehicleCache();
-
-        // Update local cache with new data
+        // Get the updated vehicle data from the response (includes new image URL)
+        const updatedVehicle = json.data as Vehicle;
+        console.log("[useUpdateVehicle] Updated vehicle received:", {
+          vehicleId: updatedVehicle.VehicleId,
+          imageUrl: updatedVehicle.Image?.substring(0, 100) + "..."
+        });
+        
+        // Update local cache immediately with the new data
         try {
           const cached = localStorage.getItem("vms-vehicles");
           if (cached) {
@@ -95,14 +99,21 @@ export function useUpdateVehicle(
             if (Array.isArray(parsed)) {
               const index = parsed.findIndex((v: Vehicle) => v.VehicleId === data.VehicleId);
               if (index >= 0) {
-                parsed[index] = { ...parsed[index], ...data };
+                // Use the server-returned data which includes the new image URL
+                parsed[index] = updatedVehicle;
                 writeVehicleCache(parsed);
+                console.log("[useUpdateVehicle] Cache updated with new image URL");
               }
             }
           }
-        } catch {
-          // Ignore cache errors
+        } catch (e) {
+          console.error("[useUpdateVehicle] Cache update error:", e);
         }
+
+        // Also trigger a background cache refresh
+        refreshVehicleCache().catch(() => {});
+
+
 
         onSuccess?.();
         return true;
