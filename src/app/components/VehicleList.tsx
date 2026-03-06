@@ -24,12 +24,14 @@ function normalizeString(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function normalizeCategoryKey(value: unknown) {
-  const raw = normalizeString(value);
+// Normalize category to match API format (same as db-schema.ts)
+function normalizeCategoryKey(value: unknown): string {
+  const raw = String(value ?? "").trim();
   if (!raw) return "";
-  if (raw === "car") return "cars";
-  if (raw === "motorcycle") return "motorcycles";
-  if (raw === "tuktuk" || raw === "tuk-tuk") return "tuk tuk";
+  const lower = raw.toLowerCase();
+  if (lower === "car" || lower === "cars") return "Car";
+  if (lower === "motorcycle" || lower === "motorcycles") return "Motorcycles";
+  if (lower === "tuk tuk" || lower === "tuktuk" || lower === "tuk-tuk" || lower === "tuktuks") return "Tuk Tuk";
   return raw;
 }
 
