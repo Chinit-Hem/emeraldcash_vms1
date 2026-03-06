@@ -249,9 +249,10 @@ export default function VehicleTable({
               return (
               <tr
                 key={vehicleId || `row-${index}`}
+                onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`)}
                 className={cn(
                   ui.table.tr,
-                  "transition-colors duration-150",
+                  "transition-colors duration-150 cursor-pointer hover:bg-[var(--table-row-hover)]",
                   index % 2 !== 0 && "bg-[var(--table-row-alt)]"
                 )}
               >
@@ -360,10 +361,13 @@ export default function VehicleTable({
                   </td>
 
                   {/* Actions */}
-                  <td className="px-4 py-3 whitespace-nowrap text-center">
+                  <td className="px-4 py-3 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1">
                       <button
-                        onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+                        }}
                         className="touch-target rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--glass-bg-soft)] hover:text-[var(--text-primary)]"
                         title="View"
                       >
@@ -382,7 +386,10 @@ export default function VehicleTable({
                       {isAdmin && (
                         <>
                       <button
-                        onClick={() => onEdit ? onEdit(vehicle) : router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit ? onEdit(vehicle) : router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`);
+                        }}
                         className="touch-target rounded-lg p-2 text-[var(--accent-green)] transition-colors hover:bg-[var(--accent-green-soft)]"
                         title="Edit"
                       >
@@ -399,7 +406,10 @@ export default function VehicleTable({
                             </svg>
                           </button>
                           <button
-                            onClick={() => onDelete(vehicle)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete(vehicle);
+                            }}
                             className="touch-target rounded-lg p-2 text-[var(--accent-red)] transition-colors hover:bg-[var(--accent-red-soft)]"
                             title="Delete"
                           >

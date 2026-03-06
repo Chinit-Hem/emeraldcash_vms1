@@ -10,8 +10,6 @@ import LoadingSkeleton from "@/app/components/LoadingSkeleton";
 import ImageModal from "@/app/components/ImageModal";
 import { GlassToast, useToast } from "@/app/components/ui/GlassToast";
 
-
-
 interface CleanedVehicle {
   id: number;
   category: string;
@@ -50,7 +48,6 @@ export default function CleanedVehiclesPage() {
       fetchVehicles();
     }
   }, [user, router, filter]);
-
 
   const fetchVehicles = async () => {
     setIsLoading(true);
@@ -111,8 +108,6 @@ export default function CleanedVehiclesPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <TopBar user={user} onMenuClick={() => {}} />
       <Sidebar user={user} onNavigate={() => {}} />
-
-
       
       <main className="lg:pl-64 pt-16 pb-20 lg:pb-8">
         <div className="p-4 sm:p-6 lg:p-8">
@@ -203,7 +198,6 @@ export default function CleanedVehiclesPage() {
             </div>
           )}
 
-
           {/* Vehicles Table */}
           {!isLoading && vehicles.length > 0 && (
             <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
@@ -225,9 +219,10 @@ export default function CleanedVehiclesPage() {
                   {vehicles.map((vehicle) => (
                     <tr 
                       key={vehicle.id} 
-                      className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      onClick={() => vehicle.image_id && setSelectedImage(getGoogleDriveImageUrl(vehicle.image_id))}
+                      className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${vehicle.image_id ? "cursor-pointer" : ""}`}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         {vehicle.image_id ? (
                           <button
                             onClick={() => setSelectedImage(getGoogleDriveImageUrl(vehicle.image_id))}
@@ -237,10 +232,9 @@ export default function CleanedVehiclesPage() {
                               src={getGoogleDriveImageUrl(vehicle.image_id) || ""}
                               alt={`${vehicle.brand} ${vehicle.model}`}
                               className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 75'%3E%3Crect width='100' height='75' fill='%23e2e8f0'/%3E%3Ctext x='50' y='40' text-anchor='middle' font-size='10' fill='%2364748b' font-family='sans-serif'%3ENo Image%3C/text%3E%3C/svg%3E";
-                            }}
-
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 75'%3E%3Crect width='100' height='75' fill='%23e2e8f0'/%3E%3Ctext x='50' y='40' text-anchor='middle' font-size='10' fill='%2364748b' font-family='sans-serif'%3ENo Image%3C/text%3E%3C/svg%3E";
+                              }}
                             />
                           </button>
                         ) : (
@@ -306,7 +300,6 @@ export default function CleanedVehiclesPage() {
         alt="Vehicle Image"
         onClose={() => setSelectedImage(null)}
       />
-
     </div>
   );
 }
