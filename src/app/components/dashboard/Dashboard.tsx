@@ -378,49 +378,134 @@ export default function Dashboard() {
 
   if (isIOSSafari) {
     return (
-      <div className="p-4 sm:p-6 min-h-screen pb-20">
+      <div className="p-3 sm:p-4 min-h-screen pb-20 ios-safe-area">
         <GlassToast toasts={toasts} onRemove={removeToast} />
 
-        <div className="mb-4 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-200">
-          iPhone Safari compatibility mode is active.
+        {/* iOS Header */}
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-slate-800 dark:text-white">Dashboard</h1>
+            <p className="text-xs text-slate-500">Welcome, {user?.username || "Guest"}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-mono text-slate-600 dark:text-slate-400">{cambodiaNow}</p>
+          </div>
         </div>
 
         {vehiclesError ? (
-          <div className="mb-4 rounded-xl border border-red-300/70 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-200">
-            <p className="mb-3">{vehiclesError}</p>
+          <div className="mb-4 rounded-xl border border-red-300/70 bg-red-50 p-3 text-sm text-red-700">
+            <p className="mb-2">{vehiclesError}</p>
             <button
               onClick={() => fetchVehicles()}
-              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white"
+              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white active:scale-95 transition-transform"
             >
               Retry
             </button>
           </div>
         ) : null}
 
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <KpiCard label="Total" value={kpis.total.toLocaleString()} accent="green" />
-          <KpiCard label="Cars" value={kpis.cars.toLocaleString()} accent="green" />
-          <KpiCard label="Motorcycles" value={kpis.motorcycles.toLocaleString()} accent="gray" />
-          <KpiCard label="Tuk Tuk" value={kpis.tukTuk.toLocaleString()} accent="green" />
+        {/* All 7 KPI Cards - Optimized for iOS */}
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
+          <KpiCard 
+            label="Total" 
+            value={kpis.total.toLocaleString()} 
+            sublabel="vehicles"
+            accent="green" 
+            onClick={() => router.push("/vehicles")}
+          />
+          <KpiCard 
+            label="Cars" 
+            value={kpis.cars.toLocaleString()} 
+            sublabel="vehicles"
+            accent="green" 
+            onClick={() => applyFilter(router, { type: "category", value: "Car" })}
+          />
+          <KpiCard
+            label="Motorcycles"
+            value={kpis.motorcycles.toLocaleString()}
+            sublabel="vehicles"
+            accent="gray"
+            onClick={() => applyFilter(router, { type: "category", value: "Motorcycle" })}
+          />
+          <KpiCard 
+            label="Tuk Tuk" 
+            value={kpis.tukTuk.toLocaleString()} 
+            sublabel="vehicles"
+            accent="green" 
+            onClick={() => applyFilter(router, { type: "category", value: "Tuk Tuk" })}
+          />
+          <KpiCard 
+            label="New" 
+            value={kpis.newCount.toLocaleString()} 
+            sublabel="condition"
+            accent="green" 
+            onClick={() => applyFilter(router, { type: "condition", value: "New" })}
+          />
+          <KpiCard 
+            label="Used" 
+            value={kpis.usedCount.toLocaleString()} 
+            sublabel="condition"
+            accent="red" 
+            onClick={() => applyFilter(router, { type: "condition", value: "Used" })}
+          />
+          <KpiCard 
+            label="No Images" 
+            value={kpis.noImagesCount.toLocaleString()} 
+            sublabel="need upload"
+            accent="red" 
+            onClick={() => applyFilter(router, { type: "noImage", value: true })}
+          />
+          {/* Quick Actions Card */}
+          <div 
+            className="ec-metric-card ec-metric-card-accent-blue active:scale-95 transition-transform cursor-pointer"
+            onClick={() => router.push("/vehicles")}
+          >
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              Quick Action
+            </div>
+            <div className="mt-2 text-lg font-bold text-[var(--text-primary)]">
+              View All
+            </div>
+            <div className="mt-1 text-xs font-medium text-[var(--text-secondary)]">
+              Open vehicles list
+            </div>
+          </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200/70 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fetchVehicles()}
-              disabled={isRefreshing}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200"
-            >
-              {isRefreshing ? "Refreshing..." : "Refresh"}
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/vehicles")}
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white"
-            >
-              Open Vehicles
-            </button>
+        {/* iOS Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => fetchVehicles()}
+            disabled={isRefreshing}
+            className="flex-1 rounded-lg border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:active:bg-slate-800 transition-colors"
+          >
+            {isRefreshing ? "Refreshing..." : "Refresh Data"}
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="flex-1 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white active:bg-emerald-700 transition-colors"
+          >
+            + Add Vehicle
+          </button>
+        </div>
+
+        {/* Simple Category Chart for iOS */}
+        <div className="rounded-xl border border-slate-200/70 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-white mb-3">Vehicles by Category</h3>
+          <div className="space-y-2">
+            {[
+              { name: "Cars", value: kpis.cars, color: "bg-emerald-500" },
+              { name: "Motorcycles", value: kpis.motorcycles, color: "bg-blue-500" },
+              { name: "Tuk Tuk", value: kpis.tukTuk, color: "bg-orange-500" },
+            ].map((item) => (
+              <div key={item.name} className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${item.color}`} />
+                <div className="flex-1 text-sm text-slate-700 dark:text-slate-300">{item.name}</div>
+                <div className="text-sm font-bold text-slate-900 dark:text-white">{item.value}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
