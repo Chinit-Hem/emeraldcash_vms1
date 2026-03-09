@@ -7,7 +7,8 @@ import KpiCard from "@/app/components/dashboard/KpiCard";
 import SkeletonDashboard from "@/app/components/dashboard/SkeletonDashboard";
 import VehicleModal from "@/app/components/dashboard/VehicleModal";
 import { GlassToast, useToast } from "@/app/components/ui/GlassToast";
-import { Suspense, lazy } from "react";
+import { isIOSSafariBrowser } from "@/lib/platform";
+import { Suspense, lazy, useEffect, useState } from "react";
 
 // Lazy load charts
 const MonthlyAddedChart = lazy(() => import("@/app/components/dashboard/charts/MonthlyAddedChart"));
@@ -60,7 +61,7 @@ import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle, VehicleMeta } from "@/lib/types";
 import { writeVehicleCache } from "@/lib/vehicleCache";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 
 // Safe client-side only hook to prevent hydration mismatches
 function useIsMounted() {
@@ -132,11 +133,19 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [cambodiaNow, setCambodiaNow] = useState(() => getCambodiaNowString());
   const [isLoading, setIsLoading] = useState(true);
+  const [isIOSSafari, setIsIOSSafari] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const isMounted = useIsMounted();
 
   // Modal state - now using global UI state
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+
+  // Detect iOS Safari for performance optimization
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsIOSSafari(isIOSSafariBrowser());
+    }
+  }, []);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -376,11 +385,16 @@ export default function Dashboard() {
     return <SkeletonDashboard />;
   }
 
+  // iOS-safe classes for performance
+  const heroClass = isIOSSafari 
+    ? "bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 mb-6 border border-gray-200 dark:border-slate-700 shadow-lg"
+    : "ec-dashboard-hero rounded-2xl p-5 sm:p-6 mb-6";
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 min-h-screen pb-20 lg:pb-8">
       <GlassToast toasts={toasts} onRemove={removeToast} />
       {/* Glass Hero Header */}
-      <div className="ec-dashboard-hero rounded-2xl p-5 sm:p-6 mb-6">
+      <div className={heroClass}>
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           {/* Left: Title + Welcome */}
           <div className="space-y-1">
