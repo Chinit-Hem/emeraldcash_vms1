@@ -5047,6 +5047,7 @@ body {
   background: rgba(255, 255, 255, 0.94) !important;
   border-color: rgba(148, 163, 184, 0.36) !important;
   box-shadow: none !important;
+  color: #0f172a !important;
 }
 
 .ios-safari.dark :where(
@@ -5083,6 +5084,62 @@ body {
   ) {
   background: rgba(15, 23, 42, 0.9) !important;
   border-color: rgba(148, 163, 184, 0.24) !important;
+  color: #f8fafc !important;
+}
+
+/* Ensure all text elements are visible in iOS Safari */
+.ios-safari :where(
+    .ec-sidebar *,
+    .ec-glassPanel *,
+    .ec-glassPanelSoft *,
+    .ec-dashboard-hero *,
+    .ec-metric-card *,
+    .ec-chart-card *,
+    .ec-liquid-card *,
+    .ec-liquid-card-soft *,
+    .ec-liquid-modal *,
+    .ec-glassCard *,
+    .ec-liquid-table-wrap *,
+    .ec-time-pill *,
+    .ec-mobileNav *,
+    .ec-sidebar-user-card *
+  ) {
+  color: inherit !important;
+}
+
+.ios-safari.dark :where(
+    .ec-sidebar *,
+    .ec-glassPanel *,
+    .ec-glassPanelSoft *,
+    .ec-dashboard-hero *,
+    .ec-metric-card *,
+    .ec-chart-card *,
+    .ec-liquid-card *,
+    .ec-liquid-card-soft *,
+    .ec-liquid-modal *,
+    .ec-glassCard *,
+    .ec-liquid-table-wrap *,
+    .ec-time-pill *,
+    .ec-mobileNav *,
+    .ec-sidebar-user-card *
+  ),
+.ios-safari[data-theme="dark"] :where(
+    .ec-sidebar *,
+    .ec-glassPanel *,
+    .ec-glassPanelSoft *,
+    .ec-dashboard-hero *,
+    .ec-metric-card *,
+    .ec-chart-card *,
+    .ec-liquid-card *,
+    .ec-liquid-card-soft *,
+    .ec-liquid-modal *,
+    .ec-glassCard *,
+    .ec-liquid-table-wrap *,
+    .ec-time-pill *,
+    .ec-mobileNav *,
+    .ec-sidebar-user-card *
+  ) {
+  color: inherit !important;
 }
 
 .ios-safari :where(
@@ -5139,6 +5196,111 @@ body {
       -webkit-backdrop-filter: none !important;
       filter: none !important;
       box-shadow: none !important;
+    }
+
+    /* iOS Safari: Ensure text is visible on glass elements */
+    :root:not(.dark):not([data-theme="dark"]) :where(
+        .ec-sidebar,
+        .ec-glassPanel,
+        .ec-glassPanelSoft,
+        .ec-dashboard-hero,
+        .ec-metric-card,
+        .ec-chart-card,
+        .ec-liquid-card,
+        .ec-liquid-card-soft,
+        .ec-liquid-modal,
+        .ec-glassCard,
+        .ec-liquid-table-wrap,
+        .ec-time-pill,
+        .ec-mobileNav,
+        .ec-sidebar-user-card
+      ),
+    :root.light :where(
+        .ec-sidebar,
+        .ec-glassPanel,
+        .ec-glassPanelSoft,
+        .ec-dashboard-hero,
+        .ec-metric-card,
+        .ec-chart-card,
+        .ec-liquid-card,
+        .ec-liquid-card-soft,
+        .ec-liquid-modal,
+        .ec-glassCard,
+        .ec-liquid-table-wrap,
+        .ec-time-pill,
+        .ec-mobileNav,
+        .ec-sidebar-user-card
+      ),
+    :root[data-theme="light"] :where(
+        .ec-sidebar,
+        .ec-glassPanel,
+        .ec-glassPanelSoft,
+        .ec-dashboard-hero,
+        .ec-metric-card,
+        .ec-chart-card,
+        .ec-liquid-card,
+        .ec-liquid-card-soft,
+        .ec-liquid-modal,
+        .ec-glassCard,
+        .ec-liquid-table-wrap,
+        .ec-time-pill,
+        .ec-mobileNav,
+        .ec-sidebar-user-card
+      ) {
+      background: rgba(255, 255, 255, 0.94) !important;
+      color: #0f172a !important;
+    }
+
+    :root.dark :where(
+        .ec-sidebar,
+        .ec-glassPanel,
+        .ec-glassPanelSoft,
+        .ec-dashboard-hero,
+        .ec-metric-card,
+        .ec-chart-card,
+        .ec-liquid-card,
+        .ec-liquid-card-soft,
+        .ec-liquid-modal,
+        .ec-glassCard,
+        .ec-liquid-table-wrap,
+        .ec-time-pill,
+        .ec-mobileNav,
+        .ec-sidebar-user-card
+      ),
+    .dark :where(
+        .ec-sidebar,
+        .ec-glassPanel,
+        .ec-glassPanelSoft,
+        .ec-dashboard-hero,
+        .ec-metric-card,
+        .ec-chart-card,
+        .ec-liquid-card,
+        .ec-liquid-card-soft,
+        .ec-liquid-modal,
+        .ec-glassCard,
+        .ec-liquid-table-wrap,
+        .ec-time-pill,
+        .ec-mobileNav,
+        .ec-sidebar-user-card
+      ),
+    :root[data-theme="dark"] :where(
+        .ec-sidebar,
+        .ec-glassPanel,
+        .ec-glassPanelSoft,
+        .ec-dashboard-hero,
+        .ec-metric-card,
+        .ec-chart-card,
+        .ec-liquid-card,
+        .ec-liquid-card-soft,
+        .ec-liquid-modal,
+        .ec-glassCard,
+        .ec-liquid-table-wrap,
+        .ec-time-pill,
+        .ec-mobileNav,
+        .ec-sidebar-user-card
+      ) {
+      background: rgba(15, 23, 42, 0.9) !important;
+      color: #f8fafc !important;
     }
 
     :where(
