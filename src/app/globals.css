@@ -5494,3 +5494,302 @@ body {
 :root[data-theme="dark"] [class*="vehicle-detail"] * {
   color: inherit !important;
 }
+
+/* ---------------- UNIVERSAL FIX: All Devices Dark Mode Text Visibility ---------------- */
+
+/* Universal dark mode text fix - applies to ALL devices */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+  
+  body {
+    color: #f8fafc !important;
+    background-color: #0b1220 !important;
+  }
+  
+  /* Force all text to be light */
+  * {
+    color: inherit !important;
+  }
+  
+  /* Specific element overrides */
+  h1, h2, h3, h4, h5, h6, p, span, label, div, a, button, 
+  input, textarea, select, li, td, th, strong, em, small {
+    color: #f8fafc !important;
+  }
+  
+  /* Muted text */
+  .text-muted, [class*="muted"], .text-gray-400, .text-gray-500, 
+  .text-slate-400, .text-slate-500 {
+    color: #cbd5e1 !important;
+  }
+  
+  /* Primary accent */
+  .text-primary, .text-emerald-500, .text-emerald-600, 
+  .text-green-500, .text-green-600 {
+    color: #34d399 !important;
+  }
+  
+  /* Danger accent */
+  .text-danger, .text-red-500, .text-red-600 {
+    color: #f87171 !important;
+  }
+}
+
+/* Class-based dark mode (manual toggle) */
+.dark,
+[data-theme="dark"] {
+  color-scheme: dark !important;
+}
+
+.dark body,
+[data-theme="dark"] body {
+  color: #f8fafc !important;
+  background-color: #0b1220 !important;
+}
+
+/* Force ALL elements in dark mode to have visible text */
+.dark *,
+[data-theme="dark"] * {
+  color: inherit !important;
+}
+
+/* Override inline styles and Tailwind classes */
+.dark [style*="color"],
+[data-theme="dark"] [style*="color"] {
+  color: #f8fafc !important;
+}
+
+/* Specific overrides for common Tailwind text classes in dark mode */
+.dark .text-black,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-gray-600,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-zinc-900,
+.dark .text-zinc-800,
+.dark .text-zinc-700,
+.dark .text-neutral-900,
+.dark .text-neutral-800,
+.dark .text-neutral-700,
+[data-theme="dark"] .text-black,
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-gray-700,
+[data-theme="dark"] .text-gray-600,
+[data-theme="dark"] .text-slate-900,
+[data-theme="dark"] .text-slate-800,
+[data-theme="dark"] .text-slate-700,
+[data-theme="dark"] .text-slate-600,
+[data-theme="dark"] .text-zinc-900,
+[data-theme="dark"] .text-zinc-800,
+[data-theme="dark"] .text-zinc-700,
+[data-theme="dark"] .text-neutral-900,
+[data-theme="dark"] .text-neutral-800,
+[data-theme="dark"] .text-neutral-700 {
+  color: #f8fafc !important;
+}
+
+/* Glass card specific fixes for all devices */
+.dark .glass-card,
+.dark [class*="glass-card"],
+.dark .glassCard,
+.dark [class*="glassCard"],
+.dark .ec-glassCard,
+.dark [class*="ec-glass"],
+.dark .ec-liquid-card,
+.dark [class*="ec-liquid"],
+[data-theme="dark"] .glass-card,
+[data-theme="dark"] [class*="glass-card"],
+[data-theme="dark"] .glassCard,
+[data-theme="dark"] [class*="glassCard"],
+[data-theme="dark"] .ec-glassCard,
+[data-theme="dark"] [class*="ec-glass"],
+[data-theme="dark"] .ec-liquid-card,
+[data-theme="dark"] [class*="ec-liquid"] {
+  color: #f8fafc !important;
+  background-color: rgba(15, 23, 42, 0.85) !important;
+}
+
+/* Ensure all children inherit proper color */
+.dark .glass-card *,
+.dark [class*="glass-card"] *,
+.dark .glassCard *,
+.dark [class*="glassCard"] *,
+.dark .ec-glassCard *,
+.dark [class*="ec-glass"] *,
+.dark .ec-liquid-card *,
+.dark [class*="ec-liquid"] *,
+[data-theme="dark"] .glass-card *,
+[data-theme="dark"] [class*="glass-card"] *,
+[data-theme="dark"] .glassCard *,
+[data-theme="dark"] [class*="glassCard"] *,
+[data-theme="dark"] .ec-glassCard *,
+[data-theme="dark"] [class*="ec-glass"] *,
+[data-theme="dark"] .ec-liquid-card *,
+[data-theme="dark"] [class*="ec-liquid"] * {
+  color: inherit !important;
+}
+
+/* Button text visibility */
+.dark button,
+.dark [role="button"],
+.dark .btn,
+.dark [class*="btn"],
+[data-theme="dark"] button,
+[data-theme="dark"] [role="button"],
+[data-theme="dark"] .btn,
+[data-theme="dark"] [class*="btn"] {
+  color: #f8fafc !important;
+}
+
+/* Input text visibility */
+.dark input,
+.dark textarea,
+.dark select,
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  color: #f8fafc !important;
+  background-color: rgba(30, 41, 59, 0.8) !important;
+}
+
+/* Link visibility */
+.dark a:not([class*="btn"]),
+[data-theme="dark"] a:not([class*="btn"]) {
+  color: #34d399 !important;
+}
+
+/* Dashboard specific */
+.dark .ec-metric-card,
+.dark .ec-chart-card,
+.dark .ec-dashboard-hero,
+[data-theme="dark"] .ec-metric-card,
+[data-theme="dark"] .ec-chart-card,
+[data-theme="dark"] .ec-dashboard-hero {
+  color: #f8fafc !important;
+}
+
+/* Sidebar specific */
+.dark .ec-sidebar,
+.dark .ec-sidebar-item,
+.dark .ec-sidebar-user-card,
+[data-theme="dark"] .ec-sidebar,
+[data-theme="dark"] .ec-sidebar-item,
+[data-theme="dark"] .ec-sidebar-user-card {
+  color: #f8fafc !important;
+}
+
+/* Vehicle details specific */
+.dark [class*="VehicleDetails"],
+.dark [class*="vehicle-details"],
+.dark [class*="vehicle-detail"],
+.dark [class*="Vehicle"],
+[data-theme="dark"] [class*="VehicleDetails"],
+[data-theme="dark"] [class*="vehicle-details"],
+[data-theme="dark"] [class*="vehicle-detail"],
+[data-theme="dark"] [class*="Vehicle"] {
+  color: #f8fafc !important;
+}
+
+/* Force white text on dark backgrounds */
+.dark [class*="bg-slate-900"],
+.dark [class*="bg-gray-900"],
+.dark [class*="bg-zinc-900"],
+.dark [class*="bg-neutral-900"],
+.dark [class*="bg-dark"],
+[data-theme="dark"] [class*="bg-slate-900"],
+[data-theme="dark"] [class*="bg-gray-900"],
+[data-theme="dark"] [class*="bg-zinc-900"],
+[data-theme="dark"] [class*="bg-neutral-900"],
+[data-theme="dark"] [class*="bg-dark"] {
+  color: #f8fafc !important;
+}
+
+/* Table visibility */
+.dark table,
+.dark th,
+.dark td,
+[data-theme="dark"] table,
+[data-theme="dark"] th,
+[data-theme="dark"] td {
+  color: #f8fafc !important;
+}
+
+/* Modal/Dialog visibility */
+.dark [role="dialog"],
+.dark [role="alertdialog"],
+.dark .modal,
+.dark [class*="modal"],
+.dark .dialog,
+.dark [class*="dialog"],
+[data-theme="dark"] [role="dialog"],
+[data-theme="dark"] [role="alertdialog"],
+[data-theme="dark"] .modal,
+[data-theme="dark"] [class*="modal"],
+[data-theme="dark"] .dialog,
+[data-theme="dark"] [class*="dialog"] {
+  color: #f8fafc !important;
+}
+
+/* Navigation visibility */
+.dark nav,
+.dark [role="navigation"],
+.dark .nav,
+.dark [class*="nav"],
+[data-theme="dark"] nav,
+[data-theme="dark"] [role="navigation"],
+[data-theme="dark"] .nav,
+[data-theme="dark"] [class*="nav"] {
+  color: #f8fafc !important;
+}
+
+/* Card visibility */
+.dark .card,
+.dark [class*="card"],
+[data-theme="dark"] .card,
+[data-theme="dark"] [class*="card"] {
+  color: #f8fafc !important;
+}
+
+/* Form visibility */
+.dark form,
+.dark fieldset,
+.dark legend,
+[data-theme="dark"] form,
+[data-theme="dark"] fieldset,
+[data-theme="dark"] legend {
+  color: #f8fafc !important;
+}
+
+/* List visibility */
+.dark ul,
+.dark ol,
+.dark dl,
+.dark li,
+[data-theme="dark"] ul,
+[data-theme="dark"] ol,
+[data-theme="dark"] dl,
+[data-theme="dark"] li {
+  color: #f8fafc !important;
+}
+
+/* Ensure text is never transparent */
+.dark [class*="text-transparent"],
+[data-theme="dark"] [class*="text-transparent"] {
+  color: #f8fafc !important;
+}
+
+/* Fix for any element with opacity issues */
+.dark [style*="opacity: 0"],
+.dark [style*="opacity:0"],
+[data-theme="dark"] [style*="opacity: 0"],
+[data-theme="dark"] [style*="opacity:0"] {
+  opacity: 1 !important;
+  color: #f8fafc !important;
+}
