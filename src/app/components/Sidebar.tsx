@@ -4,6 +4,7 @@ import type { User, VehicleMeta } from "@/lib/types";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { isIOSSafariBrowser } from "@/lib/platform";
 
 // Safe client-side only hook to prevent hydration mismatches
 function useIsMounted() {
@@ -319,7 +320,13 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [meta, setMeta] = useState<VehicleMeta | null>(null);
-  const isMounted = useIsMounted();
+  const [isIOSSafari, setIsIOSSafari] = useState(false);
+  const isMountedThe Sidebar uses `ec-sidebar` class which is a CSS class. Since it's desktop only (hidden on mobile), it might not be the issue for iPhone. Let me check if there are other components with glass effects that might cause issues.
+
+Let me search for VehicleTable and VehicleCardMobile which are usedLet me check for other components with glass effects - the VehicleTable and VehicleCardMobile:
+
+ in the vehicles page, as those might also have glass effects.<read_file>
+<path>src/app/components/dashboard/VehicleCardMobile.tsx</path>
 
   // Fetch meta data for category counts (client-side only)
   useEffect(() => {

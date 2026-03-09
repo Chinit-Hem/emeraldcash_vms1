@@ -4,6 +4,7 @@ import { GlassInput } from "@/app/components/ui/GlassInput";
 import { useUI } from "@/app/components/UIContext";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { COLOR_OPTIONS, TAX_TYPE_OPTIONS, type Vehicle } from "@/lib/types";
+import { isIOSSafariBrowser } from "@/lib/platform";
 import { useEffect, useState, useCallback } from "react";
 
 interface VehicleModalProps {
@@ -27,8 +28,16 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave }: Vehic
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isDragging, setIsDragging] = useState(false);
+  const [isIOSSafari, setIsIOSSafari] = useState(false);
 
   const isEditing = !!vehicle;
+
+  // Detect iOS Safari
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsIOSSafari(isIOSSafariBrowser());
+    }
+  }, []);
 
   // Lock body scroll when modal is open
   useBodyScrollLock(isOpen);

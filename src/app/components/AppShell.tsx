@@ -10,6 +10,7 @@ import MobileBottomNav from "@/app/components/MobileBottomNav";
 import { AuthUserProvider } from "@/app/components/AuthContext";
 import { UIProvider, useUI } from "@/app/components/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/app/components/authCache";
+import { isIOSSafariBrowser } from "@/lib/platform";
 
 type AppShellProps = {
   children: ReactNode;
@@ -24,7 +25,15 @@ function AppShellContent({ children }: AppShellProps) {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isIOSSafari, setIsIOSSafari] = useState(false);
   const hasRedirected = useRef(false);
+
+  // Detect iOS Safari for performance optimization
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsIOSSafari(isIOSSafariBrowser());
+    }
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -118,6 +127,15 @@ function AppShellContent({ children }: AppShellProps) {
     return () => cancelAnimationFrame(rafId);
   }, [pathname]);
 
+  // iOS-safe classes
+  const loadingCardClass = isIOSSafari
+    ? "bg-white dark:bg-slate-800 rounded-2xl shadow-lg"
+    : "bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl";
+
+  const mobileHeaderClass = isIOSSafari
+    ? "lg:hidden sticky top-0 z-40 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-sm"
+    : "lg:hidden sticky top-0 z-40 ec-glassPanel ec-theme-overlay-host border-b border-white/40 dark:border-white/10";
+
   // Loading state
   if (loading) {
     return (
@@ -134,7 +152,7 @@ function AppShellContent({ children }: AppShellProps) {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-        <div className="w-full max-w-md p-8 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl text-center">
+        <div className={`w-full max-w-md p-8 ${loadingCardClass} text-center`}>
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
             <span className="text-2xl">⚠️</span>
           </div>
@@ -193,8 +211,8 @@ function AppShellContent({ children }: AppShellProps) {
         )}
 
         <div className="flex-1 min-w-0 flex flex-col">
-          {/* Mobile header - Liquid Glass White */}
-          <header className="lg:hidden sticky top-0 z-40 ec-glassPanel ec-theme-overlay-host border-b border-white/40 dark:border-white/10">
+          {/* Mobile header - Liquid Glass White (iOS-safe) */}
+          <header className={mobileHeaderClass}>
             <div className="h-14 px-4 flex items-center justify-between">
               <button
                 onClick={() => setIsSidebarOpen(true)}
