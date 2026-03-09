@@ -3898,6 +3898,89 @@ body::before {
   color: var(--muted);
 }
 
+/* ---------------- Liquid Glass / Frosted Glass Utility Classes ---------------- */
+
+/**
+ * Liquid Glass Effect - Dark Mode Only
+ * 
+ * These utility classes apply a premium frosted glass effect ONLY in dark mode.
+ * Light mode remains completely unchanged.
+ * 
+ * Usage: Add 'liquid-glass' class to any element for instant dark mode glass effect
+ * Or use 'liquid-glass-card' for pre-configured card styling
+ */
+
+/* Base liquid glass effect */
+.liquid-glass {
+  /* Light mode: no effect (transparent) */
+  background-color: transparent;
+  
+  /* Dark mode: Frosted glass effect */
+  @apply dark:bg-slate-900/40;
+  @apply dark:backdrop-blur-xl;
+  @apply dark:border;
+  @apply dark:border-white/10;
+  @apply dark:shadow-2xl;
+}
+
+/* Card variant with padding and rounded corners */
+.liquid-glass-card {
+  @apply liquid-glass;
+  @apply p-5 sm:p-6;
+  @apply rounded-2xl;
+}
+
+/* Panel variant for larger containers */
+.liquid-glass-panel {
+  @apply liquid-glass;
+  @apply p-6;
+  @apply rounded-3xl;
+  @apply dark:bg-slate-900/60;
+  @apply dark:backdrop-blur-2xl;
+}
+
+/* Navbar variant with sticky positioning */
+.liquid-glass-navbar {
+  /* Light mode */
+  @apply bg-white/80;
+  @apply backdrop-blur-md;
+  @apply border-b;
+  @apply border-gray-200;
+  
+  /* Dark mode */
+  @apply dark:bg-slate-900/70;
+  @apply dark:backdrop-blur-xl;
+  @apply dark:border-white/10;
+}
+
+/* Hover effect variant */
+.liquid-glass-hover {
+  @apply dark:transition-all;
+  @apply dark:duration-300;
+  @apply dark:hover:bg-slate-800/50;
+  @apply dark:hover:border-white/20;
+  @apply dark:hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)];
+}
+
+/* Glow effect variant */
+.liquid-glass-glow {
+  @apply dark:shadow-[0_0_40px_-10px_rgba(255,255,255,0.1)];
+  @apply dark:hover:shadow-[0_0_60px_-10px_rgba(255,255,255,0.15)];
+}
+
+/* Stronger blur variant */
+.liquid-glass-strong {
+  @apply dark:bg-slate-900/60;
+  @apply dark:backdrop-blur-2xl;
+}
+
+/* Subtle variant - less opacity */
+.liquid-glass-subtle {
+  @apply dark:bg-slate-900/20;
+  @apply dark:backdrop-blur-lg;
+  @apply dark:border-white/5;
+}
+
 /* ---------------- Sidebar Gray Blur Override ---------------- */
 
 :root,

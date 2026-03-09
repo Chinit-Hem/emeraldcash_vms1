@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { clearCachedUser } from "@/app/components/authCache";
 import { useAuthUser } from "@/app/components/AuthContext";
+import ThemeToggle from "@/components/theme-toggle";
 import type { Role } from "@/lib/types";
 
 type ManagedUser = {
@@ -171,12 +172,19 @@ export default function SettingsPage() {
     <div className="min-h-screen pb-24 lg:pb-24 dark:bg-slate-950/40">
       <div className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
         <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-6 shadow-sm backdrop-blur-md dark:border-slate-700 dark:bg-slate-950/95 dark:text-white">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Settings
-          </h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-100">
-            Manage account preferences and security options.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                Settings
+              </h1>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-100">
+                Manage account preferences and security options.
+              </p>
+            </div>
+            <div className="shrink-0">
+              <ThemeToggle />
+            </div>
+          </div>
 
           <div className="mt-6 space-y-4">
             {isAdmin ? (

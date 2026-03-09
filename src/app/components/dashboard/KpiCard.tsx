@@ -20,7 +20,21 @@ function accentClasses(accent: KpiCardProps["accent"]) {
 export default function KpiCard({ label, value, sublabel, subtitle, accent = "green", onClick }: KpiCardProps) {
   return (
     <div
-      className={`ec-metric-card ${accentClasses(accent)} ${onClick ? "" : "cursor-default"}`}
+      className={`
+        ec-metric-card 
+        ${accentClasses(accent)} 
+        ${onClick ? "" : "cursor-default"}
+        dark:bg-slate-900/40
+        dark:backdrop-blur-xl
+        dark:border
+        dark:border-white/10
+        dark:shadow-2xl
+        dark:transition-all
+        dark:duration-300
+        dark:hover:bg-slate-800/50
+        dark:hover:border-white/20
+        dark:hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]
+      `}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
