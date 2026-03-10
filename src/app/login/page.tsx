@@ -33,10 +33,9 @@ function LoginForm() {
 
   // Detect iOS Safari on client side
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsIOSSafari(isIOSSafariBrowser());
-    }
-  }, []);
+    if (!isMounted) return;
+    setIsIOSSafari(isIOSSafariBrowser());
+  }, [isMounted]);
 
   // Load remembered username (client-side only)
   useEffect(() => {
