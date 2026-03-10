@@ -7,7 +7,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.trim();
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 const REQUEST_TIMEOUT_MS = 30000;
-const FETCH_TIMEOUT_MS = 15000; // 15 seconds for fetchJSON
+const FETCH_TIMEOUT_MS = 30000; // 30 seconds for fetchJSON (increased from 15s for large datasets)
 
 // Auth configuration - support both Bearer header and query token
 const USE_QUERY_TOKEN = process.env.NEXT_PUBLIC_USE_QUERY_TOKEN === "true";

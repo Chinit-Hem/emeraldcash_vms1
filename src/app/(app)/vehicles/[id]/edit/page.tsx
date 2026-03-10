@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "@/app/components/AuthContext";
 import { useToast } from "@/app/components/ui/GlassToast";
@@ -12,6 +12,7 @@ import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal
 import { useVehicle } from "@/app/components/vehicles/useVehicle";
 import { useUpdateVehicle } from "@/app/components/vehicles/useUpdateVehicle";
 import { useDeleteVehicle } from "@/app/components/vehicles/useDeleteVehicle";
+import { useVehicles } from "@/lib/useVehicles";
 import { formatVehicleId, formatVehicleTime } from "@/lib/format";
 import type { Vehicle } from "@/lib/types";
 
@@ -35,7 +36,25 @@ function EditVehicleInner() {
 
   // Hooks
   const { vehicle, loading, error: fetchError, refetch } = useVehicle(id);
+  const { vehicles: allVehicles } = useVehicles();
   
+  // Calculate next and previous vehicles
+  const { nextVehicle, prevVehicle } = useMemo(() => {
+    if (!allVehicles || allVehicles.length === 0 || !vehicle) {
+      return { nextVehicle: null, prevVehicle: null };
+    }
+    
+    const currentIndex = allVehicles.findIndex(v => v.VehicleId === vehicle.VehicleId);
+    if (currentIndex === -1) {
+      return { nextVehicle: null, prevVehicle: null };
+    }
+    
+    const next = currentIndex < allVehicles.length - 1 ? allVehicles[currentIndex + 1] : null;
+    const prev = currentIndex > 0 ? allVehicles[currentIndex - 1] : null;
+    
+    return { nextVehicle: next, prevVehicle: prev };
+  }, [allVehicles, vehicle]);
+
   const handleUpdateSuccess = useCallback(() => {
     success("Vehicle updated successfully");
     // Refresh vehicle data to get the new image URL
@@ -266,6 +285,55 @@ function EditVehicleInner() {
                   </svg>
                   Back
                 </GlassButton>
+                
+                {/* Navigation Buttons */}
+                <div className="flex items-center gap-1 border-l border-gray-300 dark:border-gray-600 pl-3">
+                  <GlassButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => prevVehicle && router.push(`/vehicles/${prevVehicle.VehicleId}/edit`)}
+                    disabled={!prevVehicle}
+                    className="flex items-center gap-1 px-2"
+                    title={prevVehicle ? `Previous: ${prevVehicle.Brand} ${prevVehicle.Model}` : 'No previous vehicle'}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="m15 18-6-6 6-6" />
+                    </svg>
+                    <span className="hidden sm:inline">Prev</span>
+                  </GlassButton>
+                  <GlassButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => nextVehicle && router.push(`/vehicles/${nextVehicle.VehicleId}/edit`)}
+                    disabled={!nextVehicle}
+                    className="flex items-center gap-1 px-2"
+                    title={nextVehicle ? `Next: ${nextVehicle.Brand} ${nextVehicle.Model}` : 'No next vehicle'}
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </GlassButton>
+                </div>
+
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
                     Edit Vehicle

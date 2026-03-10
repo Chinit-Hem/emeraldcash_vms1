@@ -411,9 +411,9 @@ export default function Dashboard() {
               </span>
             </p>
             {lastUpdated && (
-              <p className="text-xs text-slate-500 dark:text-white flex items-center gap-1.5">
+              <p className="text-xs text-slate-500 dark:text-gray-300 flex items-center gap-1.5">
                 <span>Last updated:</span>
-                <span className="font-mono text-slate-600 dark:text-white">{lastUpdated}</span>
+                <span className="font-mono text-slate-600 dark:text-gray-200">{lastUpdated}</span>
                 {isRefreshing && (
                   <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                     <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">

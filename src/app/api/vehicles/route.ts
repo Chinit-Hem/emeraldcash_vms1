@@ -1,19 +1,10 @@
 import { requireSession } from "@/lib/auth";
-import { getCambodiaNowString, normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
-import {
-  getAllVehicles,
-  createVehicle,
-  searchVehicles,
-  getVehicleStats,
-  VehicleDB,
-  toVehicle,
-} from "@/lib/db-schema";
+import { vehicleService } from "@/services/VehicleService";
 import { uploadImage, getCloudinaryFolder } from "@/lib/cloudinary";
 import type { Vehicle, VehicleMeta } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { clearCachedVehicles } from "./_cache";
-import { extractDriveFileId } from "./_shared";
 
 function buildCorsHeaders(req: NextRequest) {
   const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim();
@@ -94,6 +85,8 @@ function createErrorResponse(message: string, status: number): NextResponse {
 }
 
 export async function GET(req: NextRequest) {
+  const startTime = Date.now();
+  
   // Keep `noCache` query support for backwards compatibility with old clients.
   void req.nextUrl.searchParams.get("noCache");
   const lite = req.nextUrl.searchParams.get("lite") === "1";
@@ -109,39 +102,65 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch vehicles from PostgreSQL database
-    let dbVehicles: VehicleDB[];
+    // Fetch vehicles using VehicleService with SSR optimization
+    let vehicles: Vehicle[];
     
     if (search) {
-      // Search vehicles
-      dbVehicles = await searchVehicles(search);
+      // Search vehicles using case-insensitive ILIKE
+      const searchResult = await vehicleService.searchVehicles(search, maxRows || undefined);
+      if (!searchResult.success || !searchResult.data) {
+        throw new Error(searchResult.error || "Search failed");
+      }
+      vehicles = searchResult.data;
     } else {
-      // Get all vehicles
-      dbVehicles = await getAllVehicles();
+      // Get vehicles with database-level limit if maxRows specified
+      // Uses case-insensitive ILIKE filtering via VehicleService
+      const vehiclesResult = await vehicleService.getVehicles(
+        maxRows ? { limit: maxRows } : undefined
+      );
+      if (!vehiclesResult.success || !vehiclesResult.data) {
+        throw new Error(vehiclesResult.error || "Failed to fetch vehicles");
+      }
+      vehicles = vehiclesResult.data;
     }
 
-    // Convert DB format to API format
-    const vehicles = dbVehicles.map(toVehicle);
-
+    // Sanitize image values for list view
     const normalizedVehicles = vehicles.map((vehicle) => {
       const nextImage = sanitizeListImageValue(vehicle.Image);
       if (nextImage === vehicle.Image) return vehicle;
       return { ...vehicle, Image: nextImage };
     });
 
-    // Get stats from database
-    const stats = await getVehicleStats();
+    // Get stats from database using VehicleService
+    // Use lite version when in lite mode for better performance
+    let stats;
+    if (lite) {
+      // Lite mode: only get total count, skip expensive aggregations
+      const statsResult = await vehicleService.getVehicleStatsLite();
+      if (!statsResult.success || !statsResult.data) {
+        throw new Error(statsResult.error || "Failed to fetch stats");
+      }
+      stats = { total: statsResult.data.total };
+    } else {
+      // Full mode: get all stats including category/condition breakdowns
+      const statsResult = await vehicleService.getVehicleStats();
+      if (!statsResult.success || !statsResult.data) {
+        throw new Error(statsResult.error || "Failed to fetch stats");
+      }
+      stats = statsResult.data;
+    }
 
     // Compute meta from FULL dataset
     const meta: VehicleMeta = {
       total: stats.total,
-      countsByCategory: stats.byCategory,
-      avgPrice: stats.avgPrice,
+      countsByCategory: 'byCategory' in stats ? stats.byCategory : {},
+      avgPrice: 'avgPrice' in stats ? stats.avgPrice : 0,
       noImageCount: normalizedVehicles.filter(v => !v.Image).length,
-      countsByCondition: stats.byCondition,
+      countsByCondition: 'byCondition' in stats ? stats.byCondition : { New: 0, Used: 0, Other: 0 },
     };
 
-    const limitedVehicles = maxRows ? normalizedVehicles.slice(0, maxRows) : normalizedVehicles;
+    // maxRows already applied at DB level, but apply again in case search was used
+    const limitedVehicles = maxRows && search ? normalizedVehicles.slice(0, maxRows) : normalizedVehicles;
     const responseVehicles = lite
       ? limitedVehicles.map((vehicle) => {
           const {
@@ -165,10 +184,14 @@ export async function GET(req: NextRequest) {
         })
       : limitedVehicles;
 
+    const duration = Date.now() - startTime;
+    console.log(`[GET /api/vehicles] Success: ${responseVehicles.length} vehicles, lite=${lite}, ${duration}ms`);
+
     return NextResponse.json({ ok: true, data: responseVehicles, meta }, { headers: noStoreHeaders() });
   } catch (e: unknown) {
+    const duration = Date.now() - startTime;
     const message = e instanceof Error ? e.message : "Fetch failed";
-    console.error("[GET /api/vehicles] Error:", message);
+    console.error(`[GET /api/vehicles] Error after ${duration}ms:`, message);
     return createErrorResponse(message, 500);
   }
 }
@@ -241,7 +264,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Prepare vehicle data for database (matching cleaned_vehicles_for_google_sheets schema)
-    const vehicleData: Omit<VehicleDB, "id" | "created_at" | "updated_at"> = {
+    const vehicleData = {
       category,
       brand,
       model,
@@ -255,8 +278,14 @@ export async function POST(req: NextRequest) {
       image_id: imageId,
     };
 
-    // Create vehicle in database
-    const newVehicle = await createVehicle(vehicleData);
+    // Create vehicle in database using VehicleService
+    const createResult = await vehicleService.createVehicle(vehicleData);
+    
+    if (!createResult.success || !createResult.data) {
+      throw new Error(createResult.error || "Failed to create vehicle");
+    }
+
+    const newVehicle = createResult.data;
 
     // Clear server-side cache and revalidate
     clearCachedVehicles();
@@ -271,7 +300,7 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json({ 
       ok: true, 
-      data: toVehicle(newVehicle) 
+      data: newVehicle
     }, { headers: noStoreHeaders() });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to create vehicle";

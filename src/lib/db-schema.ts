@@ -1,27 +1,12 @@
 // Database schema definitions and CRUD operations for vehicles
-import { sql } from "./db";
+// REFACTORED: Now uses VehicleService singleton for all operations
+// Maintains backward compatibility with existing exports
 
+import { vehicleService } from "@/services/VehicleService";
+import type { VehicleDB as VehicleDBType } from "@/services/VehicleService";
 
-
-// Vehicle type definition matching the cleaned_vehicles_for_google_sheets table schema (14 columns)
-export interface VehicleDB {
-  id: number;
-  category: string;
-  brand: string;
-  model: string;
-  year: number;
-  plate: string;
-  market_price: number;
-  tax_type: string | null;
-  condition: string;
-  body_type: string | null;
-  color: string | null;
-  image_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-
+// Re-export VehicleDB type for backward compatibility
+export type VehicleDB = VehicleDBType;
 
 // Note: The cleaned_vehicles_for_google_sheets table is managed by Google Sheets sync
 // This function is kept for compatibility but doesn't create the table
@@ -30,13 +15,19 @@ export async function createVehiclesTable(): Promise<void> {
   console.log("cleaned_vehicles_for_google_sheets table is managed by Google Sheets sync");
 }
 
-
 // Get all vehicles (alias for getVehicles without filters)
-export async function getAllVehicles(): Promise<VehicleDB[]> {
-  return await getVehicles();
+// Supports optional limit for performance when only a subset is needed
+export async function getAllVehicles(limit?: number): Promise<VehicleDB[]> {
+  const result = await vehicleService.getVehicles(limit ? { limit } : undefined);
+  if (!result.success || !result.data) {
+    throw new Error(result.error || "Failed to fetch vehicles");
+  }
+  // Convert back to DB format for backward compatibility
+  return result.data.map(v => vehicleToDB(v));
 }
 
 // Get all vehicles with optional filtering
+// Uses case-insensitive ILIKE for text searches via VehicleService
 export async function getVehicles(filters?: {
   category?: string;
   brand?: string;
@@ -48,137 +39,58 @@ export async function getVehicles(filters?: {
   limit?: number;
   offset?: number;
 }): Promise<VehicleDB[]> {
-
-  let query = sql`SELECT * FROM cleaned_vehicles_for_google_sheets WHERE 1=1`;
-  
-  if (filters?.category) {
-    query = sql`${query} AND TRIM(category) ILIKE ${filters.category}`;
+  const result = await vehicleService.getVehicles(filters);
+  if (!result.success || !result.data) {
+    throw new Error(result.error || "Failed to fetch vehicles");
   }
-  
-  if (filters?.brand) {
-    query = sql`${query} AND brand ILIKE ${`%${filters.brand}%`}`;
-  }
-  
-  if (filters?.condition) {
-    query = sql`${query} AND condition = ${filters.condition}`;
-  }
-  
-  if (filters?.yearMin) {
-    query = sql`${query} AND year >= ${filters.yearMin}`;
-  }
-  
-  if (filters?.yearMax) {
-    query = sql`${query} AND year <= ${filters.yearMax}`;
-  }
-  
-  if (filters?.priceMin) {
-    query = sql`${query} AND market_price >= ${filters.priceMin}`;
-  }
-  
-  if (filters?.priceMax) {
-    query = sql`${query} AND market_price <= ${filters.priceMax}`;
-  }
-  
-  query = sql`${query} ORDER BY id ASC`;
-  
-  if (filters?.limit) {
-    query = sql`${query} LIMIT ${filters.limit}`;
-  }
-  
-  if (filters?.offset) {
-    query = sql`${query} OFFSET ${filters.offset}`;
-  }
-  
-  return await query as VehicleDB[];
+  // Convert back to DB format for backward compatibility
+  return result.data.map(v => vehicleToDB(v));
 }
-
-
 
 // Get a single vehicle by ID
 export async function getVehicleById(id: number): Promise<VehicleDB | null> {
-  const result = await sql`SELECT * FROM cleaned_vehicles_for_google_sheets WHERE id = ${id}`;
-  return (result[0] as VehicleDB) || null;
+  const result = await vehicleService.getVehicleById(id);
+  if (!result.success) {
+    return null;
+  }
+  return result.data ? vehicleToDB(result.data) : null;
 }
 
-// Get a single vehicle by plate (since cleaned_vehicles_for_google_sheets doesn't have vehicle_id)
+// Get a single vehicle by plate (case-insensitive ILIKE)
 export async function getVehicleByPlate(plate: string): Promise<VehicleDB | null> {
-  const result = await sql`SELECT * FROM cleaned_vehicles_for_google_sheets WHERE plate = ${plate}`;
-  return (result[0] as VehicleDB) || null;
+  const result = await vehicleService.getVehicleByPlate(plate);
+  if (!result.success) {
+    return null;
+  }
+  return result.data ? vehicleToDB(result.data) : null;
 }
-
-
 
 // Create a new vehicle
 export async function createVehicle(vehicle: Omit<VehicleDB, "id" | "created_at" | "updated_at">): Promise<VehicleDB> {
-  const now = new Date().toISOString();
-  
-  // Get the next available ID
-  const maxIdResult = await sql`SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM cleaned_vehicles_for_google_sheets`;
-  const nextId = maxIdResult[0].next_id;
-  
-  const result = await sql`
-    INSERT INTO cleaned_vehicles_for_google_sheets (
-      id, category, brand, model, year, plate, market_price,
-      tax_type, condition, body_type, color, image_id,
-      created_at, updated_at
-    ) VALUES (
-      ${nextId},
-      ${vehicle.category}, 
-      ${vehicle.brand}, 
-      ${vehicle.model}, 
-      ${vehicle.year || new Date().getFullYear()}, 
-      ${vehicle.plate},
-      ${vehicle.market_price || 0}, 
-      ${vehicle.tax_type},
-      ${vehicle.condition}, 
-      ${vehicle.body_type},
-      ${vehicle.color},
-      ${vehicle.image_id},
-      ${now},
-      ${now}
-    )
-    RETURNING *
-  `;
-  return result[0] as VehicleDB;
+  const result = await vehicleService.createVehicle(vehicle);
+  if (!result.success || !result.data) {
+    throw new Error(result.error || "Failed to create vehicle");
+  }
+  return vehicleToDB(result.data);
 }
-
-
-
-
-
 
 // Update a vehicle
 export async function updateVehicle(id: number, vehicle: Partial<VehicleDB>): Promise<VehicleDB | null> {
-  const result = await sql`
-    UPDATE cleaned_vehicles_for_google_sheets 
-    SET 
-      category = COALESCE(${vehicle.category}, category),
-      brand = COALESCE(${vehicle.brand}, brand),
-      model = COALESCE(${vehicle.model}, model),
-      year = COALESCE(${vehicle.year}, year),
-      plate = COALESCE(${vehicle.plate}, plate),
-      market_price = COALESCE(${vehicle.market_price}, market_price),
-      tax_type = COALESCE(${vehicle.tax_type}, tax_type),
-      condition = COALESCE(${vehicle.condition}, condition),
-      body_type = COALESCE(${vehicle.body_type}, body_type),
-      color = COALESCE(${vehicle.color}, color),
-      image_id = COALESCE(${vehicle.image_id}, image_id),
-      updated_at = ${new Date().toISOString()}
-    WHERE id = ${id}
-    RETURNING *
-  `;
-  return (result[0] as VehicleDB) || null;
+  const result = await vehicleService.updateVehicle(id, vehicle);
+  if (!result.success) {
+    return null;
+  }
+  return result.data ? vehicleToDB(result.data) : null;
 }
-
-
-
 
 // Delete a vehicle
 export async function deleteVehicle(id: number): Promise<boolean> {
-  const result = await sql`DELETE FROM cleaned_vehicles_for_google_sheets WHERE id = ${id} RETURNING id`;
-  return result.length > 0;
+  const result = await vehicleService.deleteVehicle(id);
+  if (!result.success || result.data === undefined) {
+    return false;
+  }
+  return result.data;
 }
-
 
 // Normalize condition to proper case
 function normalizeCondition(condition: string): "New" | "Used" | "Other" {
@@ -197,49 +109,19 @@ function normalizeCategory(category: string): string {
   return category?.trim() || "Other";
 }
 
-// Get vehicle statistics
+// Get vehicle statistics - optimized single query with CTEs via VehicleService
 export async function getVehicleStats(): Promise<{
   total: number;
   byCategory: Record<string, number>;
   byCondition: Record<string, number>;
   avgPrice: number;
 }> {
-  const totalResult = await sql`SELECT COUNT(*) as count FROM cleaned_vehicles_for_google_sheets`;
-  const total = parseInt(totalResult[0].count);
-  
-  const byCategoryResult = await sql`
-    SELECT category, COUNT(*) as count 
-    FROM cleaned_vehicles_for_google_sheets 
-    GROUP BY category
-  `;
-  
-  // Merge counts by normalized category to avoid duplicates
-  const byCategory: Record<string, number> = {};
-  for (const row of byCategoryResult) {
-    const normalized = normalizeCategory(row.category);
-    byCategory[normalized] = (byCategory[normalized] || 0) + parseInt(row.count);
+  const result = await vehicleService.getVehicleStats();
+  if (!result.success || !result.data) {
+    throw new Error(result.error || "Failed to fetch vehicle stats");
   }
   
-  const byConditionResult = await sql`
-    SELECT condition, COUNT(*) as count 
-    FROM cleaned_vehicles_for_google_sheets 
-    GROUP BY condition
-  `;
-  
-  // Merge counts by normalized condition to avoid duplicates
-  const byCondition: Record<string, number> = { New: 0, Used: 0, Other: 0 };
-  for (const row of byConditionResult) {
-    const normalized = normalizeCondition(row.condition);
-    byCondition[normalized] += parseInt(row.count);
-  }
-  
-  const avgPriceResult = await sql`
-    SELECT AVG(market_price) as avg_price 
-    FROM cleaned_vehicles_for_google_sheets 
-    WHERE market_price IS NOT NULL
-  `;
-  const avgPrice = parseFloat(avgPriceResult[0].avg_price) || 0;
-  
+  const { total, byCategory, byCondition, avgPrice } = result.data;
   return {
     total,
     byCategory,
@@ -248,21 +130,27 @@ export async function getVehicleStats(): Promise<{
   };
 }
 
-
-// Search vehicles by text
-export async function searchVehicles(searchTerm: string): Promise<VehicleDB[]> {
-  const pattern = `%${searchTerm}%`;
-  const result = await sql`
-    SELECT * FROM cleaned_vehicles_for_google_sheets 
-    WHERE 
-      brand ILIKE ${pattern} OR
-      model ILIKE ${pattern} OR
-      plate ILIKE ${pattern}
-    ORDER BY brand, model
-  `;
-  return result as VehicleDB[];
+// Get lightweight stats (total count only) for lite mode
+export async function getVehicleStatsLite(): Promise<{
+  total: number;
+}> {
+  const result = await vehicleService.getVehicleStatsLite();
+  if (!result.success || !result.data) {
+    throw new Error(result.error || "Failed to fetch vehicle count");
+  }
+  return {
+    total: result.data.total
+  };
 }
 
+// Search vehicles by text with case-insensitive ILIKE
+export async function searchVehicles(searchTerm: string): Promise<VehicleDB[]> {
+  const result = await vehicleService.searchVehicles(searchTerm);
+  if (!result.success || !result.data) {
+    throw new Error(result.error || "Failed to search vehicles");
+  }
+  return result.data.map(v => vehicleToDB(v));
+}
 
 // Pricing calculation helpers
 function roundTo(value: number, decimals = 2): number {
@@ -284,6 +172,26 @@ function derivePrice40(priceNew: number | null): number | null {
 
 function derivePrice70(priceNew: number | null): number | null {
   return percentOfPrice(priceNew, 0.7);
+}
+
+// Convert API vehicle format back to DB format (for backward compatibility)
+function vehicleToDB(vehicle: Record<string, unknown>): VehicleDB {
+  return {
+    id: parseInt(vehicle.VehicleId as string),
+    category: vehicle.Category as string,
+    brand: vehicle.Brand as string,
+    model: vehicle.Model as string,
+    year: vehicle.Year as number,
+    plate: vehicle.Plate as string,
+    market_price: vehicle.PriceNew as number,
+    tax_type: (vehicle.TaxType as string) || null,
+    condition: vehicle.Condition as string,
+    body_type: (vehicle.BodyType as string) || null,
+    color: (vehicle.Color as string) || null,
+    image_id: (vehicle.Image as string) || null,
+    created_at: vehicle.Time as string,
+    updated_at: vehicle.Time as string,
+  };
 }
 
 // Convert DB vehicle format to API vehicle format

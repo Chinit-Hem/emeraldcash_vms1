@@ -20,7 +20,7 @@ export default function VehiclesByBrandChart({ data }: VehiclesByBrandChartProps
 
   return (
     <div className="h-[320px]">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
         <BarChart data={data} margin={{ top: 10, right: 10, bottom: 24, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--ec-chart-grid)" />
           <XAxis

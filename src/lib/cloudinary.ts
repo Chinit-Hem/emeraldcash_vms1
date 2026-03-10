@@ -59,9 +59,15 @@ export async function uploadImage(
     }
     
     // Handle base64 image data
-    const uploadOptions: any = {
+    const uploadOptions = {
       folder: targetFolder || "vehicles",
-      resource_type: "image",
+      resource_type: "image" as const,
+    } as {
+      folder: string;
+      resource_type: "image";
+      public_id?: string;
+      tags?: string[];
+      transformation?: object;
     };
 
     if (options.publicId) {
@@ -177,7 +183,15 @@ export function getOptimizedImageUrl(
     return "";
   }
 
-  const transformation: any = {};
+  interface TransformationOptions {
+    width?: number;
+    height?: number;
+    crop?: string;
+    quality?: number;
+    fetch_format?: string;
+  }
+  
+  const transformation: TransformationOptions = {};
 
   if (options.width) transformation.width = options.width;
   if (options.height) transformation.height = options.height;

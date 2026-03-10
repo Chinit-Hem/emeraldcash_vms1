@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     
     // Get total count
     const countResult = await sql`SELECT COUNT(*) as count FROM cleaned_vehicles_for_google_sheets`;
-    const total = parseInt(countResult[0].count);
+    const total = parseInt((countResult as unknown as { count: string }[])[0].count);
 
     return NextResponse.json({
       success: true,

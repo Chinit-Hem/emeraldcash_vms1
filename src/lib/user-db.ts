@@ -173,13 +173,14 @@ export async function createUserInDB(params: {
       throw new DatabaseError("Failed to create user - no result returned");
     }
     
+    const typedResult = result as unknown as UserDB[];
     log("INFO", "User INSERTED successfully", { 
-      username: result[0]?.username,
-      role: result[0]?.role
+      username: typedResult[0]?.username,
+      role: typedResult[0]?.role
     });
-    log("DEBUG", "Full result", { result: result[0] });
+    log("DEBUG", "Full result", { result: typedResult[0] });
     
-    return result[0] as UserDB;
+    return typedResult[0];
   } catch (error) {
     // Re-throw known errors
     if (error instanceof ValidationError || 
@@ -388,15 +389,17 @@ export async function countAdminUsers(): Promise<number> {
       "countAdminUsers"
     );
     
-    if (!result || result.length === 0 || !result[0].count) {
+    const typedResult = result as unknown as { count: string }[];
+    
+    if (!typedResult || typedResult.length === 0 || !typedResult[0].count) {
       log("ERROR", "Count query returned unexpected result");
       throw new DatabaseError("Failed to count admin users");
     }
     
-    const count = parseInt(result[0].count, 10);
+    const count = parseInt(typedResult[0].count, 10);
     
     if (isNaN(count)) {
-      log("ERROR", "Count result is not a valid number", { raw: result[0].count });
+      log("ERROR", "Count result is not a valid number", { raw: typedResult[0].count });
       throw new DatabaseError("Invalid count result from database");
     }
     

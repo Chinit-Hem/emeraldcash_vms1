@@ -16,7 +16,7 @@ type LiquidGlassProps = {
  * This component applies a premium frosted glass effect ONLY in dark mode.
  * Light mode remains completely unchanged with solid backgrounds.
  * 
- * Design Specifications:
+ * Design Specifications (Dark Mode Only):
  * - bg-slate-900/40 (Semi-transparent dark background)
  * - backdrop-blur-xl (Heavy blur effect)
  * - border border-white/10 (Subtle glowing border)
@@ -47,8 +47,10 @@ export function LiquidGlass({
     "dark:border",
     "dark:border-white/10",
     "dark:shadow-2xl",
+    // Fast click feedback
+    "active:scale-[0.99] transition-transform duration-75",
     // Optional hover effect for dark mode
-    hover && "dark:transition-all dark:duration-300 dark:hover:bg-slate-800/50 dark:hover:border-white/20 dark:hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]",
+    hover && "dark:hover:bg-slate-800/50 dark:hover:border-white/20 dark:hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]",
     // Optional glow effect for dark mode
     glow && "dark:shadow-[0_0_40px_-10px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_60px_-10px_rgba(255,255,255,0.15)]",
     className
@@ -103,6 +105,11 @@ export function LiquidGlassPanel({
 
 /**
  * LiquidGlassNavbar - For navigation bars with sticky positioning
+ * 
+ * Usage:
+ * <LiquidGlassNavbar>
+ *   <NavigationContent />
+ * </LiquidGlassNavbar>
  */
 export function LiquidGlassNavbar({
   children,
@@ -129,3 +136,110 @@ export function LiquidGlassNavbar({
     </header>
   );
 }
+
+/**
+ * LiquidGlassMetric - For dashboard KPI cards with accent border
+ * 
+ * Usage:
+ * <LiquidGlassMetric accent="green">
+ *   <KpiContent />
+ * </LiquidGlassMetric>
+ */
+export function LiquidGlassMetric({
+  children,
+  className,
+  accent = "green",
+}: Omit<LiquidGlassProps, "hover" | "glow"> & { accent?: "green" | "blue" | "orange" | "red" | "gray" }) {
+  const accentColors = {
+    green: "dark:border-t-emerald-500/50",
+    blue: "dark:border-t-blue-500/50",
+    orange: "dark:border-t-orange-500/50",
+    red: "dark:border-t-red-500/50",
+    gray: "dark:border-t-slate-500/50",
+  };
+
+  return (
+    <LiquidGlass
+      className={cn(
+        "p-5",
+        "rounded-2xl",
+        "dark:border-t-4",
+        accentColors[accent],
+        "dark:transition-all",
+        "dark:duration-300",
+        "dark:hover:bg-slate-800/50",
+        "dark:hover:-translate-y-1",
+        className
+      )}
+      hover={false}
+    >
+      {children}
+    </LiquidGlass>
+  );
+}
+
+/**
+ * LiquidGlassChart - For chart containers
+ * 
+ * Usage:
+ * <LiquidGlassChart>
+ *   <ChartContent />
+ * </LiquidGlassChart>
+ */
+export function LiquidGlassChart({
+  children,
+  className,
+}: Omit<LiquidGlassProps, "hover" | "glow">) {
+  return (
+    <LiquidGlass
+      className={cn(
+        "rounded-2xl",
+        "overflow-hidden",
+        className
+      )}
+      hover={false}
+    >
+      {children}
+    </LiquidGlass>
+  );
+}
+
+/**
+ * LiquidGlassModal - For modal dialogs with stronger blur
+ * 
+ * Usage:
+ * <LiquidGlassModal>
+ *   <ModalContent />
+ * </LiquidGlassModal>
+ */
+export function LiquidGlassModal({
+  children,
+  className,
+}: Omit<LiquidGlassProps, "hover" | "glow">) {
+  return (
+    <LiquidGlass
+      className={cn(
+        "p-6",
+        "rounded-3xl",
+        "dark:bg-slate-900/80",
+        "dark:backdrop-blur-2xl",
+        "dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]",
+        className
+      )}
+      hover={false}
+    >
+      {children}
+    </LiquidGlass>
+  );
+}
+
+// Re-export all components as default export for convenience
+export default {
+  LiquidGlass,
+  LiquidGlassCard,
+  LiquidGlassPanel,
+  LiquidGlassNavbar,
+  LiquidGlassMetric,
+  LiquidGlassChart,
+  LiquidGlassModal,
+};

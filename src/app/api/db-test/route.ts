@@ -19,7 +19,8 @@ export async function GET() {
     
     // Get vehicles table schema if it exists
     let vehiclesSchema = null;
-    const hasVehicles = tables.some(t => t.table_name === 'vehicles');
+    const typedTables = tables as unknown as { table_name: string; column_count: string }[];
+    const hasVehicles = typedTables.some(t => t.table_name === 'vehicles');
     
     if (hasVehicles) {
       const columns = await sql`
@@ -37,15 +38,15 @@ export async function GET() {
       
       vehiclesSchema = {
         columns,
-        rowCount: rowCount[0].count
+        rowCount: (rowCount as unknown as { count: string }[])[0].count
       };
     }
 
     return NextResponse.json({
       success: true,
       database: {
-        version: versionResult[0].version,
-        currentTime: timeResult[0].current_time,
+        version: (versionResult as unknown as { version: string }[])[0].version,
+        currentTime: (timeResult as unknown as { current_time: string }[])[0].current_time,
         tables: tables,
         vehicles: vehiclesSchema
       }
