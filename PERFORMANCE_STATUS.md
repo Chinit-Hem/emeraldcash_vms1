@@ -21,9 +21,20 @@
 - [x] 4.1 Load vehicle from cache first for instant display
 - [x] 4.2 Fetch fresh data in background
 
-### Phase 5: Add/Save - PENDING
-- [ ] 5.1 Add page: Show success immediately, process in background
-- [ ] 5.2 edit_file page: Show success immediately, process in background
+### Phase 5: Add/Save - ✅ COMPLETED
+- [x] 5.1 Add page: Show success immediately, process in background
+  - Created `useAddVehicleOptimistic.ts` hook with:
+    - Image compression before upload
+    - Cloudinary upload with retry logic
+    - API call with 3 retry attempts for 502/504 errors
+    - Instant success feedback, background processing
+  - Updated Add Vehicle page to use optimistic hook
+  - Navigate immediately after form submission
+  - Background sync indicator shows processing state
+- [x] 5.2 Edit page: Already implemented via `useUpdateVehicleOptimistic.ts`
+  - Image compression and upload
+  - Retry logic for transient errors
+  - Optimistic UI updates
 
 ## Summary of Changes
 
