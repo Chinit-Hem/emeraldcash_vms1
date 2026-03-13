@@ -1,42 +1,30 @@
-# Cloudinary Configuration Fix - TODO
+# Cloudinary Undefined Image Fix - Implementation Checklist
 
-## Problem
-Error: `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME not configured` when trying to update a vehicle with an image.
+## Requirements from User:
+1. ✅ Use DEFAULT_PLACEHOLDER_URL instead of empty string
+2. ✅ Include caller context in debug logs
+3. ⏳ Block vehicle submission if image upload fails
+4. ⏳ Show user-friendly error toast
 
-## Root Cause
-Environment variables for Cloudinary are missing from `.env.local` file.
+## Implementation Steps:
 
-## Required Environment Variables
-- `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` - Your Cloudinary cloud name
-- `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` - Unsigned upload preset name
+### 1. src/lib/cloudinary.ts ✅ COMPLETED
+- [x] Add DEFAULT_PLACEHOLDER_URL constant
+- [x] Add defensive check in `getCloudinaryUrlFromPublicId` for null/undefined publicId
+- [x] Add debug log with caller context before URL construction
+- [x] Return placeholder URL if identifier is invalid
 
-## Implementation Steps
+### 2. src/app/components/vehicles/useAddVehicleOptimistic.ts ✅ COMPLETED
+- [x] Add strict validation before vehicle submission
+- [x] Block submission if image upload fails or returns undefined
+- [x] Show user-friendly error toast
 
-### Step 1: Create Environment Template ✅
-- [x] Create `.env.local.example` with all required variables
-- [x] Add clear comments for each variable
+### 3. src/app/components/vehicles/useUpdateVehicleOptimistic.ts ✅ COMPLETED
+- [x] Add strict validation before vehicle update
+- [x] Block update if image upload fails or returns undefined
+- [x] Show user-friendly error toast
 
-### Step 2: Improve Error Handling ✅
-- [x] Modify `useUpdateVehicleOptimistic.ts` to provide helpful error messages
-- [x] Add specific checks for each missing variable
-- [x] Include setup instructions in error messages
-
-### Step 3: Create Setup Guide ✅
-- [x] Create `CLOUDINARY_SETUP_GUIDE.md`
-- [x] Include step-by-step Cloudinary dashboard instructions
-- [x] Add troubleshooting section
-
-### Step 4: Create Diagnostic Script ✅
-- [x] Create `scripts/check-cloudinary-env.mjs`
-- [x] Check if environment variables are configured
-- [x] Provide clear next steps if missing
-
-## Implementation Complete! ✅
-
-All fixes have been implemented successfully.
-
-## Next Steps After Implementation
-1. Copy `.env.local.example` to `.env.local`
-2. Fill in your actual Cloudinary credentials
-3. Run `node scripts/check-cloudinary-env.mjs` to verify
-4. Restart your Next.js dev server
+### 4. Testing ✅ READY FOR TESTING
+- [ ] Simulate upload failure scenario
+- [ ] Verify placeholder image displays correctly
+- [ ] Verify error toast appears on upload failure

@@ -620,6 +620,10 @@ Original error: ${errorMessage}`,
 // Re-export folder utilities
 export { getCloudinaryFolder } from "./cloudinary-folders";
 
+// Default placeholder image URL for when image identifier is invalid
+// Using a standard Cloudinary placeholder image
+const DEFAULT_PLACEHOLDER_URL = "https://res.cloudinary.com/demo/image/upload/w_400,h_300,c_fill/placeholder.jpg";
+
 /**
  * Check if a value is a Cloudinary public_id (not a full URL)
  * Public IDs are alphanumeric strings with underscores, hyphens, and sometimes slashes for folders
@@ -669,21 +673,48 @@ export function isCloudinaryPublicId(value: string): boolean {
  * Convert a Cloudinary public_id to a full Cloudinary URL
  * Uses the configured cloud name from environment variables
  */
-export function getCloudinaryUrlFromPublicId(publicId: string, options: {
-  width?: number;
-  height?: number;
-  crop?: string;
-  quality?: number;
-  format?: string;
-} = {}): string {
+export function getCloudinaryUrlFromPublicId(
+  publicId: string | null | undefined, 
+  options: {
+    width?: number;
+    height?: number;
+    crop?: string;
+    quality?: number;
+    format?: string;
+    callerContext?: string; // Optional context for debug logging (e.g., "VehicleCard", "Upload")
+  } = {}
+): string {
+  // Debug log before URL construction
+  const callerContext = options.callerContext || "unknown";
+  console.log(`[getCloudinaryUrlFromPublicId] Called from ${callerContext} with publicId:`, {
+    publicId,
+    type: typeof publicId,
+    isNull: publicId === null,
+    isUndefined: publicId === undefined,
+    isEmptyString: publicId === "",
+  });
+
+  // Defensive check: if publicId is null, undefined, or empty string, return placeholder
+  if (!publicId || typeof publicId !== "string" || publicId.trim() === "") {
+    console.warn(`[getCloudinaryUrlFromPublicId] ${callerContext}: Invalid publicId (null/undefined/empty), returning placeholder`);
+    return DEFAULT_PLACEHOLDER_URL;
+  }
+
+  // Check for the literal string "undefined" or "null"
+  if (publicId === "undefined" || publicId === "null") {
+    console.warn(`[getCloudinaryUrlFromPublicId] ${callerContext}: publicId is string "${publicId}", returning placeholder`);
+    return DEFAULT_PLACEHOLDER_URL;
+  }
+
   if (!isCloudinaryPublicId(publicId)) {
     // If it's not a public_id, return as-is (might already be a URL)
+    console.log(`[getCloudinaryUrlFromPublicId] ${callerContext}: Not a valid public_id, returning as-is`);
     return publicId;
   }
 
   if (!isCloudinaryConfigured || !CLOUDINARY_CLOUD_NAME) {
-    console.warn("[getCloudinaryUrlFromPublicId] Cloudinary not configured, cannot convert public_id to URL");
-    return publicId;
+    console.warn(`[getCloudinaryUrlFromPublicId] ${callerContext}: Cloudinary not configured, cannot convert public_id to URL`);
+    return DEFAULT_PLACEHOLDER_URL;
   }
 
   interface TransformationOptions {
@@ -702,11 +733,17 @@ export function getCloudinaryUrlFromPublicId(publicId: string, options: {
   if (options.quality) transformation.quality = options.quality;
   if (options.format) transformation.fetch_format = options.format;
 
-  return cloudinary.url(publicId, {
+  const url = cloudinary.url(publicId, {
     transformation: Object.keys(transformation).length > 0 ? transformation : undefined,
     secure: true,
     sdk_semver: "2.0.0", // Required by Cloudinary SDK
   });
+
+  console.log(`[getCloudinaryUrlFromPublicId] ${callerContext}: Successfully generated URL:`, {
+    url: url.substring(0, 100) + (url.length > 100 ? "..." : ""),
+  });
+
+  return url;
 }
 
 /**

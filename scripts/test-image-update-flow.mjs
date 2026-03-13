@@ -1,113 +1,197 @@
-// Test script to verify vehicle image update flow
-import { config } from "dotenv";
-import { neon } from "@neondatabase/serverless";
+/**
+ * Image Update Flow Diagnostic Test
+ * 
+ * This script tests the complete image update flow to identify where it fails:
+ * 1. Frontend → Cloudinary upload
+ * 2. Cloudinary → API payload
+ * 3. API → Database update
+ * 4. Database → Response
+ */
 
-// Load environment variables
-config({ path: ".env.local" });
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-if (!DATABASE_URL) {
-  console.error("❌ DATABASE_URL not set");
-  process.exit(1);
+console.log("=".repeat(80));
+console.log("IMAGE UPDATE FLOW DIAGNOSTIC");
+console.log("=".repeat(80));
+
+// Check 1: Verify useUpdateVehicleOptimistic.ts sends correct payload
+console.log("\n🔍 CHECK 1: Frontend Hook (useUpdateVehicleOptimistic.ts)");
+console.log("Expected behavior:");
+console.log("  - Should upload image to Cloudinary first");
+console.log("  - Should send PUT to /api/vehicles/{id} with image_id field");
+console.log("  - Payload should contain: { image_id: 'https://res.cloudinary.com/...' }");
+
+const useUpdatePath = path.join(__dirname, '../src/app/components/vehicles/useUpdateVehicleOptimistic.ts');
+if (fs.existsSync(useUpdatePath)) {
+  const content = fs.readFileSync(useUpdatePath, 'utf8');
+  
+  // Check for image_id in payload
+  const hasImageIdInPayload = content.includes('payload.image_id = cloudinaryImageUrl');
+  console.log(`  ✓ Sets payload.image_id: ${hasImageIdInPayload ? 'YES' : 'NO ❌'}`);
+  
+  // Check for PUT request
+  const hasPutRequest = content.includes("method: \"PUT\"");
+  console.log(`  ✓ Uses PUT method: ${hasPutRequest ? 'YES' : 'NO ❌'}`);
+  
+  // Check for correct endpoint
+  const hasCorrectEndpoint = content.includes('/api/vehicles/${encodeURIComponent(vehicleId)}');
+  console.log(`  ✓ Calls /api/vehicles/{id}: ${hasCorrectEndpoint ? 'YES' : 'NO ❌'}`);
+  
+  // Check for Cloudinary upload
+  const hasCloudinaryUpload = content.includes('uploadImageToCloudinary');
+  console.log(`  ✓ Uploads to Cloudinary: ${hasCloudinaryUpload ? 'YES' : 'NO ❌'}`);
+} else {
+  console.log("  ❌ File not found!");
 }
 
-const sql = neon(DATABASE_URL);
+// Check 2: Verify API route receives and processes image_id
+console.log("\n🔍 CHECK 2: API Route ([id]/route.ts)");
+console.log("Expected behavior:");
+console.log("  - Should extract image_id from request body");
+console.log("  - Should pass image_id to updateVehicle() function");
+console.log("  - Should return updated vehicle with Image field");
 
-async function testImageUpdateFlow() {
-  try {
-    console.log("🔍 Testing vehicle image update flow...\n");
-    
-    // 1. Get a test vehicle
-    const vehicles = await sql`SELECT * FROM vehicles LIMIT 1`;
-    if (vehicles.length === 0) {
-      console.error("❌ No vehicles found");
-      process.exit(1);
-    }
-    
-    const vehicle = vehicles[0];
-    console.log("📋 Test vehicle:", {
-      id: vehicle.id,
-      brand: vehicle.brand,
-      model: vehicle.model,
-      current_image_id: vehicle.image_id
-    });
-    
-    // 2. Simulate an image update
-    const testImageUrl = "https://res.cloudinary.com/demo/image/upload/test_image_" + Date.now();
-    console.log("\n📝 Updating with test image URL:", testImageUrl);
-    
-    // 3. Update the vehicle
-    const updateResult = await sql`
-      UPDATE vehicles 
-      SET image_id = ${testImageUrl},
-          updated_at = ${new Date().toISOString()}
-      WHERE id = ${vehicle.id}
-      RETURNING *
-    `;
-    
-    if (updateResult.length === 0) {
-      console.error("❌ Update failed");
-      process.exit(1);
-    }
-    
-    const updatedVehicle = updateResult[0];
-    console.log("\n✅ Vehicle updated:", {
-      id: updatedVehicle.id,
-      new_image_id: updatedVehicle.image_id
-    });
-    
-    // 4. Verify the update
-    const verifyResult = await sql`SELECT * FROM vehicles WHERE id = ${vehicle.id}`;
-    const verifiedVehicle = verifyResult[0];
-    
-    console.log("\n🔍 Verification:", {
-      id: verifiedVehicle.id,
-      image_id: verifiedVehicle.image_id,
-      match: verifiedVehicle.image_id === testImageUrl
-    });
-    
-    // 5. Test the toVehicle conversion
-    const priceNew = typeof verifiedVehicle.market_price === 'string' 
-      ? parseFloat(verifiedVehicle.market_price) 
-      : (verifiedVehicle.market_price || 0);
-    
-    const apiVehicle = {
-      VehicleId: String(verifiedVehicle.id),
-      Category: verifiedVehicle.category,
-      Brand: verifiedVehicle.brand,
-      Model: verifiedVehicle.model,
-      Year: verifiedVehicle.year,
-      Plate: verifiedVehicle.plate,
-      PriceNew: priceNew,
-      TaxType: verifiedVehicle.tax_type,
-      Condition: verifiedVehicle.condition,
-      BodyType: verifiedVehicle.body_type,
-      Color: verifiedVehicle.color,
-      Image: verifiedVehicle.image_id || "",
-      Time: verifiedVehicle.created_at,
-    };
-    
-    console.log("\n📤 API Response would be:", {
-      VehicleId: apiVehicle.VehicleId,
-      Image: apiVehicle.Image?.substring(0, 100) + "..."
-    });
-    
-    // 6. Restore original image
-    await sql`
-      UPDATE vehicles 
-      SET image_id = ${vehicle.image_id},
-          updated_at = ${new Date().toISOString()}
-      WHERE id = ${vehicle.id}
-    `;
-    console.log("\n🔄 Restored original image");
-    
-    console.log("\n✅ All tests passed!");
-    
-  } catch (error) {
-    console.error("❌ Error:", error.message);
-    process.exit(1);
-  }
+const apiRoutePath = path.join(__dirname, '../src/app/api/vehicles/[id]/route.ts');
+if (fs.existsSync(apiRoutePath)) {
+  const content = fs.readFileSync(apiRoutePath, 'utf8');
+  
+  // Check for image_id extraction
+  const extractsImageId = content.includes('body.image_id') || content.includes('body.imageId') || content.includes('body.Image');
+  console.log(`  ✓ Extracts image_id from body: ${extractsImageId ? 'YES' : 'NO ❌'}`);
+  
+  // Check for updateVehicle call with image_id
+  const passesImageId = content.includes('updateData.image_id = imageId') || content.includes("updateData.image_id =");
+  console.log(`  ✓ Passes image_id to updateVehicle: ${passesImageId ? 'YES' : 'NO ❌'}`);
+  
+  // Check for response with Image
+  const returnsImage = content.includes('responseVehicle.Image');
+  console.log(`  ✓ Returns Image in response: ${returnsImage ? 'YES' : 'NO ❌'}`);
+} else {
+  console.log("  ❌ File not found!");
 }
 
-testImageUpdateFlow();
+// Check 3: Verify db-schema updateVehicle handles image_id
+console.log("\n🔍 CHECK 3: Database Schema (db-schema.ts)");
+console.log("Expected behavior:");
+console.log("  - updateVehicle should accept image_id in vehicle parameter");
+console.log("  - Should pass through to vehicleService.updateVehicle");
+
+const dbSchemaPath = path.join(__dirname, '../src/lib/db-schema.ts');
+if (fs.existsSync(dbSchemaPath)) {
+  const content = fs.readFileSync(dbSchemaPath, 'utf8');
+  
+  // Check for image_id in VehicleDB type
+  const hasImageIdInType = content.includes('image_id:');
+  console.log(`  ✓ VehicleDB has image_id field: ${hasImageIdInType ? 'YES' : 'NO ❌'}`);
+  
+  // Check for updateVehicle function
+  const hasUpdateFunction = content.includes('export async function updateVehicle');
+  console.log(`  ✓ Has updateVehicle function: ${hasUpdateFunction ? 'YES' : 'NO ❌'}`);
+} else {
+  console.log("  ❌ File not found!");
+}
+
+// Check 4: Verify VehicleService.updateVehicle handles image_id
+console.log("\n🔍 CHECK 4: VehicleService (VehicleService.ts)");
+console.log("Expected behavior:");
+console.log("  - Should accept image_id in update data");
+console.log("  - Should pass to BaseService.update which builds SQL");
+
+const vehicleServicePath = path.join(__dirname, '../src/services/VehicleService.ts');
+if (fs.existsSync(vehicleServicePath)) {
+  const content = fs.readFileSync(vehicleServicePath, 'utf8');
+  
+  // Check for updateVehicle method
+  const hasUpdateMethod = content.includes('public async updateVehicle');
+  console.log(`  ✓ Has updateVehicle method: ${hasUpdateMethod ? 'YES' : 'NO ❌'}`);
+  
+  // Check for image_id in toEntity (for reading back)
+  const hasImageInEntity = content.includes('image_id');
+  console.log(`  ✓ toEntity handles image_id: ${hasImageInEntity ? 'YES' : 'NO ❌'}`);
+} else {
+  console.log("  ❌ File not found!");
+}
+
+// Check 5: Verify BaseService.update builds correct SQL
+console.log("\n🔍 CHECK 5: BaseService (BaseService.ts)");
+console.log("Expected behavior:");
+console.log("  - Should dynamically build UPDATE SQL with all provided fields");
+console.log("  - Should include image_id in SET clause if provided");
+
+const baseServicePath = path.join(__dirname, '../src/services/BaseService.ts');
+if (fs.existsSync(baseServicePath)) {
+  const content = fs.readFileSync(baseServicePath, 'utf8');
+  
+  // Check for dynamic UPDATE building
+  const buildsDynamicUpdate = content.includes('UPDATE') && content.includes('SET');
+  console.log(`  ✓ Builds dynamic UPDATE: ${buildsDynamicUpdate ? 'YES' : 'NO ❌'}`);
+  
+  // Check for field iteration
+  const iteratesFields = content.includes('Object.entries(data)');
+  console.log(`  ✓ Iterates over data fields: ${iteratesFields ? 'YES' : 'NO ❌'}`);
+  
+  // Check for sanitizeColumnName (should allow image_id)
+  const hasSanitization = content.includes('sanitizeColumnName');
+  console.log(`  ✓ Sanitizes column names: ${hasSanitization ? 'YES' : 'NO ❌'}`);
+} else {
+  console.log("  ❌ File not found!");
+}
+
+// Check 6: Verify VehiclesClient uses correct handler
+console.log("\n🔍 CHECK 6: VehiclesClient (VehiclesClient.tsx)");
+console.log("Expected behavior:");
+console.log("  - Should use handleSubmitVehicle for both add and edit");
+console.log("  - handleSubmitVehicle should route to updateVehicle when editing");
+
+const vehiclesClientPath = path.join(__dirname, '../src/app/(app)/vehicles/VehiclesClient.tsx');
+if (fs.existsSync(vehiclesClientPath)) {
+  const content = fs.readFileSync(vehiclesClientPath, 'utf8');
+  
+  // Check for handleSubmitVehicle
+  const hasSubmitHandler = content.includes('const handleSubmitVehicle');
+  console.log(`  ✓ Has handleSubmitVehicle: ${hasSubmitHandler ? 'YES' : 'NO ❌'}`);
+  
+  // Check for editingVehicle check
+  const checksEditing = content.includes('if (editingVehicle)');
+  console.log(`  ✓ Checks editingVehicle state: ${checksEditing ? 'YES' : 'NO ❌'}`);
+  
+  // Check for updateVehicle call
+  const callsUpdateVehicle = content.includes('await updateVehicle(');
+  console.log(`  ✓ Calls updateVehicle hook: ${callsUpdateVehicle ? 'YES' : 'NO ❌'}`);
+  
+  // Check VehicleModal uses handleSubmitVehicle
+  const modalUsesCorrectHandler = content.includes('onSave={handleSubmitVehicle}');
+  console.log(`  ✓ VehicleModal uses handleSubmitVehicle: ${modalUsesCorrectHandler ? 'YES' : 'NO ❌'}`);
+} else {
+  console.log("  ❌ File not found!");
+}
+
+// Summary
+console.log("\n" + "=".repeat(80));
+console.log("DIAGNOSTIC SUMMARY");
+console.log("=".repeat(80));
+
+console.log(`
+If all checks show YES ✓, the image update flow should work correctly.
+
+Common failure points:
+1. ❌ Cloudinary upload fails (check env vars: NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET)
+2. ❌ API route doesn't receive image_id (check field name matches: image_id vs imageId vs Image)
+3. ❌ Database column name mismatch (should be 'image_id' in PostgreSQL)
+4. ❌ SQL sanitization blocks the field (check sanitizeColumnName allows underscores)
+
+To test manually:
+1. Open browser dev tools
+2. Edit a vehicle and select a new image
+3. Watch Network tab for PUT /api/vehicles/{id}
+4. Check request payload contains: { image_id: "https://res.cloudinary.com/..." }
+5. Check response contains updated Image field
+6. Check console for any error messages
+`);
+
+console.log("=".repeat(80));

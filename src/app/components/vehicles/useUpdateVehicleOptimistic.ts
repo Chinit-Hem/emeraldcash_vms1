@@ -24,6 +24,8 @@ interface UseUpdateVehicleOptimisticReturn {
 // Maximum retry attempts for transient errors
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 1000;
+const MAX_CLOUDINARY_RETRIES = 2;
+const CLOUDINARY_RETRY_DELAY = 500;
 
 // Cloudinary configuration from environment variables
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -65,6 +67,42 @@ const isRetryableError = (error: Error): boolean => {
   
   return has502 || has504 || hasTimeout || hasNetworkError || isRetryableStatus;
 };
+
+/**
+ * Upload image file to Cloudinary using unsigned upload preset with retry logic
+ */
+async function uploadImageToCloudinaryWithRetry(
+  file: File,
+  category: string,
+  vehicleId: string,
+  maxRetries: number = MAX_CLOUDINARY_RETRIES
+): Promise<string> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      console.log(`[uploadImageToCloudinary] Attempt ${attempt}/${maxRetries + 1}`);
+      const result = await uploadImageToCloudinary(file, category, vehicleId);
+      return result;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Unknown upload error");
+      
+      // Don't retry on configuration errors
+      if (lastError.message.includes('configuration error') || 
+          lastError.message.includes('Upload Preset Error') ||
+          lastError.message.includes('Cloud Name Error')) {
+        throw lastError;
+      }
+      
+      if (attempt <= maxRetries) {
+        console.log(`[uploadImageToCloudinary] Retrying after ${CLOUDINARY_RETRY_DELAY}ms...`);
+        await delay(CLOUDINARY_RETRY_DELAY * attempt); // Exponential backoff
+      }
+    }
+  }
+  
+  throw lastError || new Error("Cloudinary upload failed after retries");
+}
 
 /**
  * Upload image file to Cloudinary using unsigned upload preset
@@ -259,7 +297,7 @@ export function useUpdateVehicleOptimistic(
           });
 
           console.log(`[updateVehicle] Uploading compressed image to Cloudinary...`);
-          cloudinaryImageUrl = await uploadImageToCloudinary(
+          cloudinaryImageUrl = await uploadImageToCloudinaryWithRetry(
             compressedResult.file,
             data.Category || originalVehicle.Category || "Cars",
             vehicleId
@@ -279,7 +317,7 @@ export function useUpdateVehicleOptimistic(
             size: `${(fileFromBase64.size / 1024).toFixed(2)}KB`,
           });
 
-          cloudinaryImageUrl = await uploadImageToCloudinary(
+          cloudinaryImageUrl = await uploadImageToCloudinaryWithRetry(
             fileFromBase64,
             data.Category || originalVehicle.Category || "Cars",
             vehicleId
@@ -304,7 +342,32 @@ export function useUpdateVehicleOptimistic(
         throw error;
       }
 
-      // Step 2: Prepare payload with Cloudinary URL (never send Base64)
+      // Step 2: Validate image upload result
+      // CRITICAL: If an image was provided but upload failed, block update
+      const imageWasProvided = !!imageFile || (data.Image && data.Image.startsWith("data:image/"));
+      const imageUploadFailed = imageWasProvided && !cloudinaryImageUrl;
+      const imageUrlIsInvalid = cloudinaryImageUrl === "undefined" || 
+                                cloudinaryImageUrl === "null" || 
+                                (cloudinaryImageUrl && cloudinaryImageUrl.includes("/undefined"));
+
+      if (imageUploadFailed || imageUrlIsInvalid) {
+        console.error(`[updateVehicle] Image upload failed or returned invalid URL:`, {
+          cloudinaryImageUrl,
+          imageWasProvided,
+          imageUploadFailed,
+          imageUrlIsInvalid,
+        });
+        setIsUpdating(false);
+        const error = new Error(
+          imageUrlIsInvalid 
+            ? "Image upload returned an invalid URL. Please try uploading the image again."
+            : "Image upload failed. Please check your internet connection and try again."
+        );
+        onError?.(error, originalVehicle);
+        throw error;
+      }
+
+      // Step 3: Prepare payload with Cloudinary URL (never send Base64)
       const payload: Record<string, unknown> = {
         id: vehicleId,
         category: data.Category || originalVehicle.Category,
@@ -320,7 +383,18 @@ export function useUpdateVehicleOptimistic(
       };
 
       // Only add image_id if we have a valid Cloudinary URL
-      if (cloudinaryImageUrl) {
+      // CRITICAL: Never send Base64 strings to the API - they cause 502/503 errors
+      if (cloudinaryImageUrl && 
+          (cloudinaryImageUrl.startsWith('http://') || 
+           cloudinaryImageUrl.startsWith('https://'))) {
+        // Double-check that we're not accidentally sending a Base64 string
+        if (cloudinaryImageUrl.startsWith('data:image/')) {
+          console.error(`[updateVehicle] CRITICAL: Attempted to send Base64 in payload! Blocking.`);
+          setIsUpdating(false);
+          const error = new Error("Image upload failed: Invalid image format detected. Please try again.");
+          onError?.(error, originalVehicle);
+          throw error;
+        }
         payload.image_id = cloudinaryImageUrl;
         console.log(`[updateVehicle] Payload will include Cloudinary URL`);
       } else {
@@ -333,6 +407,16 @@ export function useUpdateVehicleOptimistic(
           delete payload[key];
         }
       });
+
+      // Final safety check: ensure no Base64 data in any payload field
+      const payloadString = JSON.stringify(payload);
+      if (payloadString.includes('data:image/')) {
+        console.error(`[updateVehicle] CRITICAL: Base64 detected in payload! Aborting.`);
+        setIsUpdating(false);
+        const error = new Error("Image upload failed: Base64 data detected in payload. Please try again.");
+        onError?.(error, originalVehicle);
+        throw error;
+      }
 
       // Step 3: Send to API with retry logic (only for the API call, not upload)
       while (attempts < MAX_RETRY_ATTEMPTS) {

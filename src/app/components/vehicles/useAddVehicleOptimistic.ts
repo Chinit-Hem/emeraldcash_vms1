@@ -327,7 +327,33 @@ export function useAddVehicleOptimistic(
         throw error;
       }
 
-      // Step 2: Prepare payload with Cloudinary URL
+      // Step 2: Validate image upload result
+      // CRITICAL: If an image was provided but upload failed, block submission
+      const imageWasProvided = !!imageFile || (data.Image && data.Image.startsWith("data:image/"));
+      const imageUploadFailed = imageWasProvided && !cloudinaryImageUrl;
+      const imageUrlIsInvalid = cloudinaryImageUrl === "undefined" || 
+                                cloudinaryImageUrl === "null" || 
+                                (cloudinaryImageUrl && cloudinaryImageUrl.includes("/undefined"));
+
+      if (imageUploadFailed || imageUrlIsInvalid) {
+        console.error(`[addVehicle] Image upload failed or returned invalid URL:`, {
+          cloudinaryImageUrl,
+          imageWasProvided,
+          imageUploadFailed,
+          imageUrlIsInvalid,
+        });
+        setIsAdding(false);
+        setIsProcessing(false);
+        const error = new Error(
+          imageUrlIsInvalid 
+            ? "Image upload returned an invalid URL. Please try uploading the image again."
+            : "Image upload failed. Please check your internet connection and try again."
+        );
+        onError?.(error);
+        throw error;
+      }
+
+      // Step 3: Prepare payload with Cloudinary URL
       const payload: Record<string, unknown> = {
         category: data.Category,
         brand: data.Brand,
@@ -342,7 +368,18 @@ export function useAddVehicleOptimistic(
       };
 
       // Only add image_id if we have a valid Cloudinary URL
-      if (cloudinaryImageUrl) {
+      if (cloudinaryImageUrl && 
+          (cloudinaryImageUrl.startsWith("http://") || 
+           cloudinaryImageUrl.startsWith("https://"))) {
+        // Double-check that we're not accidentally sending a Base64 string
+        if (cloudinaryImageUrl.startsWith('data:image/')) {
+          console.error(`[addVehicle] CRITICAL: Attempted to send Base64 in payload! Blocking.`);
+          setIsAdding(false);
+          setIsProcessing(false);
+          const error = new Error("Image upload failed: Invalid image format detected. Please try again.");
+          onError?.(error);
+          throw error;
+        }
         payload.image_id = cloudinaryImageUrl;
         optimisticVehicle.Image = cloudinaryImageUrl;
         console.log(`[addVehicle] Payload will include Cloudinary URL`);
