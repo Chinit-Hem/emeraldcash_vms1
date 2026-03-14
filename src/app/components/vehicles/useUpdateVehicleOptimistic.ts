@@ -31,26 +31,9 @@ const CLOUDINARY_RETRY_DELAY = 300; // Reduced from 500
 const COMPRESSION_MAX_WIDTH = 800; // Reduced from 1280 for faster processing
 const COMPRESSION_QUALITY = 0.7; // Reduced from 0.75 for faster processing
 
-// Cloudinary configuration from environment variables
-const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-// Helper function to check Cloudinary configuration
-function checkCloudinaryConfig(): { valid: boolean; missing: string[] } {
-  const missing: string[] = [];
-  
-  if (!CLOUDINARY_CLOUD_NAME || CLOUDINARY_CLOUD_NAME === 'your_cloud_name_here') {
-    missing.push('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
-  }
-  if (!CLOUDINARY_UPLOAD_PRESET || CLOUDINARY_UPLOAD_PRESET === 'your_unsigned_preset_name') {
-    missing.push('NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET');
-  }
-  
-  return {
-    valid: missing.length === 0,
-    missing
-  };
-}
+// Server-side upload configuration - uses /api/upload endpoint
+// This keeps Cloudinary credentials secure on the server
+const UPLOAD_API_URL = '/api/upload';
 
 // Helper function to delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -109,139 +92,58 @@ async function uploadImageToCloudinaryWithRetry(
 }
 
 /**
- * Upload image file to Cloudinary using unsigned upload preset
+ * Upload image file to Cloudinary via server-side API endpoint
+ * This keeps Cloudinary credentials secure on the server
  */
 async function uploadImageToCloudinary(
   file: File,
   category: string,
   vehicleId: string
 ): Promise<string> {
-  const config = checkCloudinaryConfig();
-  
-  if (!config.valid) {
-    const missingVars = config.missing.join(', ');
-    const errorMessage = [
-      `Cloudinary configuration error: ${missingVars} not configured.`,
-      '',
-      'To fix this:',
-      '1. Copy .env.local.example to .env.local',
-      '2. Fill in your Cloudinary credentials:',
-      '   - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: Your cloud name from https://cloudinary.com/console',
-      '   - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: Create an unsigned preset in Cloudinary dashboard',
-      '3. Restart your Next.js dev server',
-      '',
-      'See CLOUDINARY_SETUP_GUIDE.md for detailed instructions.'
-    ].join('\n');
-    
-    console.error('[uploadImageToCloudinary] Configuration error:', errorMessage);
-    throw new Error(errorMessage);
-  }
-
-  const folder = getCloudinaryFolder(category);
-  const publicId = `vehicle_${vehicleId}_${Date.now()}`;
-
   const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-  formData.append("folder", folder);
-  formData.append("public_id", publicId);
-  formData.append("tags", `vehicle,${category}`);
+  formData.append("image", file);
+  formData.append("vehicleId", vehicleId);
+  formData.append("category", category);
 
-  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-
-  console.log(`[uploadImageToCloudinary] Uploading to Cloudinary:`, {
-    cloudName: CLOUDINARY_CLOUD_NAME,
-    folder,
-    publicId,
+  console.log(`[uploadImageToCloudinary] Uploading via server API:`, {
+    url: UPLOAD_API_URL,
+    vehicleId,
+    category,
     fileSize: `${(file.size / 1024).toFixed(2)}KB`,
   });
 
-  const response = await fetch(url, {
+  const response = await fetch(UPLOAD_API_URL, {
     method: "POST",
     body: formData,
+    credentials: "include", // Include cookies for authentication
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error?.message || `Upload failed: ${response.status}`;
+    const errorMessage = errorData.error || errorData.details || `Upload failed: ${response.status}`;
     
-    // Enhanced error detection and messaging
-    if (errorMessage.includes('Upload preset not found') || 
-        errorMessage.includes('upload preset') ||
-        errorMessage.includes('preset')) {
-      const enhancedError = new Error([
-        `❌ Cloudinary Upload Preset Error: "${CLOUDINARY_UPLOAD_PRESET}"`,
-        '',
-        'The upload preset was not found in your Cloudinary account.',
-        '',
-        '🔧 To fix this:',
-        '1. Go to Cloudinary Dashboard: https://cloudinary.com/console',
-        '2. Click Settings (gear icon) → Upload',
-        '3. Scroll to "Upload presets" section',
-        '4. Click "Add upload preset" or verify existing preset',
-        '5. Set the preset name to exactly: ' + CLOUDINARY_UPLOAD_PRESET,
-        '6. Set Signing Mode to: UNSIGNED (⚠️ Important!)',
-        '7. Click Save',
-        '8. Restart your Next.js dev server',
-        '',
-        '📚 Full guide: CLOUDINARY_SETUP_GUIDE.md',
-        '',
-        `Original error: ${errorMessage}`
-      ].join('\n'));
-      
-      console.error('[uploadImageToCloudinary] Upload preset error:', {
-        preset: CLOUDINARY_UPLOAD_PRESET,
-        cloudName: CLOUDINARY_CLOUD_NAME,
-        error: errorMessage,
-        errorData
-      });
-      
-      throw enhancedError;
-    }
-    
-    // Check for cloud name errors
-    if (errorMessage.includes('cloud name') || 
-        errorMessage.includes('Cloud name') ||
-        response.status === 401) {
-      const enhancedError = new Error([
-        `❌ Cloudinary Cloud Name Error: "${CLOUDINARY_CLOUD_NAME}"`,
-        '',
-        'The cloud name appears to be invalid or not found.',
-        '',
-        '🔧 To fix this:',
-        '1. Go to Cloudinary Dashboard: https://cloudinary.com/console',
-        '2. Find your Cloud Name at the top of the dashboard',
-        '3. Update NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME in .env.local',
-        '4. Restart your Next.js dev server',
-        '',
-        '📚 Full guide: CLOUDINARY_SETUP_GUIDE.md',
-        '',
-        `Original error: ${errorMessage}`
-      ].join('\n'));
-      
-      console.error('[uploadImageToCloudinary] Cloud name error:', {
-        cloudName: CLOUDINARY_CLOUD_NAME,
-        error: errorMessage,
-        errorData
-      });
-      
-      throw enhancedError;
-    }
+    console.error('[uploadImageToCloudinary] Server upload error:', {
+      status: response.status,
+      error: errorMessage,
+      errorData,
+    });
     
     throw new Error(errorMessage);
   }
 
   const result = await response.json();
   
-  if (!result.secure_url) {
-    throw new Error("Cloudinary response missing secure_url");
+  if (!result.ok || !result.data?.url) {
+    throw new Error("Server response missing image URL");
   }
 
   console.log(`[uploadImageToCloudinary] Success:`, {
-    url: result.secure_url.substring(0, 100) + "...",
+    url: result.data.url.substring(0, 100) + "...",
+    publicId: result.data.publicId,
+    folder: result.data.folder,
   });
 
-  return result.secure_url;
+  return result.data.url;
 }
 
 /**
