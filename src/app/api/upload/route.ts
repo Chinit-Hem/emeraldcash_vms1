@@ -437,23 +437,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     fileType: imageFile?.type,
   });
 
-  // Step 4: Convert file to base64
-  let base64Image: string;
-  try {
-    const conversionStartTime = Date.now();
-    base64Image = await fileToBase64(imageFile!);
-    console.log(`[POST /api/upload] File converted to base64 in ${Date.now() - conversionStartTime}ms`);
-  } catch (error) {
-    console.error("[POST /api/upload] File conversion error:", error);
-    return createErrorResponse(
-      "File processing failed", 
-      500, 
-      error instanceof Error ? error.message : undefined, 
-      corsHeaders
-    );
-  }
-
-  // Step 5: Upload to Cloudinary
+  // Step 4: Upload to Cloudinary (pass File directly - more efficient than base64)
   const folder = getCloudinaryFolder(category);
   let uploadResult;
   
@@ -461,10 +445,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   
   try {
     const uploadStartTime = Date.now();
-    uploadResult = await uploadImage(base64Image, {
+    // Pass the File object directly - uploadImage handles compression and streaming
+    uploadResult = await uploadImage(imageFile!, {
       folder: folder,
       publicId: `vehicle_${vehicleId}_${Date.now()}`,
       tags: [category],
+      timeout: 55000, // 55 seconds - just under Vercel's 60s limit
+      retryAttempts: 2,
+      compress: true,
+      maxWidth: 1200, // Slightly larger for better quality
+      quality: 0.85, // Better quality
     });
     console.log(`[POST /api/upload] Cloudinary upload completed in ${Date.now() - uploadStartTime}ms`);
   } catch (error) {
