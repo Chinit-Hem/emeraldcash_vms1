@@ -81,6 +81,10 @@ export function ImageInput({
   const [isMounted, setIsMounted] = useState(false);
   const [isUsingFallback, setIsUsingFallback] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  // Cache key to force image re-render when image changes
+  const [cacheKey, setCacheKey] = useState(0);
+  // Track object URLs for cleanup
+  const objectUrlRef = useRef<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
@@ -252,8 +256,22 @@ export function ImageInput({
 
     setIsLoading(true);
     
+    // Clear any existing object URL to prevent caching issues
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    
+    // Clear preview immediately to remove old image from UI
+    setPreview(null);
+    
+    // Force cache key update to trigger re-render
+    setCacheKey(prev => prev + 1);
+    
     // Show immediate preview using object URL for instant feedback
     const immediatePreviewUrl = URL.createObjectURL(file);
+    objectUrlRef.current = immediatePreviewUrl;
+    
     setPreview({
       url: immediatePreviewUrl,
       name: file.name,
@@ -274,10 +292,14 @@ export function ImageInput({
       const dataUrl = await readFileAsDataUrl(processedFile);
       
       // Revoke the temporary object URL to free memory
-      URL.revokeObjectURL(immediatePreviewUrl);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
       
       // Update preview with compressed data URL
       onChange(dataUrl);
+      setCacheKey(prev => prev + 1); // Force re-render with new image
       setPreview({
         url: dataUrl,
         name: processedFile.name,
@@ -289,6 +311,7 @@ export function ImageInput({
       console.warn("[ImageInput] Compression failed, using original file:", err);
       const dataUrl = await readFileAsDataUrl(file);
       onChange(dataUrl);
+      setCacheKey(prev => prev + 1); // Force re-render with new image
       setPreview({
         url: dataUrl,
         name: file.name,
@@ -363,6 +386,10 @@ export function ImageInput({
         img.src = trimmedUrl;
       });
 
+      // Clear preview immediately and update cache key to prevent caching
+      setPreview(null);
+      setCacheKey(prev => prev + 1);
+      
       onChange(trimmedUrl);
       setPreview({
         url: trimmedUrl,
@@ -392,12 +419,18 @@ export function ImageInput({
   }, [urlInput, handleUrlSubmit]);
 
   const handleRemove = useCallback(() => {
+    // Clean up object URL if exists
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
     onChange(null);
     setPreview(null);
     setError(null);
     setUrlInput("");
     setIsUsingFallback(false);
     setFailedUrl(null);
+    setCacheKey(prev => prev + 1); // Force re-render
   }, [onChange]);
 
   const handleRetry = useCallback(() => {
@@ -516,6 +549,7 @@ export function ImageInput({
         ) : preview ? (
           <div className="relative">
             <img
+              key={cacheKey} // Force re-render when image changes
               src={isUsingFallback ? "/placeholder-car.svg" : preview.url}
               alt="Preview"
               className="max-h-48 mx-auto rounded-lg object-contain"
