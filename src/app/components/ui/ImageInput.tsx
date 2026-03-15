@@ -252,8 +252,17 @@ export function ImageInput({
 
     setIsLoading(true);
     
+    // Show immediate preview using object URL for instant feedback
+    const immediatePreviewUrl = URL.createObjectURL(file);
+    setPreview({
+      url: immediatePreviewUrl,
+      name: file.name,
+      size: file.size,
+      isUrl: false,
+    });
+    
     try {
-      // Compress image before converting to data URL
+      // Compress image in background
       // This reduces upload time and prevents 502 timeouts
       const processedFile = await processImageForUpload(file, {
         maxWidth: 1200,
@@ -263,6 +272,11 @@ export function ImageInput({
       });
       
       const dataUrl = await readFileAsDataUrl(processedFile);
+      
+      // Revoke the temporary object URL to free memory
+      URL.revokeObjectURL(immediatePreviewUrl);
+      
+      // Update preview with compressed data URL
       onChange(dataUrl);
       setPreview({
         url: dataUrl,
@@ -271,8 +285,16 @@ export function ImageInput({
         isUrl: false,
       });
     } catch (err) {
-      setError("Failed to process image. Please try again.");
-      console.error("[ImageInput] File processing error:", err);
+      // If compression fails, keep the original preview and still use it
+      console.warn("[ImageInput] Compression failed, using original file:", err);
+      const dataUrl = await readFileAsDataUrl(file);
+      onChange(dataUrl);
+      setPreview({
+        url: dataUrl,
+        name: file.name,
+        size: file.size,
+        isUrl: false,
+      });
     } finally {
       setIsLoading(false);
     }

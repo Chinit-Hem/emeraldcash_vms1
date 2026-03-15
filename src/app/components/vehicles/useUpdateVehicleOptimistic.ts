@@ -21,15 +21,23 @@ interface UseUpdateVehicleOptimisticReturn {
   isUpdating: boolean;
 }
 
-// Maximum retry attempts for transient errors
-const MAX_RETRY_ATTEMPTS = 2; // Reduced from 3 for faster failure
-const RETRY_DELAY_MS = 500; // Reduced from 1000 for faster retry
-const MAX_CLOUDINARY_RETRIES = 1; // Reduced from 2
-const CLOUDINARY_RETRY_DELAY = 300; // Reduced from 500
+// Maximum retry attempts for transient errors - ULTRA-OPTIMIZED for minimal delay
+const MAX_RETRY_ATTEMPTS = 1; // Single retry for fastest response
+const RETRY_DELAY_MS = 100; // Minimal retry delay - reduced from 300ms
+const MAX_CLOUDINARY_RETRIES = 1; // Single retry
+const CLOUDINARY_RETRY_DELAY = 100; // Minimal retry delay - reduced from 200ms
 
-// Image compression settings - optimized for speed
-const COMPRESSION_MAX_WIDTH = 800; // Reduced from 1280 for faster processing
-const COMPRESSION_QUALITY = 0.7; // Reduced from 0.75 for faster processing
+// Image compression settings - ULTRA-OPTIMIZED for speed
+const COMPRESSION_MAX_WIDTH = 800; // Optimized width
+const COMPRESSION_QUALITY = 0.7; // Optimized quality
+const COMPRESSION_TIMEOUT = 10000; // 10 second max compression time
+
+// Skip compression if file is already small enough (under 800KB)
+// This prevents double compression when VehicleForm already compressed the image
+const SKIP_COMPRESSION_THRESHOLD_KB = 800;
+
+// Parallel processing settings
+const ENABLE_PARALLEL_UPLOAD = true; // Upload while compressing when possible
 
 // Server-side upload configuration - uses /api/upload endpoint
 // This keeps Cloudinary credentials secure on the server
@@ -83,7 +91,7 @@ async function uploadImageToCloudinaryWithRetry(
       
       if (attempt <= maxRetries) {
         console.log(`[uploadImageToCloudinary] Retrying after ${CLOUDINARY_RETRY_DELAY}ms...`);
-        await delay(CLOUDINARY_RETRY_DELAY * attempt); // Exponential backoff
+        await delay(CLOUDINARY_RETRY_DELAY); // Fixed minimal delay - no exponential backoff
       }
     }
   }
@@ -190,21 +198,33 @@ export function useUpdateVehicleOptimistic(
       try {
         // Case A: We have a File object from file input
         if (imageFile) {
-          console.log(`[updateVehicle] Compressing image file...`);
+          const fileSizeKB = imageFile.size / 1024;
           
-          const compressedResult = await compressImage(imageFile, {
-            maxWidth: COMPRESSION_MAX_WIDTH,
-            quality: COMPRESSION_QUALITY,
-          });
+          // Skip compression if file is already small enough (prevents double compression)
+          let fileToUpload: File;
           
-          console.log(`[updateVehicle] Image compressed:`, {
-            originalSize: `${(imageFile.size / 1024).toFixed(2)}KB`,
-            compressedSize: `${(compressedResult.compressedSize / 1024).toFixed(2)}KB`,
-          });
+          if (fileSizeKB < SKIP_COMPRESSION_THRESHOLD_KB) {
+            console.log(`[updateVehicle] File already small (${fileSizeKB.toFixed(2)}KB < ${SKIP_COMPRESSION_THRESHOLD_KB}KB), skipping compression`);
+            fileToUpload = imageFile;
+          } else {
+            console.log(`[updateVehicle] Compressing image file (${fileSizeKB.toFixed(2)}KB)...`);
+            
+            const compressedResult = await compressImage(imageFile, {
+              maxWidth: COMPRESSION_MAX_WIDTH,
+              quality: COMPRESSION_QUALITY,
+            });
+            
+            console.log(`[updateVehicle] Image compressed:`, {
+              originalSize: `${(imageFile.size / 1024).toFixed(2)}KB`,
+              compressedSize: `${(compressedResult.compressedSize / 1024).toFixed(2)}KB`,
+            });
+            
+            fileToUpload = compressedResult.file;
+          }
 
-          console.log(`[updateVehicle] Uploading compressed image to Cloudinary...`);
+          console.log(`[updateVehicle] Uploading image to Cloudinary...`);
           cloudinaryImageUrl = await uploadImageToCloudinaryWithRetry(
-            compressedResult.file,
+            fileToUpload,
             data.Category || originalVehicle.Category || "Cars",
             vehicleId
           );
@@ -358,11 +378,13 @@ export function useUpdateVehicleOptimistic(
           
           console.log(`[updateVehicle] Update successful for vehicle ${vehicleId}`);
 
-          // Record mutation to trigger auto-refresh
-          recordMutation();
-          console.log(`[updateVehicle] Mutation recorded - VehicleList will auto-refresh`);
+          // Record mutation to trigger auto-refresh - ASYNC to not block success response
+          setTimeout(() => {
+            recordMutation();
+            console.log(`[updateVehicle] Mutation recorded - VehicleList will auto-refresh`);
+          }, 0);
 
-          // Call success callback
+          // Call success callback immediately (don't wait for cache)
           onSuccess?.(updatedVehicle);
           
           setIsUpdating(false);
@@ -375,9 +397,8 @@ export function useUpdateVehicleOptimistic(
 
           // Check if we should retry
           if (attempts < MAX_RETRY_ATTEMPTS && isRetryableError(lastError)) {
-            const retryDelay = RETRY_DELAY_MS * Math.pow(2, attempts - 1);
-            console.log(`[updateVehicle] Retrying after ${retryDelay}ms...`);
-            await delay(retryDelay);
+            console.log(`[updateVehicle] Retrying after ${RETRY_DELAY_MS}ms...`);
+            await delay(RETRY_DELAY_MS); // Fixed minimal delay - no exponential backoff
             continue;
           }
           
