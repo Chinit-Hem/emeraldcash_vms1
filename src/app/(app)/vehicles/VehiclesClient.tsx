@@ -711,7 +711,7 @@ export default function VehiclesClient() {
       result = result.filter((vehicle) => {
         const imageValue = vehicle.Image;
         // Check if Image field is empty or null
-        if (!imageValue || !String(imageValue).trim()) return true;
+        if (!imageValue || typeof imageValue !== 'string' || !imageValue.trim()) return true;
         
         // Check if it's a valid image URL (Drive, Cloudinary, or data URL)
         const isUrl = 
