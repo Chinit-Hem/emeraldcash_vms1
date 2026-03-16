@@ -113,6 +113,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         signature,
         timestamp,
         api_key: CLOUDINARY_API_KEY,
+        cloud_name: CLOUDINARY_CLOUD_NAME,
         upload_preset: CLOUDINARY_UPLOAD_PRESET,
         folder,
         ...(publicId && { public_id: publicId }),

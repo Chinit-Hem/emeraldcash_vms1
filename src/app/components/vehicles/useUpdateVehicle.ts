@@ -19,11 +19,141 @@ interface UseUpdateVehicleResult {
 
 // Cloudinary configuration
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "vehicle_uploads";
 
 // Skip compression if file is already small enough (under 800KB)
 // This prevents double compression when VehicleForm already compressed the image
 const SKIP_COMPRESSION_THRESHOLD_KB = 800;
+
+/**
+ * Get Cloudinary signature from server API for signed uploads
+ */
+async function getCloudinarySignature(
+  folder: string,
+  publicId: string,
+  tags: string[]
+): Promise<{
+  signature: string;
+  timestamp: number;
+  api_key: string;
+  cloud_name: string;
+  upload_preset: string;
+  folder: string;
+  public_id?: string;
+  tags?: string;
+}> {
+  const response = await fetch('/api/cloudinary-signature', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      folder,
+      public_id: publicId,
+      tags,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error || `Failed to get upload signature: ${response.status}`
+    );
+  }
+
+  const result = await response.json();
+  
+  if (!result.ok || !result.data) {
+    throw new Error(result.error || 'Invalid signature response from server');
+  }
+
+  return result.data;
+}
+
+/**
+ * Upload image using signed upload (server-generated signature)
+ */
+async function uploadImageToCloudinarySigned(
+  file: File,
+  vehicleId: string
+): Promise<string> {
+  const folder = "vms/vehicles";
+  const publicId = `vehicle_${vehicleId}_${Date.now()}`;
+  const tags = ["vms", "vehicle"];
+
+  // Get signature from server
+  const signatureData = await getCloudinarySignature(folder, publicId, tags);
+
+  // Build Cloudinary upload URL using cloud name from server response
+  const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloud_name}/image/upload`;
+  
+  // Create form data for Cloudinary SIGNED upload
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", signatureData.upload_preset);
+  formData.append("folder", signatureData.folder);
+  formData.append("public_id", signatureData.public_id || publicId);
+  formData.append("api_key", signatureData.api_key);
+  formData.append("timestamp", String(signatureData.timestamp));
+  formData.append("signature", signatureData.signature);
+  
+  if (signatureData.tags) {
+    formData.append("tags", signatureData.tags);
+  }
+
+  const response = await fetch(cloudinaryUrl, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error?.message || 
+      errorData.message || 
+      `Cloudinary upload failed: ${response.status}`
+    );
+  }
+
+  const result = await response.json();
+  
+  if (!result.secure_url) {
+    throw new Error("Cloudinary response missing secure_url");
+  }
+
+  return result.secure_url;
+}
+
+/**
+ * Upload image using direct unsigned upload (requires NEXT_PUBLIC_ env vars)
+ */
+async function uploadImageToCloudinaryDirect(
+  file: File
+): Promise<string> {
+  if (!CLOUDINARY_CLOUD_NAME) {
+    throw new Error("NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME is not configured");
+  }
+
+  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+  
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  formData.append("folder", "vms/vehicles");
+
+  const uploadRes = await fetch(url, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!uploadRes.ok) {
+    const errorData = await uploadRes.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `Failed to upload image to Cloudinary: ${uploadRes.status}`);
+  }
+
+  const uploadData = await uploadRes.json();
+  return uploadData.secure_url;
+}
 
 export function useUpdateVehicle(
   onSuccess?: (updatedVehicle?: Vehicle) => void,
@@ -45,13 +175,9 @@ export function useUpdateVehicle(
         if (imageFile) {
           console.log("[useUpdateVehicle] Uploading image to Cloudinary...");
           console.log("[useUpdateVehicle] Cloudinary config:", {
-            cloudName: CLOUDINARY_CLOUD_NAME ? "SET" : "MISSING",
+            cloudName: CLOUDINARY_CLOUD_NAME ? "SET" : "MISSING (will use signed upload)",
             uploadPreset: CLOUDINARY_UPLOAD_PRESET ? "SET" : "MISSING"
           });
-          
-          if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
-            throw new Error("Cloudinary configuration missing. Please check your environment variables.");
-          }
 
           // Check if we should skip compression (file already small enough)
           const fileSizeKB = imageFile.size / 1024;
@@ -76,30 +202,16 @@ export function useUpdateVehicle(
             fileToUpload = compressedResult.file;
           }
 
-          // Upload to Cloudinary
-          const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-          console.log("[useUpdateVehicle] Uploading to:", url);
-          
-          const formData = new FormData();
-          formData.append("file", fileToUpload);
-          formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-          formData.append("folder", "vms/vehicles");
-
-          const uploadRes = await fetch(url, {
-            method: "POST",
-            body: formData,
-          });
-
-          console.log("[useUpdateVehicle] Cloudinary response status:", uploadRes.status);
-
-          if (!uploadRes.ok) {
-            const errorData = await uploadRes.json().catch(() => ({}));
-            console.error("[useUpdateVehicle] Cloudinary upload failed:", errorData);
-            throw new Error(errorData.error?.message || `Failed to upload image to Cloudinary: ${uploadRes.status}`);
+          // Choose upload method based on configuration
+          if (CLOUDINARY_CLOUD_NAME) {
+            // Use direct unsigned upload
+            console.log("[useUpdateVehicle] Using direct unsigned upload");
+            cloudinaryImageUrl = await uploadImageToCloudinaryDirect(fileToUpload);
+          } else {
+            // Use signed upload via server API
+            console.log("[useUpdateVehicle] Using signed upload via server API");
+            cloudinaryImageUrl = await uploadImageToCloudinarySigned(fileToUpload, data.VehicleId);
           }
-
-          const uploadData = await uploadRes.json();
-          cloudinaryImageUrl = uploadData.secure_url;
           
           console.log("[useUpdateVehicle] Image uploaded to Cloudinary:", {
             url: cloudinaryImageUrl?.substring(0, 100) + "..."

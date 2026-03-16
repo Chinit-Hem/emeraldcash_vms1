@@ -36,7 +36,7 @@ const COMPRESSION_QUALITY = 0.7; // Optimized quality
 const SKIP_COMPRESSION_THRESHOLD_KB = 800;
 
 // Cloudinary configuration - CLIENT-SIDE UNSIGNED UPLOAD
-// These MUST be set in environment variables with NEXT_PUBLIC_ prefix
+// These MUST be set in environment variables with NEXT_PUBLIC_ prefix for direct uploads
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "vehicle_uploads";
 
@@ -61,13 +61,14 @@ const isRetryableError = (error: Error): boolean => {
 };
 
 /**
- * Validate Cloudinary configuration
+ * Validate Cloudinary configuration for direct uploads
  */
-function validateCloudinaryConfig(): { valid: boolean; error?: string } {
+function validateCloudinaryConfig(): { valid: boolean; error?: string; useSignedUpload?: boolean } {
   if (!CLOUDINARY_CLOUD_NAME) {
+    // If no direct upload config, we'll use signed upload via API instead
     return {
-      valid: false,
-      error: "Cloudinary Cloud Name is not configured. Please set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME in your environment variables."
+      valid: true, // Don't block - we'll use signed upload fallback
+      useSignedUpload: true
     };
   }
   
@@ -78,7 +79,52 @@ function validateCloudinaryConfig(): { valid: boolean; error?: string } {
     };
   }
   
-  return { valid: true };
+  return { valid: true, useSignedUpload: false };
+}
+
+/**
+ * Get Cloudinary signature from server API
+ */
+async function getCloudinarySignature(
+  folder: string,
+  publicId: string,
+  tags: string[]
+): Promise<{
+  signature: string;
+  timestamp: number;
+  api_key: string;
+  cloud_name: string;
+  upload_preset: string;
+  folder: string;
+  public_id?: string;
+  tags?: string;
+}> {
+  const response = await fetch('/api/cloudinary-signature', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      folder,
+      public_id: publicId,
+      tags,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error || `Failed to get upload signature: ${response.status}`
+    );
+  }
+
+  const result = await response.json();
+  
+  if (!result.ok || !result.data) {
+    throw new Error(result.error || 'Invalid signature response from server');
+  }
+
+  return result.data;
 }
 
 /**
@@ -117,45 +163,43 @@ async function uploadImageToCloudinaryWithRetry(
 }
 
 /**
- * Upload image file directly to Cloudinary from the browser using UNSIGNED upload
- * Uses upload preset configured in Cloudinary dashboard (no signature needed)
- * This bypasses Vercel entirely and prevents 502/504 errors
- * 
- * NOTE: The upload preset "vehicle_uploads" must be configured in Cloudinary as UNSIGNED
+ * Upload image file to Cloudinary using SIGNED upload (server-generated signature)
+ * Used when NEXT_PUBLIC_ environment variables are not available
  */
-async function uploadImageToCloudinary(
+async function uploadImageToCloudinarySigned(
   file: File,
   category: string,
   vehicleId: string
 ): Promise<string> {
-  // Validate configuration first
-  const configValidation = validateCloudinaryConfig();
-  if (!configValidation.valid) {
-    throw new Error(`Configuration Error: ${configValidation.error}`);
-  }
-
-  // Build Cloudinary upload URL
-  const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-  
   // Get folder based on category
   const folder = getCloudinaryFolder(category);
   const publicId = `vehicle_${vehicleId}_${Date.now()}`;
   const tags = [category, "vms", "vehicle"];
 
-  // Create form data for Cloudinary UNSIGNED upload
-  // Only requires: file, upload_preset, folder, public_id, tags
+  // Get signature from server
+  const signatureData = await getCloudinarySignature(folder, publicId, tags);
+
+  // Build Cloudinary upload URL using cloud name from server response
+  const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloud_name || 'unknown'}/image/upload`;
+  
+  // Create form data for Cloudinary SIGNED upload
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-  formData.append("folder", folder);
-  formData.append("public_id", publicId);
-  formData.append("tags", tags.join(","));
+  formData.append("upload_preset", signatureData.upload_preset);
+  formData.append("folder", signatureData.folder);
+  formData.append("public_id", signatureData.public_id || publicId);
+  formData.append("api_key", signatureData.api_key);
+  formData.append("timestamp", String(signatureData.timestamp));
+  formData.append("signature", signatureData.signature);
+  
+  if (signatureData.tags) {
+    formData.append("tags", signatureData.tags);
+  }
 
   try {
     const response = await fetch(cloudinaryUrl, {
       method: "POST",
       body: formData,
-      // No credentials needed for unsigned uploads
     });
 
     if (!response.ok) {
@@ -164,7 +208,6 @@ async function uploadImageToCloudinary(
                           errorData.message || 
                           `Cloudinary upload failed: ${response.status}`;
       
-      // Create error with status code for retry logic
       const error = new Error(errorMessage);
       (error as Error & { statusCode?: number }).statusCode = response.status;
       throw error;
@@ -179,7 +222,80 @@ async function uploadImageToCloudinary(
     return result.secure_url;
     
   } catch (error) {
-    // Handle network errors specifically
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error(`Network error uploading to Cloudinary: ${error.message}. Please check your internet connection.`);
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Upload image file directly to Cloudinary from the browser using UNSIGNED upload
+ * Uses upload preset configured in Cloudinary dashboard (no signature needed)
+ * This bypasses Vercel entirely and prevents 502/504 errors
+ * 
+ * Falls back to SIGNED upload if NEXT_PUBLIC_ environment variables are not set
+ */
+async function uploadImageToCloudinary(
+  file: File,
+  category: string,
+  vehicleId: string
+): Promise<string> {
+  // Check if direct upload is available
+  const configValidation = validateCloudinaryConfig();
+  
+  // If no direct upload config, use signed upload via API
+  if (configValidation.useSignedUpload) {
+    return uploadImageToCloudinarySigned(file, category, vehicleId);
+  }
+
+  if (!configValidation.valid) {
+    throw new Error(`Configuration Error: ${configValidation.error}`);
+  }
+
+  // Build Cloudinary upload URL
+  const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+  
+  // Get folder based on category
+  const folder = getCloudinaryFolder(category);
+  const publicId = `vehicle_${vehicleId}_${Date.now()}`;
+  const tags = [category, "vms", "vehicle"];
+
+  // Create form data for Cloudinary UNSIGNED upload
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  formData.append("folder", folder);
+  formData.append("public_id", publicId);
+  formData.append("tags", tags.join(","));
+
+  try {
+    const response = await fetch(cloudinaryUrl, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || 
+                          errorData.message || 
+                          `Cloudinary upload failed: ${response.status}`;
+      
+      const error = new Error(errorMessage);
+      (error as Error & { statusCode?: number }).statusCode = response.status;
+      throw error;
+    }
+
+    const result = await response.json();
+    
+    if (!result.secure_url) {
+      throw new Error("Cloudinary response missing secure_url");
+    }
+
+    return result.secure_url;
+    
+  } catch (error) {
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error(`Network error uploading to Cloudinary: ${error.message}. Please check your internet connection.`);
     }
