@@ -25,11 +25,6 @@ interface HealthMetrics {
     vehicleCount: number;
     lastUpdated: string | null;
   };
-  googleSheets: {
-    status: "connected" | "disconnected" | "unknown";
-    lastSync: string | null;
-    error?: string;
-  };
   cloudinary: {
     status: "connected" | "disconnected" | "error";
     cloudName?: string;
@@ -133,31 +128,6 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
   const cachedVehicles = getCachedVehicles();
   const cacheStatus = cachedVehicles ? "hit" : "miss";
   
-  // Check Google Sheets connectivity
-  let sheetsStatus: "connected" | "disconnected" | "unknown" = "unknown";
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  
-  if (baseUrl) {
-    try {
-      const testUrl = new URL(baseUrl);
-      testUrl.searchParams.set("action", "getVehicles");
-      testUrl.searchParams.set("limit", "1");
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const res = await fetch(testUrl.toString(), {
-        method: "GET",
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      sheetsStatus = res.ok ? "connected" : "disconnected";
-    } catch {
-      sheetsStatus = "disconnected";
-    }
-  }
-  
   // Check Cloudinary connectivity
   let cloudinaryStatus: "connected" | "disconnected" | "error" = "disconnected";
   let cloudinaryMessage = "";
@@ -183,9 +153,9 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
   
   // Determine overall health
   let status: "healthy" | "degraded" | "unhealthy" = "healthy";
-  if (dbStatus === "error" && sheetsStatus === "disconnected") {
+  if (dbStatus === "error" && cloudinaryStatus === "error") {
     status = "unhealthy";
-  } else if (dbStatus === "error" || sheetsStatus === "disconnected" || cloudinaryStatus === "error") {
+  } else if (dbStatus === "error" || cloudinaryStatus === "error") {
     status = "degraded";
   }
   
@@ -213,11 +183,6 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
       vehicleCount: cachedVehicles?.length || 0,
       lastUpdated: LAST_SYNC_TIME,
     },
-    googleSheets: {
-      status: sheetsStatus,
-      lastSync: LAST_SYNC_TIME,
-      error: LAST_SYNC_ERROR || undefined,
-    },
     cloudinary: {
       status: cloudinaryStatus,
       cloudName: cloudinaryCloudName,
@@ -230,7 +195,6 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
     status, 
     dbStatus, 
     dbHost,
-    sheetsStatus,
     cloudinaryStatus,
     uptime 
   });

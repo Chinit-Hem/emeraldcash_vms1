@@ -38,7 +38,5 @@ jobs:
         CLOUDINARY_API_SECRET: dummy-secret
         NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: dummy-cloud
         NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: dummy-preset
-        APPS_SCRIPT_URL: https://dummy.example.com
-        APPS_SCRIPT_UPLOAD_TOKEN: dummy-token
         CRON_SECRET: dummy-cron-secret
       run: npm run build --if-present

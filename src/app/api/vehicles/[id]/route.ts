@@ -13,9 +13,6 @@ const deleteImage = async (publicId: string): Promise<{ success: boolean; error?
 };
 
 import { clearCachedVehicles, getCachedVehicles } from "../_cache";
-import {
-  appsScriptUrl,
-} from "../_shared";
 
 
 
@@ -80,15 +77,6 @@ export async function GET(
       if (cached) {
         return NextResponse.json({ ok: true, data: cached });
       }
-    }
-
-    // If not found in database or cache, check if we have Apps Script fallback
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!baseUrl) {
-      return NextResponse.json(
-        { ok: false, error: "Vehicle not found and Apps Script fallback not configured" },
-        { status: 404 }
-      );
     }
 
     // If not found in database or cache, return 404

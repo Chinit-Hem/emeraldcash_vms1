@@ -1,54 +1,10 @@
-import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
-
-/** Fetch with timeout to avoid ETIMEDOUT when calling Apps Script (e.g. large image upload). */
-export async function fetchAppsScript(
-  url: string,
-  options: RequestInit & { timeoutMs?: number } = {}
-): Promise<Response> {
-  const { timeoutMs = 30000, ...fetchOptions } = options;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      ...fetchOptions,
-      signal: controller.signal,
-    });
-    return res;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-const DEFAULT_DRIVE_FOLDER_CARS = "1UKgtZ_sSNSVy3p-8WBwBrploVL9IDxec";
-const DEFAULT_DRIVE_FOLDER_MOTORCYCLES = "10OcxTtK6ZqQj5cvPMNNIP4VsaVneGiYP";
-const DEFAULT_DRIVE_FOLDER_TUKTUK = "18oDOlZXE9JGE5EDZ7yL6oBRVG6SgVYdP";
 
 function toStringValue(value: unknown): string {
   if (typeof value === "string") return value;
   if (value == null) return "";
   return String(value);
-}
-
-export function driveFolderIdForCategory(category: unknown): string | null {
-  const raw = toStringValue(category).trim();
-  const normalized = raw.toLowerCase();
-  if (!normalized) return null;
-
-  if (normalized === "car" || normalized === "cars") {
-    return process.env.DRIVE_FOLDER_CARS?.trim() || DEFAULT_DRIVE_FOLDER_CARS;
-  }
-
-  if (normalized === "motorcycle" || normalized === "motorcycles") {
-    return process.env.DRIVE_FOLDER_MOTORCYCLES?.trim() || DEFAULT_DRIVE_FOLDER_MOTORCYCLES;
-  }
-
-  if (normalized === "tuktuk" || normalized === "tuk tuk" || normalized === "tuk-tuk") {
-    return process.env.DRIVE_FOLDER_TUKTUK?.trim() || DEFAULT_DRIVE_FOLDER_TUKTUK;
-  }
-
-  return null;
 }
 
 export function parseImageDataUrl(
@@ -67,8 +23,6 @@ export function parseImageDataUrl(
 
   return { mimeType, base64Data };
 }
-
-export { driveThumbnailUrl, extractDriveFileId };
 
 function toNumberOrNull(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -127,12 +81,6 @@ function normalizeCategoryToSheet(value: unknown): string {
   if (normalized === "tuktuk" || normalized === "tuk tuk" || normalized === "tuk-tuk") return "Tuk Tuk";
 
   return raw;
-}
-
-export function appsScriptUrl(baseUrl: string, action: string): string {
-  const url = new URL(baseUrl);
-  url.searchParams.set("action", action);
-  return url.toString();
 }
 
 export function toVehicle(row: Record<string, unknown>): Vehicle {
@@ -198,61 +146,3 @@ export function toVehicle(row: Record<string, unknown>): Vehicle {
   };
 }
 
-export function toAppsScriptPayload(
-  input: Record<string, unknown>,
-  options?: { vehicleId?: string }
-): Record<string, unknown> {
-  const vehicleId = options?.vehicleId ?? toStringValue(pick(input, ["VehicleId", "VehicleID", "Id", "id"]));
-
-  const categoryRaw = pick(input, ["Category"]);
-  const categorySheet = normalizeCategoryToSheet(categoryRaw);
-
-  const year = toNumberOrNull(pick(input, ["Year"]));
-  const priceNew = toNumberOrNull(pick(input, ["PriceNew", "Market Price", "Price New", "Price (New)"]));
-  const derived = derivePrices(priceNew);
-  const price40 =
-    toNumberOrNull(pick(input, ["Price40", "D.O.C.40%", "D.O.C.1 40%", "Price 40%", "Price 40", "Price40%"])) ??
-    derived.Price40;
-  const price70 =
-    toNumberOrNull(pick(input, ["Price70", "Vehicles70%", "Vehicle 70%", "Vihicle 70%", "Price 70%", "Price 70", "Price70%"])) ??
-    derived.Price70;
-
-  const taxType = toStringValue(pick(input, ["TaxType", "Tax Type"]));
-  const bodyType = toStringValue(pick(input, ["BodyType", "Body Type"]));
-
-  const payload: Record<string, unknown> = {
-    VehicleId: vehicleId,
-    id: vehicleId,
-    VehicleID: vehicleId,
-    Category: categorySheet,
-    Brand: toStringValue(pick(input, ["Brand"])),
-    Model: toStringValue(pick(input, ["Model"])),
-    Year: year ?? "",
-    Plate: toStringValue(pick(input, ["Plate", "PlateNumber", "Plate Number"])),
-    Condition: toStringValue(pick(input, ["Condition"])),
-    Color: toStringValue(pick(input, ["Color"])),
-    Image: toStringValue(pick(input, ["Image", "ImageURL", "Image URL"])),
-    Time: toStringValue(pick(input, ["Time"])),
-
-    // Compatibility keys (camelCase)
-    PriceNew: priceNew ?? "",
-    Price40: price40 ?? "",
-    Price70: price70 ?? "",
-    TaxType: taxType,
-    BodyType: bodyType,
-  };
-
-  // Compatibility keys (Google Sheet headers with spaces)
-  payload["Price New"] = priceNew ?? "";
-  payload["Market Price"] = priceNew ?? "";
-  payload["Price 40%"] = price40 ?? "";
-  payload["D.O.C.1 40%"] = price40 ?? "";
-  payload["D.O.C.40%"] = price40 ?? "";
-  payload["Price 70%"] = price70 ?? "";
-  payload["Vehicle 70%"] = price70 ?? "";
-  payload["Vehicles70%"] = price70 ?? "";
-  payload["Tax Type"] = taxType;
-  payload["Body Type"] = bodyType;
-
-  return payload;
-}
