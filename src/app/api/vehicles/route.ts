@@ -405,7 +405,7 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     model: vehicleData.model as string,
     year: year,
     plate: vehicleData.plate as string,
-    market_price: marketPrice,
+    market_price: marketPrice ?? 0,
     tax_type: (vehicleData.tax_type as string) || (vehicleData.taxType as string) || null,
     condition: (vehicleData.condition as "New" | "Used" | "Other") || "Other",
     body_type: (vehicleData.body_type as string) || (vehicleData.bodyType as string) || null,
