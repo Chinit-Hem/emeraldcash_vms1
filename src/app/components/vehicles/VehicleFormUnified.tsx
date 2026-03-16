@@ -173,6 +173,9 @@ const ImageSection: React.FC<{
 }) => {
   const isCompact = layout === "compact";
   
+  // Ensure Image is a string - handle cases where it might be an array or other type
+  const imageValue = typeof formData.Image === 'string' ? formData.Image : '';
+  
   // Convert uploadedImage to File for ImageInput compatibility
   const handleImageChange = async (value: string | null) => {
     if (!value) {
@@ -194,7 +197,7 @@ const ImageSection: React.FC<{
   return (
     <SectionCard title="Vehicle Image" icon={ICONS.image} className={isCompact ? "p-3" : undefined}>
       <ImageInput
-        value={formData.Image || null}
+        value={imageValue || null}
         onChange={handleImageChange}
         label={isCompact ? undefined : "Vehicle Image"}
         helperText={isCompact ? undefined : "Drag & drop, click to upload, paste URL, or Ctrl+V"}

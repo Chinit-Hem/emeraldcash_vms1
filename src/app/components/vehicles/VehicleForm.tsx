@@ -468,7 +468,7 @@ export function VehicleForm({
       {/* Image Section - Full Featured with ImageInput */}
       <SectionCard title="Vehicle Image" icon={icons.image}>
         <ImageInput
-          value={formData.Image?.trim() || null}
+          value={typeof formData.Image === 'string' ? formData.Image.trim() || null : null}
           onChange={async (value) => {
             if (!value) {
               handleRemoveImage();
