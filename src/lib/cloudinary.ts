@@ -218,6 +218,9 @@ export async function uploadImage(
       let compressedSize = 0;
       let wasCompressed = false;
 
+      // Get Cloudinary instance
+      const cloudinary = await getCloudinary();
+
       // Handle File/Blob objects directly (preferred method)
       if (imageData instanceof File || imageData instanceof Blob) {
         // Check file size before uploading
@@ -487,6 +490,7 @@ export async function deleteImage(publicId: string): Promise<{
   }
 
   try {
+    const cloudinary = await getCloudinary();
     const result = await cloudinary.uploader.destroy(publicId);
     
     if (result.result === "ok") {
@@ -508,7 +512,7 @@ export async function deleteImage(publicId: string): Promise<{
 
 
 // Get optimized image URL
-export function getOptimizedImageUrl(
+export async function getOptimizedImageUrl(
   publicId: string,
   options: {
     width?: number;
@@ -517,7 +521,7 @@ export function getOptimizedImageUrl(
     quality?: number;
     format?: string;
   } = {}
-): string {
+): Promise<string> {
   if (!isCloudinaryConfigured) {
     return "";
   }
@@ -538,6 +542,7 @@ export function getOptimizedImageUrl(
   if (options.quality) transformation.quality = options.quality;
   if (options.format) transformation.fetch_format = options.format;
 
+  const cloudinary = await getCloudinary();
   return cloudinary.url(publicId, {
     transformation: Object.keys(transformation).length > 0 ? transformation : undefined,
     secure: true,
@@ -559,6 +564,7 @@ export async function testCloudinaryConnection(): Promise<{
   }
 
   try {
+    const cloudinary = await getCloudinary();
     const result = await cloudinary.api.ping();
     return {
       success: true,
@@ -653,7 +659,7 @@ export function isCloudinaryPublicId(value: string): boolean {
  * Convert a Cloudinary public_id to a full Cloudinary URL
  * Uses the configured cloud name from environment variables
  */
-export function getCloudinaryUrlFromPublicId(
+export async function getCloudinaryUrlFromPublicId(
   publicId: string | null | undefined, 
   options: {
     width?: number;
@@ -662,7 +668,7 @@ export function getCloudinaryUrlFromPublicId(
     quality?: number;
     format?: string;
   } = {}
-): string {
+): Promise<string> {
   // Defensive check: if publicId is null, undefined, or empty string, return placeholder
   if (!publicId || typeof publicId !== "string" || publicId.trim() === "") {
     return DEFAULT_PLACEHOLDER_URL;
@@ -698,6 +704,7 @@ export function getCloudinaryUrlFromPublicId(
   if (options.quality) transformation.quality = options.quality;
   if (options.format) transformation.fetch_format = options.format;
 
+  const cloudinary = await getCloudinary();
   return cloudinary.url(publicId, {
     transformation: Object.keys(transformation).length > 0 ? transformation : undefined,
     secure: true,
@@ -735,7 +742,7 @@ function getGoogleDriveThumbnailUrl(fileId: string, size = "w400-h400"): string 
  * - If it's a Google Drive ID, convert to thumbnail URL
  * - If it's empty/invalid, return empty string
  */
-export function normalizeImageUrl(imageId: string | null | undefined): string {
+export async function normalizeImageUrl(imageId: string | null | undefined): Promise<string> {
   if (!imageId || typeof imageId !== "string") {
     return "";
   }
@@ -754,7 +761,7 @@ export function normalizeImageUrl(imageId: string | null | undefined): string {
 
   // If it's a Cloudinary public_id, convert to URL
   if (isCloudinaryPublicId(trimmed)) {
-    return getCloudinaryUrlFromPublicId(trimmed);
+    return await getCloudinaryUrlFromPublicId(trimmed);
   }
 
   // If it looks like a Google Drive ID, convert to thumbnail URL
