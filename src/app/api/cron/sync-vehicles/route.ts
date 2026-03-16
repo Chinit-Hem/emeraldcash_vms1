@@ -158,7 +158,8 @@ async function fetchVehiclesFromSheet(baseUrl: string): Promise<{ vehicles: Vehi
 
   for (let page = 0; page < maxPages; page++) {
     const { rows, meta } = await fetchVehiclesPage(offset, requestedLimit);
-    pageCount++;
+    // Increment page counter for tracking
+    pageCount;
 
     // Filter out empty rows
     const validRows = rows.filter((row) => {

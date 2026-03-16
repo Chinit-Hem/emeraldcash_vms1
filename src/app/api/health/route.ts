@@ -56,7 +56,7 @@ function updateSyncStatus(success: boolean, error?: string) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { success, error } = body;
+      const { success, error: syncError } = body;
     
     if (typeof success !== 'boolean') {
       return NextResponse.json(
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    updateSyncStatus(success, error);
+    updateSyncStatus(success, syncError);
     
     return NextResponse.json({
       success: true,

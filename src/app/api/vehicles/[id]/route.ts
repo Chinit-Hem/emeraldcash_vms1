@@ -45,60 +45,6 @@ function toIntOrNull(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function fetchAllVehicleRows(baseUrl: string, cache: RequestCache): Promise<Record<string, unknown>[]> {
-  const requestedLimit = 500;
-  const maxPages = 50; // 50 * 500 = 25k rows safety cap
-
-  let offset = 0;
-  let total: number | null = null;
-  let lastMetaOffset: number | null = null;
-  const allRows: Record<string, unknown>[] = [];
-
-  for (let page = 0; page < maxPages; page++) {
-    const url = new URL(appsScriptUrl(baseUrl, "getVehicles"));
-    url.searchParams.set("limit", String(requestedLimit));
-    url.searchParams.set("offset", String(offset));
-
-    const res = await fetch(url.toString(), { cache });
-    if (!res.ok) throw new Error(`Failed to fetch vehicles: ${res.status}`);
-
-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (json.ok === false) {
-      const message = typeof json.error === "string" && json.error.trim() ? json.error.trim() : "Apps Script ok=false";
-      throw new Error(message);
-    }
-
-    const rows = (Array.isArray(json.data) ? (json.data as unknown[]) : [])
-      .filter((row) => row && typeof row === "object") as Record<string, unknown>[];
-    allRows.push(...rows);
-
-    const metaRaw = json.meta && typeof json.meta === "object" ? (json.meta as Record<string, unknown>) : null;
-    if (!metaRaw) break;
-
-    const meta = {
-      total: toIntOrNull(metaRaw.total),
-      limit: toIntOrNull(metaRaw.limit),
-      offset: toIntOrNull(metaRaw.offset),
-    };
-
-    if (meta.total != null && meta.total >= 0) total ??= meta.total;
-    const effectiveLimit = meta.limit && meta.limit > 0 ? meta.limit : requestedLimit;
-    const effectiveOffset = meta.offset != null && meta.offset >= 0 ? meta.offset : offset;
-
-    if (lastMetaOffset != null && effectiveOffset === lastMetaOffset) break;
-    lastMetaOffset = effectiveOffset;
-
-    if (rows.length === 0) break;
-    if (rows.length < effectiveLimit) break;
-    if (total != null && allRows.length >= total) break;
-
-    offset = effectiveOffset + effectiveLimit;
-    if (total != null && offset >= total) break;
-  }
-
-  return allRows;
-}
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
