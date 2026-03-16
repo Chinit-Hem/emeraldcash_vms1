@@ -8,7 +8,11 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { getVehicleById, updateVehicle, deleteVehicle, toVehicle as dbToVehicle } from "@/lib/db-schema";
-import { deleteImage } from "@/lib/cloudinary";
+// MEMORY OPTIMIZATION: Lazy import deleteImage to avoid loading Cloudinary SDK unnecessarily
+const deleteImage = async (publicId: string): Promise<{ success: boolean; error?: string }> => {
+  const { deleteImage: cloudinaryDelete } = await import("@/lib/cloudinary");
+  return cloudinaryDelete(publicId);
+};
 
 import { clearCachedVehicles, getCachedVehicles } from "../_cache";
 import {

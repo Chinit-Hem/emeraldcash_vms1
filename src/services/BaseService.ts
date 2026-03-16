@@ -128,6 +128,12 @@ export abstract class BaseService<TEntity extends BaseEntity, TDB extends BaseDB
   // Long cache TTL for reference data (5 minutes)
   protected readonly LONG_CACHE_TTL_MS = 300000;
   
+  // MEMORY OPTIMIZATION: Maximum cache entries to prevent unbounded growth
+  private readonly MAX_CACHE_ENTRIES = 50;
+  
+  // MEMORY OPTIMIZATION: Reduced from 100 to 10 to save memory
+  private readonly MAX_QUERY_HISTORY = 10;
+  
   // Statistics tracking
   private stats: ServiceStats = {
     totalQueries: 0,
@@ -138,7 +144,6 @@ export abstract class BaseService<TEntity extends BaseEntity, TDB extends BaseDB
   
   // Query times for rolling average
   private queryTimes: number[] = [];
-  private readonly MAX_QUERY_HISTORY = 100;
 
   /**
    * Protected constructor - enforce singleton pattern via getInstance()
@@ -201,8 +206,18 @@ export abstract class BaseService<TEntity extends BaseEntity, TDB extends BaseDB
 
   /**
    * Set data in cache with TTL
+   * MEMORY OPTIMIZATION: Enforces maximum cache size to prevent unbounded growth
    */
   protected setCache<T>(key: string, data: T, ttlMs?: number): void {
+    // MEMORY OPTIMIZATION: Enforce cache size limit
+    if (this.cache.size >= this.MAX_CACHE_ENTRIES) {
+      // Remove oldest entry (first in Map)
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) {
+        this.cache.delete(firstKey);
+      }
+    }
+    
     const expiresAt = Date.now() + (ttlMs || this.DEFAULT_CACHE_TTL_MS);
     this.cache.set(key, { data, expiresAt });
   }

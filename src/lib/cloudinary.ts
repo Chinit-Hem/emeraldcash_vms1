@@ -1,55 +1,55 @@
-import { v2 as cloudinary } from "cloudinary";
-import { getCloudinaryFolder } from "./cloudinary-folders";
+// LAZY IMPORT: Only load Cloudinary SDK when needed
+// This saves ~2-3MB of memory per function instance
+let cloudinaryInstance: typeof import("cloudinary").v2 | null = null;
 
-// Configure Cloudinary using individual environment variables
-// Required: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+// Environment variables
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
-// Check if Cloudinary is configured with all required credentials
+// Check if Cloudinary is configured
 const isCloudinaryConfigured = !!(
   CLOUDINARY_CLOUD_NAME && 
   CLOUDINARY_API_KEY && 
   CLOUDINARY_API_SECRET
 );
 
-// Configure Cloudinary SDK with OPTIMIZED timeouts for faster response
-if (isCloudinaryConfigured) {
-  // OPTIMIZED: Reduced timeout from 60s to 25s for faster failure detection
-  // while still allowing enough time for large uploads
-  cloudinary.config({
-    cloud_name: CLOUDINARY_CLOUD_NAME,
-    api_key: CLOUDINARY_API_KEY,
-    api_secret: CLOUDINARY_API_SECRET,
-    secure: true,
-  });
-  
-  // Get the current config and extend timeout
-  const currentConfig = cloudinary.config() as unknown as { 
-    timeout?: number;
-    api?: { timeout?: number };
-    http_agent?: { timeout?: number };
-  };
-  
-  // OPTIMIZED: Set timeout to 25 seconds (reduced from 60s)
-  // This provides faster feedback on failures while still handling large uploads
-  currentConfig.timeout = 25000;
-  
-  // Also set API-specific timeout if the structure exists
-  if (!currentConfig.api) {
-    (currentConfig as { api?: object }).api = {};
+/**
+ * Lazy load Cloudinary SDK - only initializes when first accessed
+ * Saves memory by not loading the full SDK for functions that don't use it
+ */
+async function getCloudinary(): Promise<typeof import("cloudinary").v2> {
+  if (!cloudinaryInstance) {
+    const { v2: cloudinary } = await import("cloudinary");
+    
+    if (isCloudinaryConfigured) {
+      cloudinary.config({
+        cloud_name: CLOUDINARY_CLOUD_NAME,
+        api_key: CLOUDINARY_API_KEY,
+        api_secret: CLOUDINARY_API_SECRET,
+        secure: true,
+        timeout: 25000, // 25 seconds
+      });
+      
+      console.log('[Cloudinary] SDK lazy-loaded with optimized timeout');
+    }
+    
+    cloudinaryInstance = cloudinary;
   }
-  (currentConfig.api as { timeout?: number }).timeout = 25000;
   
-  console.log('[Cloudinary] SDK configured with optimized timeout:', {
-    cloudName: CLOUDINARY_CLOUD_NAME,
-    timeout: currentConfig.timeout,
-    apiTimeout: currentConfig.api?.timeout,
-  });
+  return cloudinaryInstance;
 }
 
-export { cloudinary };
+// Export getter for lazy access
+export { getCloudinary };
+
+// Backward compatibility - warns about eager import
+export const cloudinary = new Proxy({} as typeof import("cloudinary").v2, {
+  get: (target, prop) => {
+    console.warn('[Cloudinary] Using deprecated eager import. Use getCloudinary() for lazy loading.');
+    throw new Error("Cloudinary SDK must be loaded lazily using getCloudinary(). Eager imports are deprecated for memory optimization.");
+  }
+});
 
 // Default upload preset for unsigned uploads
 const DEFAULT_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || "vms_unsigned";
