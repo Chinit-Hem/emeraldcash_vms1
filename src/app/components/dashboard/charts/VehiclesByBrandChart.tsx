@@ -49,8 +49,12 @@ export default function VehiclesByBrandChart({ data }: VehiclesByBrandChartProps
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
-    if (!containerRef.current) return;
+    // Use setTimeout to avoid synchronous setState in effect
+    const timeoutId = setTimeout(() => setIsMounted(true), 0);
+    
+    if (!containerRef.current) {
+      return () => clearTimeout(timeoutId);
+    }
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -62,7 +66,10 @@ export default function VehiclesByBrandChart({ data }: VehiclesByBrandChartProps
     });
 
     resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
+    return () => {
+      clearTimeout(timeoutId);
+      resizeObserver.disconnect();
+    };
   }, []);
 
   if (data.length === 0) {

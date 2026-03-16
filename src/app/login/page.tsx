@@ -9,7 +9,9 @@ import { isIOSSafariBrowser } from "@/lib/platform";
 function useIsMounted() {
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
-    setIsMounted(true);
+    // Use setTimeout to avoid synchronous setState in effect
+    const timeoutId = setTimeout(() => setIsMounted(true), 0);
+    return () => clearTimeout(timeoutId);
   }, []);
   return isMounted;
 }

@@ -11,6 +11,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import type { Vehicle } from "@/lib/types";
 import { useMounted } from "@/lib/useHydrationSafe";
 import { CATEGORY_COLORS } from "@/lib/categoryColors";
@@ -298,7 +299,7 @@ export default function DashboardClient({
           icon={Icons.tuk}
           color="orange"
         />
-        <a href="/vehicles?noImage=1" className="block no-underline">
+        <Link href="/vehicles?noImage=1" className="block no-underline">
           <StatCard
             title="No Images"
             value={meta?.noImageCount.toLocaleString() || "0"}
@@ -306,7 +307,7 @@ export default function DashboardClient({
             icon={Icons.noImage}
             color="red"
           />
-        </a>
+        </Link>
       </div>
 
       {/* Charts Grid */}

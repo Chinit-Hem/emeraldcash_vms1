@@ -349,7 +349,9 @@ export default function VehiclesClient() {
   const [isIOSSafari, setIsIOSSafari] = useState(false);
 
   useEffect(() => {
-    setIsIOSSafari(isIOSSafariBrowser());
+    // Use setTimeout to avoid synchronous setState in effect
+    const timeoutId = setTimeout(() => setIsIOSSafari(isIOSSafariBrowser()), 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
 
@@ -458,7 +460,9 @@ export default function VehiclesClient() {
     if (optimisticUpdateInProgress.current) {
       return;
     }
-    setVehicles(fetchedVehicles);
+    // Use setTimeout to avoid synchronous setState in effect
+    const timeoutId = setTimeout(() => setVehicles(fetchedVehicles), 0);
+    return () => clearTimeout(timeoutId);
   }, [fetchedVehicles]);
 
   // Listen for cache updates from other components (e.g., after adding a vehicle)
@@ -481,7 +485,9 @@ export default function VehiclesClient() {
 
   useEffect(() => {
     if (!isIOSSafari) return;
-    setPageSize((prev) => (prev > 6 ? 6 : prev));
+    // Use setTimeout to avoid synchronous setState in effect
+    const timeoutId = setTimeout(() => setPageSize((prev) => (prev > 6 ? 6 : prev)), 0);
+    return () => clearTimeout(timeoutId);
   }, [isIOSSafari]);
 
   // Modal state
@@ -749,9 +755,10 @@ export default function VehiclesClient() {
     return filteredVehicles.slice(start, start + pageSize);
   }, [filteredVehicles, currentPage, pageSize]);
 
-  // Reset page when filters change - direct state update for better performance
+  // Reset page when filters change - use setTimeout to avoid synchronous setState in effect
   useEffect(() => {
-    setCurrentPage(1);
+    const timeoutId = setTimeout(() => setCurrentPage(1), 0);
+    return () => clearTimeout(timeoutId);
   }, [filters.search, filters.category, filters.brand, filters.condition, filters.color, filters.yearMin, filters.yearMax, filters.priceMin, filters.priceMax, filters.dateFrom, filters.dateTo, filters.withoutImage, pageSize]);
 
   // Initialize filters from URL query params (so dashboard links like
@@ -765,24 +772,27 @@ export default function VehiclesClient() {
     const nextCondition = conditionParam ? normalizeConditionLabel(conditionParam) : "All";
     const nextWithoutImage = noImageParam === "1";
 
-    // Direct state update for better performance
-    setFilters((prev) => {
-      // Avoid no-op state writes that can cause render loops on some mobile browsers.
-      if (
-        prev.category === nextCategory &&
-        prev.condition === nextCondition &&
-        prev.withoutImage === nextWithoutImage
-      ) {
-        return prev;
-      }
+    // Use setTimeout to avoid synchronous setState in effect
+    const timeoutId = setTimeout(() => {
+      setFilters((prev) => {
+        // Avoid no-op state writes that can cause render loops on some mobile browsers.
+        if (
+          prev.category === nextCategory &&
+          prev.condition === nextCondition &&
+          prev.withoutImage === nextWithoutImage
+        ) {
+          return prev;
+        }
 
-      return {
-        ...prev,
-        category: nextCategory,
-        condition: nextCondition,
-        withoutImage: nextWithoutImage,
-      };
-    });
+        return {
+          ...prev,
+          category: nextCategory,
+          condition: nextCondition,
+          withoutImage: nextWithoutImage,
+        };
+      });
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, [categoryParam, conditionParam, noImageParam]);
 
 
@@ -1005,7 +1015,7 @@ export default function VehiclesClient() {
 
     // Debug Log: See actual values being sent to Server
     console.log("[handleSaveVehicle] Payload to be sent:");
-    for (let pair of formData.entries()) {
+    for (const pair of formData.entries()) {
       console.log(pair[0], pair[1]);
     }
 
