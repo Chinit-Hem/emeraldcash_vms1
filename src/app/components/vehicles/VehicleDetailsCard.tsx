@@ -58,7 +58,8 @@ export function VehicleDetailsCard({
 
   // Helper to get proper image URL (handle Google Drive and Cloudinary URLs)
   const getImageUrl = (imageUrl: string | undefined): string | null => {
-    if (!imageUrl || !imageUrl.trim()) return null;
+    // Type guard: ensure imageUrl is a string before using string methods
+    if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.trim()) return null;
     
     // Check if it's a Cloudinary URL (guard against "undefined" string)
     if (imageUrl !== 'undefined' && imageUrl !== 'null' && imageUrl.includes('res.cloudinary.com')) {
