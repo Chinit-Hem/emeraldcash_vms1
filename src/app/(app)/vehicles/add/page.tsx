@@ -68,7 +68,7 @@ export default function AddVehiclePage() {
       // Navigate immediately - don't wait for background processing
       router.push("/vehicles");
       
-    } catch (err) {
+    } catch (_err) {
       // Error is handled by onError callback in the hook
       setIsNavigating(false);
     }

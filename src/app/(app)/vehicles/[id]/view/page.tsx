@@ -87,6 +87,7 @@ function ViewVehicleInner() {
   })();
 
   // Load vehicle data (client-side only)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!id || !isMounted) return;
 
@@ -174,7 +175,22 @@ function ViewVehicleInner() {
         }
       } catch (err) {
         if (!alive) return;
-        if (!vehicle) {
+        // Only show error if we don't have vehicle data yet
+        const currentVehicle = (() => {
+          try {
+            const cached = localStorage.getItem("vms-vehicles");
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed)) {
+                return parsed.find((v: Vehicle) => v.VehicleId === id);
+              }
+            }
+          } catch {
+            // Ignore
+          }
+          return null;
+        })();
+        if (!currentVehicle) {
           setError(err instanceof Error ? err.message : "Error loading vehicle");
         }
       } finally {
@@ -196,6 +212,7 @@ function ViewVehicleInner() {
   }, [shouldAutoPrint, vehicle]);
 
   // Listen for cache updates to refresh vehicle data when it changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     return onVehicleCacheUpdate((vehicles) => {
       const updatedVehicle = vehicles.find((v) => v.VehicleId === id);

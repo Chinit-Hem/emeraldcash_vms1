@@ -1,8 +1,6 @@
 import {
   requireSession,
 } from "@/lib/auth";
-import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
-import { extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -17,11 +15,6 @@ const deleteImage = async (publicId: string): Promise<{ success: boolean; error?
 import { clearCachedVehicles, getCachedVehicles } from "../_cache";
 import {
   appsScriptUrl,
-  driveFolderIdForCategory,
-  driveThumbnailUrl,
-  fetchAppsScript,
-  toAppsScriptPayload,
-  toVehicle as sharedToVehicle,
 } from "../_shared";
 
 

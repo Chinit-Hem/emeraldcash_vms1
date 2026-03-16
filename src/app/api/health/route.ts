@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withErrorHandling, createSuccessResponse, createErrorResponse } from "@/lib/api-error-wrapper";
-import { isDatabaseHealthy, getConnectionStats, testConnection } from "@/lib/db-singleton";
+import { withErrorHandling, createSuccessResponse } from "@/lib/api-error-wrapper";
+import { getConnectionStats, testConnection } from "@/lib/db-singleton";
 import { getCachedVehicles } from "../vehicles/_cache";
 import { testCloudinaryConnection } from "@/lib/cloudinary";
 

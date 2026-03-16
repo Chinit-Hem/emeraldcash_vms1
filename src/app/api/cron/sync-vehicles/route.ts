@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setCachedVehicles, clearCachedVehicles } from "../../vehicles/_cache";
+import { setCachedVehicles } from "../../vehicles/_cache";
 import type { Vehicle, VehicleMeta } from "@/lib/types";
-
-const TEN_MINUTES_SECONDS = 60 * 10;
 
 // Logging utility
 function log(level: "info" | "warn" | "error", message: string, meta?: Record<string, unknown>) {
