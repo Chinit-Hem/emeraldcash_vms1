@@ -142,21 +142,34 @@ export function VehicleForm({
 
   // Use a ref to track the previous vehicle
   const prevVehicleRef = useRef(vehicle);
+  // Use a ref to schedule state updates outside of render cycle
+  const pendingUpdateRef = useRef<Partial<Vehicle> | null>(null);
   
   // Update form when vehicle changes (using ref comparison to avoid setState in effect)
   useEffect(() => {
     // Only update if vehicle reference actually changed (different object)
     if (prevVehicleRef.current !== vehicle) {
       prevVehicleRef.current = vehicle;
-      // Schedule state updates in a microtask to avoid synchronous setState during render
-      Promise.resolve().then(() => {
-        setFormData(vehicle);
+      // Store the update in a ref to be processed outside the effect
+      pendingUpdateRef.current = vehicle;
+    }
+  }, [vehicle]);
+
+  // Process pending updates in a separate effect with timeout
+  useEffect(() => {
+    if (pendingUpdateRef.current !== null) {
+      const update = pendingUpdateRef.current;
+      pendingUpdateRef.current = null;
+      // Use setTimeout to defer state update outside of render cycle
+      const timeoutId = setTimeout(() => {
+        setFormData(update);
         setUploadedImage(null);
         setErrors({});
         setTouched({});
         // Clear compressed preview when vehicle changes
         setCompressedPreview(null);
-      });
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
   }, [vehicle]);
 
