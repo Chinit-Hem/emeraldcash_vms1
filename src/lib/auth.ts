@@ -99,7 +99,6 @@ export function parseSessionCookie(
         console.log("[AUTH] Fingerprint mismatch (allowed):", {
           stored: payload.fingerprint?.substring(0, 16),
           current: currentFingerprint?.substring(0, 16),
-          ua: userAgent?.substring(0, 30),
         });
       }
       // Continue to return the payload - session is valid if signature and expiration are good
