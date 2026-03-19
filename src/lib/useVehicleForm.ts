@@ -119,6 +119,7 @@ export function useVehicleForm(options: UseVehicleFormOptions): UseVehicleFormRe
       initialVehicleRef.current = initialVehicle;
       submitAttemptedRef.current = false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialVehicle]);
   
   // Compute derived prices
