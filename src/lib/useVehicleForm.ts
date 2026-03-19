@@ -445,3 +445,6 @@ export function useVehicleForm(options: UseVehicleFormOptions): UseVehicleFormRe
 // ============================================================================
 
 export { CATEGORY_OPTIONS, REQUIRED_FIELDS };
+
+// Re-export Vehicle type for convenience
+export type { Vehicle } from "@/lib/types";
